@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-3-docs-session\\without_skill\\outputs\\HANDOFF.md with 87 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Summary section (lines 6-7) states: 'This session focused on API documentation maintenance. Core work completed: API reference for `/users/:id` endpoint with GET/POST examples. Secondary work: identified and partially resolved outdated examples in existing docs.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## Context & Decisions section (lines 50-59) explains what was working and blockers. Document shows prioritization decision (completed `/users/:id`, partially resolved outdated examples). Explains decision to prioritize GET/POST examples."
+    },
+    {
+      "text": "has_mistakes_and_lessons",
+      "passed": false,
+      "evidence": "No dedicated 'Mistakes & Lessons' section. Document covers 'Blockers/Notes' (lines 57-59) which mentions context depletion but does not address specific mistakes made during the session or lessons learned."
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "## Outstanding Work (Priority Order) section (lines 28-47) lists 3 unfinished tasks: 1. Update `/settings` Examples (Quick, 5-10 min, no dependencies), 2. Add Table of Contents (Medium, 10-15 min), 3. Review Pass (Optional)."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## Next Steps (For Next Session) section (lines 62-67) provides 4 action items. ## Files/Paths section (lines 69-75) lists file locations. ## Notes for Next Session (lines 77-82) provides context. However, instructions are less detailed than with_skill version."
+    },
+    {
+      "text": "clear_priorities",
+      "passed": true,
+      "evidence": "## Outstanding Work (Priority Order) section (lines 28-47) clearly marks priorities: Item 1 labeled '(Quick)', Item 2 labeled '(Medium)', Item 3 labeled '(Optional)'. Each subsection shows estimated time and dependency information."
+    },
+    {
+      "text": "context_aware",
+      "passed": true,
+      "evidence": "## Context & Decisions section (lines 50-59) mentions 'Context depletion: Approaching token limit; handoff triggered proactively' (lines 56-57). Document header (line 1) shows duration 30 minutes and status 'In Progress.'"
+    }
+  ]
+}

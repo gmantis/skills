@@ -1,0 +1,125 @@
+{
+  "skill_name": "session-handoff",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just finished a learning session with my daughter. We did 3 math exercises on fractions, marked them and got 2 correct, 1 wrong. I taught her the wrong one (it was about adding unlike denominators). I also created a new knowledge page for this topic. Before I close this session, create a handoff document so I remember what we did and what to do next.",
+      "expected_output": "A session-handoff markdown file saved to .temp/ that captures: (1) summary of exercises completed and knowledge page created, (2) decision to create knowledge page, (3) mistake/lesson about the unlike denominators error, (4) any unfinished tasks, (5) next-step instructions",
+      "files": [],
+      "assertions": [
+        {
+          "name": "document_created",
+          "description": "A handoff document was created and saved"
+        },
+        {
+          "name": "has_summary",
+          "description": "Document contains a Summary section describing what was accomplished"
+        },
+        {
+          "name": "has_decisions",
+          "description": "Document lists Decisions Made (teaching immediately, knowledge page creation, etc.)"
+        },
+        {
+          "name": "has_mistakes_and_lessons",
+          "description": "Document captures Mistakes & Lessons from the session"
+        },
+        {
+          "name": "has_unfinished_tasks",
+          "description": "Document lists Unfinished Tasks in a clear, actionable format"
+        },
+        {
+          "name": "has_pickup_instructions",
+          "description": "Document contains Pickup Instructions with files to open and next steps"
+        },
+        {
+          "name": "mentions_learning_lab_context",
+          "description": "Document acknowledges this is a learning-lab session (mentions Kejia, knowledge pages, mastery, etc.)"
+        },
+        {
+          "name": "actionable",
+          "description": "Instructions are specific enough to pick up work immediately (file paths, exact commands, section references)"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I've been refactoring a React component for 2 hours. I split a 400-line LoginForm into LoginForm, LoginInput, and LoginButton components. I ran the test suite and 3 tests failed (related to form submission). I fixed 2 of them but the third one (async state management in LoginButton) is still broken and I'm not sure why. I need to switch to another project now. Can you create a handoff document so I can pick this up later?",
+      "expected_output": "A session-handoff markdown file that includes: (1) summary of refactoring work, (2) decision to split into 3 components (and why), (3) mistakes/lessons about the async state management bug, (4) unfinished task (fix LoginButton async test), (5) pickup instructions with file paths and the specific test that's failing",
+      "files": [],
+      "assertions": [
+        {
+          "name": "document_created",
+          "description": "A handoff document was created and saved"
+        },
+        {
+          "name": "has_summary",
+          "description": "Document contains a Summary section describing the refactoring work"
+        },
+        {
+          "name": "has_decisions",
+          "description": "Document explains why the 400-line component was split into 3 components"
+        },
+        {
+          "name": "has_test_failures",
+          "description": "Document clearly identifies which tests failed and which were fixed (2 fixed, 1 broken)"
+        },
+        {
+          "name": "has_debugging_guidance",
+          "description": "Document provides debugging strategy or root cause candidates for the async bug"
+        },
+        {
+          "name": "has_unfinished_tasks",
+          "description": "Document lists unfinished work (async state bug) as a clear next task"
+        },
+        {
+          "name": "has_pickup_instructions",
+          "description": "Document contains Pickup Instructions with file locations and test commands"
+        },
+        {
+          "name": "actionable_debugging",
+          "description": "Enough detail to resume debugging immediately (test file, failure symptom, next debugging step)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Quick session check-in: I've been working on documentation for 30 minutes. I wrote an API reference for the `/users/:id` endpoint, added examples for GET and POST. I reviewed the existing docs and found 3 places where examples were outdated (`/products`, `/orders`, `/settings`). I updated products and orders but didn't have time for settings. I also realized the docs need a table of contents (not added yet). I'm getting close to running out of context. Give me a handoff doc.",
+      "expected_output": "A session-handoff markdown file with: (1) summary of documentation work, (2) decisions made (e.g., format chosen for examples), (3) lessons from finding outdated examples, (4) unfinished tasks (fix /settings docs, add TOC), (5) next steps and file locations",
+      "files": [],
+      "assertions": [
+        {
+          "name": "document_created",
+          "description": "A handoff document was created and saved"
+        },
+        {
+          "name": "has_summary",
+          "description": "Document summarizes the API documentation work (users endpoint + reviews)"
+        },
+        {
+          "name": "has_decisions",
+          "description": "Document explains prioritization decisions (fixed examples before adding TOC)"
+        },
+        {
+          "name": "has_mistakes_and_lessons",
+          "description": "Document captures lessons (underestimated review time, should audit first)"
+        },
+        {
+          "name": "has_unfinished_tasks",
+          "description": "Document lists unfinished work: /settings examples, table of contents, testing"
+        },
+        {
+          "name": "has_pickup_instructions",
+          "description": "Document includes file paths and next steps with priorities"
+        },
+        {
+          "name": "clear_priorities",
+          "description": "Tasks are marked with priority levels (HIGH, MEDIUM, etc.)"
+        },
+        {
+          "name": "context_aware",
+          "description": "Document mentions context limit as the reason for stopping (awareness of constraints)"
+        }
+      ]
+    }
+  ]
+}

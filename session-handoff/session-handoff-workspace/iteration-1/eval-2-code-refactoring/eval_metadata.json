@@ -1,0 +1,39 @@
+{
+  "eval_id": 2,
+  "eval_name": "code-refactoring-session",
+  "prompt": "I've been refactoring a React component for 2 hours. I split a 400-line LoginForm into LoginForm, LoginInput, and LoginButton components. I ran the test suite and 3 tests failed (related to form submission). I fixed 2 of them but the third one (async state management in LoginButton) is still broken and I'm not sure why. I need to switch to another project now. Can you create a handoff document so I can pick this up later?",
+  "assertions": [
+  {
+    "name": "document_created",
+    "description": "A handoff document was created and saved"
+  },
+  {
+    "name": "has_summary",
+    "description": "Document contains a Summary section describing the refactoring work"
+  },
+  {
+    "name": "has_decisions",
+    "description": "Document explains why the 400-line component was split into 3 components"
+  },
+  {
+    "name": "has_test_failures",
+    "description": "Document clearly identifies which tests failed and which were fixed (2 fixed, 1 broken)"
+  },
+  {
+    "name": "has_debugging_guidance",
+    "description": "Document provides debugging strategy or root cause candidates for the async bug"
+  },
+  {
+    "name": "has_unfinished_tasks",
+    "description": "Document lists unfinished work (async state bug) as a clear next task"
+  },
+  {
+    "name": "has_pickup_instructions",
+    "description": "Document contains Pickup Instructions with file locations and test commands"
+  },
+  {
+    "name": "actionable_debugging",
+    "description": "Enough detail to resume debugging immediately (test file, failure symptom, next debugging step)"
+  }
+]
+}

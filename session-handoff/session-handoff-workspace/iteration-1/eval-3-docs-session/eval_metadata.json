@@ -1,0 +1,39 @@
+{
+  "eval_id": 3,
+  "eval_name": "documentation-session",
+  "prompt": "Quick session check-in: I've been working on documentation for 30 minutes. I wrote an API reference for the `/users/:id` endpoint, added examples for GET and POST. I reviewed the existing docs and found 3 places where examples were outdated (`/products`, `/orders`, `/settings`). I updated products and orders but didn't have time for settings. I also realized the docs need a table of contents (not added yet). I'm getting close to running out of context. Give me a handoff doc.",
+  "assertions": [
+  {
+    "name": "document_created",
+    "description": "A handoff document was created and saved"
+  },
+  {
+    "name": "has_summary",
+    "description": "Document summarizes the API documentation work (users endpoint + reviews)"
+  },
+  {
+    "name": "has_decisions",
+    "description": "Document explains prioritization decisions (fixed examples before adding TOC)"
+  },
+  {
+    "name": "has_mistakes_and_lessons",
+    "description": "Document captures lessons (underestimated review time, should audit first)"
+  },
+  {
+    "name": "has_unfinished_tasks",
+    "description": "Document lists unfinished work: /settings examples, table of contents, testing"
+  },
+  {
+    "name": "has_pickup_instructions",
+    "description": "Document includes file paths and next steps with priorities"
+  },
+  {
+    "name": "clear_priorities",
+    "description": "Tasks are marked with priority levels (HIGH, MEDIUM, etc.)"
+  },
+  {
+    "name": "context_aware",
+    "description": "Document mentions context limit as the reason for stopping (awareness of constraints)"
+  }
+]
+}

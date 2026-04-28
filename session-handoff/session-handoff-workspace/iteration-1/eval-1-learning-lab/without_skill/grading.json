@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-1-learning-lab\\without_skill\\outputs\\SESSION_HANDOFF.md with 158 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Session Summary section (lines 10-17) describes: '3 exercises attempted on the topic, 2 correct (67% accuracy), 1 incorrect — immediate teaching applied, New knowledge page created.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## What Happened Today section (lines 20-51) and ## Next Steps section describe decisions: taught wrong answer immediately with step-by-step procedure, highlighted error pattern, used metaphor/analogy. Kept in 'learning' state."
+    },
+    {
+      "text": "has_mistakes_and_lessons",
+      "passed": false,
+      "evidence": "No dedicated 'Mistakes & Lessons' section. Document has 'Questions to Ask Yourself (Reflection)' section (lines 137-143) which addresses learning but does not explicitly cover mistakes made during this session or lessons learned."
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "## Next Steps for Next Session section (lines 55-106) lists unfinished work: Schedule Redo, Check the Knowledge Page, Log Entry, Metrics to Update (all clearly marked and described)."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## Next Steps for Next Session contains clear pickup instructions: Schedule Redo (lines 59-66), Check the Knowledge Page (lines 68-73), Log Entry (lines 75-83), Metrics to Update (lines 85-95)."
+    },
+    {
+      "text": "mentions_learning_lab_context",
+      "passed": true,
+      "evidence": "Document mentions: Kejia (lines 6, 32, 115, 120), knowledge pages (lines 41-50, 63-72), topic slug format (lines 91, 149), learning system and metrics (lines 76-84), Anki cards (lines 97-105)."
+    },
+    {
+      "text": "actionable",
+      "passed": true,
+      "evidence": "Specific file paths: knowledge/maths/fractions-adding-unlike-denominators.md, wrong-questions/maths/fractions-adding-unlike-denominators.md, log.md, report.md, index.md. Concrete next steps with dates and formats (e.g., entry format for log.md, metric names like total_questions_attempted)."
+    }
+  ]
+}

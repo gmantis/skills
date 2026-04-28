@@ -1,0 +1,39 @@
+{
+  "eval_id": 1,
+  "eval_name": "learning-lab-session",
+  "prompt": "I just finished a learning session with my daughter. We did 3 math exercises on fractions, marked them and got 2 correct, 1 wrong. I taught her the wrong one (it was about adding unlike denominators). I also created a new knowledge page for this topic. Before I close this session, create a handoff document so I remember what we did and what to do next.",
+  "assertions": [
+  {
+    "name": "document_created",
+    "description": "A handoff document was created and saved"
+  },
+  {
+    "name": "has_summary",
+    "description": "Document contains a Summary section describing what was accomplished"
+  },
+  {
+    "name": "has_decisions",
+    "description": "Document lists Decisions Made (teaching immediately, knowledge page creation, etc.)"
+  },
+  {
+    "name": "has_mistakes_and_lessons",
+    "description": "Document captures Mistakes & Lessons from the session"
+  },
+  {
+    "name": "has_unfinished_tasks",
+    "description": "Document lists Unfinished Tasks in a clear, actionable format"
+  },
+  {
+    "name": "has_pickup_instructions",
+    "description": "Document contains Pickup Instructions with files to open and next steps"
+  },
+  {
+    "name": "mentions_learning_lab_context",
+    "description": "Document acknowledges this is a learning-lab session (mentions Kejia, knowledge pages, mastery, etc.)"
+  },
+  {
+    "name": "actionable",
+    "description": "Instructions are specific enough to pick up work immediately (file paths, exact commands, section references)"
+  }
+]
+}

@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-2-code-refactoring\\without_skill\\outputs\\HANDOFF.md with 243 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Executive Summary section (lines 10-12) states: 'Successfully refactored a 400-line LoginForm component into three focused components... Test suite was run and 3 tests failed. 2 tests fixed. 1 test remains broken related to async state management in the LoginButton component.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## Work Completed section (lines 16-35) describes: 1. LoginForm Component (parent controller) with extracted state management, 2. LoginInput Component (form field wrapper) tests passing, 3. LoginButton Component with async handling. Explains the architectural decision of split components."
+    },
+    {
+      "text": "has_test_failures",
+      "passed": true,
+      "evidence": "Document explicitly identifies: 3 failed tests (line 2), 2 tests fixed (lines 37-46 with Test 1 & 2 marked PASSING), 1 remaining broken test (## Critical Issue - Test 3 (BLOCKING) at lines 50-102, with detailed root cause analysis and test code reference)."
+    },
+    {
+      "text": "has_debugging_guidance",
+      "passed": true,
+      "evidence": "## Debugging Strategy for Next Session section (lines 129-150) provides 4-step debugging strategy: Step 1 (Isolate), Step 2 (Check Async Handling), Step 3 (Check Component Integration), Step 4 (Common React Testing Pitfalls). Each step lists specific checks with bullet points."
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "Document addresses unfinished work: ## Critical Issue (lines 50-102) identifies root causes and blockers; ## Debugging Strategy (lines 129-150) lists next debugging steps; ## Session Recovery Checklist (lines 231-241) provides resumption checklist."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## File Locations section (lines 153-160) lists component and test paths. ## Next Steps on Resume section (lines 176-185) provides 6 specific resume actions. ## Test Execution Command section (lines 187-196) shows exact test commands to run. ## Environment & Setup section (lines 164-173) documents dependencies."
+    },
+    {
+      "text": "actionable_debugging",
+      "passed": true,
+      "evidence": "Specific file locations: src/components/LoginForm.jsx, LoginInput.jsx, LoginButton.jsx, src/__tests__/LoginForm.test.js. Detailed debugging steps with checklist items. Specific test command: 'npm test -- LoginForm.test.js -t \"should update loading state asynchronously\"'. Approximate code context provided for async pattern and suspected problem zones."
+    }
+  ]
+}

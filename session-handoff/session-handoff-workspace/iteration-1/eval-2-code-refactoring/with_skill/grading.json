@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-2-code-refactoring\\with_skill\\outputs\\.temp\\session-handoff-2026-04-24-143000.md with 108 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Summary section (lines 3-4) states: 'Spent 2 hours refactoring a 400-line LoginForm component into three smaller components... Executed the test suite; 3 test failures emerged... Successfully fixed 2 of the 3 failing tests; the third test failure...remains unresolved.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## Decisions Made section (lines 6-9) explains: 'Split strategy: Separated concerns by extracting input and button into isolated components rather than keeping a monolithic form.' Explains why 3 components: single-responsibility principle. Also explains decision to keep parent form logic in LoginForm and defer context API/Redux."
+    },
+    {
+      "text": "has_test_failures",
+      "passed": true,
+      "evidence": "Document identifies: 3 test failures emerged (line 3); successfully fixed 2 (line 3); third test failure remains unresolved (line 3). Section ## Unfinished Tasks (lines 16-29) explicitly lists 'Debug async state management in LoginButton' as BLOCKED with HIGH priority."
+    },
+    {
+      "text": "has_debugging_guidance",
+      "passed": true,
+      "evidence": "## Pickup Instructions section 4 (lines 54-75) provides debugging context & blockers: describes async pattern, identifies problem zone (between setIsLoading(true) and button showing spinner), provides quick fix checklist with specific items to verify."
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "## Unfinished Tasks section (lines 16-29) clearly lists 3 unfinished items: Debug async state management (HIGH priority, BLOCKED), Run full test suite again (medium priority), Code review & refactor polish (low priority, deferred)."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## Pickup Instructions section (lines 31-76) with 5 subsections: 1. Open these files (lists src/components paths), 2. Current state (test status), 3. Next steps (specific debugging sequence), 4. Debugging context & blockers, 5. Before committing. Includes command reference with test commands."
+    },
+    {
+      "text": "actionable_debugging",
+      "passed": true,
+      "evidence": "Specific file paths: src/components/LoginForm.jsx, src/components/LoginButton.jsx, src/components/LoginInput.jsx, src/components/__tests__/LoginForm.test.js. Specific debugging instructions: search for test name 'show loading spinner while async submit', trace state flow steps, add console.log statements. Command: npm test -- LoginButton --watch."
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-3-docs-session\\with_skill\\outputs\\session-handoff-2026-04-24-1430.md with 58 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Summary section (lines 3-4) states: 'Spent 30 minutes on API documentation. Created a complete API reference for the `/users/:id` endpoint...reviewed the existing documentation suite, and updated outdated examples in 2 of 3 identified locations...Did not yet add a table of contents to the docs.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## Decisions Made section (lines 6-9) lists: Prioritized updating existing broken examples over adding new features (TOC deferred), Used GET/POST examples as primary focus, Chose priority order for example updates (products → orders → settings)."
+    },
+    {
+      "text": "has_mistakes_and_lessons",
+      "passed": true,
+      "evidence": "## Mistakes & Lessons section (lines 11-14) identifies: Underestimated time needed for review, Did not audit outdated docs before starting, Context approaching limit (should have created handoff sooner)."
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "## Unfinished Tasks section (lines 16-19) lists 3 tasks with checkboxes and priority labels: Update `/settings` endpoint examples (HIGH), Add table of contents (MEDIUM), Test `/users/:id` examples (MEDIUM)."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## Pickup Instructions section (lines 21-46) with 4 subsections: 1. Open files (doc locations), 2. Current state (completion status), 3. Next steps (in order), 4. Context & Notes (explains handoff reason and patterns)."
+    },
+    {
+      "text": "clear_priorities",
+      "passed": true,
+      "evidence": "## Unfinished Tasks section clearly marks priorities: 'Update `/settings`' (HIGH), 'Add table of contents' (MEDIUM), 'Test `/users/:id` examples' (MEDIUM). In Next steps, items are ordered by priority."
+    },
+    {
+      "text": "context_aware",
+      "passed": true,
+      "evidence": "## Pickup Instructions section 4 (lines 42-46) explicitly mentions context: 'You were getting close to context limit — this handoff gives you a clean restart' and notes 'Context used: ~50% (handoff created to preserve remaining context)' at line 57."
+    }
+  ]
+}

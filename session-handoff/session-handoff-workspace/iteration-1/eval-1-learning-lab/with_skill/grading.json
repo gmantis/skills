@@ -1,0 +1,44 @@
+{
+  "assertions": [
+    {
+      "text": "document_created",
+      "passed": true,
+      "evidence": "File exists at C:\\Users\\xxiang\\.claude\\skills\\session-handoff\\session-handoff-workspace\\iteration-1\\eval-1-learning-lab\\with_skill\\outputs\\session-handoff-2026-04-24.md with 68 lines of content."
+    },
+    {
+      "text": "has_summary",
+      "passed": true,
+      "evidence": "## Summary section (lines 3-5) describes accomplishments: 'Completed a focused fractions practice session with Kejia...Worked through 3 math exercises, achieving 2 correct (67% accuracy) and 1 wrong.'"
+    },
+    {
+      "text": "has_decisions",
+      "passed": true,
+      "evidence": "## Decisions Made section (lines 7-11) lists: immediate teaching on wrong answers, created dedicated knowledge page, 67% accuracy kept in 'learning' mastery state with clear reasoning."
+    },
+    {
+      "text": "has_mistakes_and_lessons",
+      "passed": true,
+      "evidence": "## Mistakes & Lessons section (lines 13-16) contains lesson about importance of immediate teaching and notes 'No major mistakes this session.'"
+    },
+    {
+      "text": "has_unfinished_tasks",
+      "passed": true,
+      "evidence": "## Unfinished Tasks section (lines 18-24) lists 4 clear tasks with checkbox format and priorities: generate interleaved practice, run /graphify --update, schedule redo attempt, monitor next attempts."
+    },
+    {
+      "text": "has_pickup_instructions",
+      "passed": true,
+      "evidence": "## Pickup Instructions section (lines 26-51) with 4 subsections: Open these files, Current state, Next steps (in order with /graphify, /progress, /review, /practice commands), Context information."
+    },
+    {
+      "text": "mentions_learning_lab_context",
+      "passed": true,
+      "evidence": "Document mentions: Kejia (lines 1, 5, 12, 37), knowledge pages (lines 10, 29, 42), graphify (lines 22, 41, 51-52), /review (lines 23, 44), /progress (lines 43, 44)."
+    },
+    {
+      "text": "actionable",
+      "passed": true,
+      "evidence": "Specific file paths provided: knowledge/maths/fractions-adding-unlike-denominators.md, exercises/dashboard.html, wrong-questions/maths/fractions-adding-unlike-denominators.md, wrong-questions/index.md, log.md, report.md. Commands listed: /graphify --update, /progress, /review, /practice."
+    }
+  ]
+}
