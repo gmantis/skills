@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_atlassian_atlassian__getConfluencePage",
+      "Skill(commit-commands:commit-push-pr)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "anki",
+    "github.com/pashpashpash/mcp-atlassian",
+    "ab-documentation",
+    "sr_database",
+    "ic-sglinux1"
+  ]
+}
