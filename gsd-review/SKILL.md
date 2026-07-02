@@ -14,7 +14,7 @@ allowed-tools:
 <objective>
 Invoke external AI CLIs (Gemini, Claude, Codex, OpenCode, Qwen Code, Cursor) to independently review phase plans.
 Produces a structured REVIEWS.md with per-reviewer feedback that can be fed back into
-planning via /gsd-plan-phase --reviews.
+planning via /gsd:plan-phase --reviews.
 
 **Flow:** Detect CLIs → Build review prompt → Invoke each CLI → Collect responses → Write REVIEWS.md
 </objective>
@@ -37,5 +37,5 @@ Phase number: extracted from $ARGUMENTS (required)
 </context>
 
 <process>
-Execute the review workflow from @$HOME/.claude/get-shit-done/workflows/review.md end-to-end.
+Execute end-to-end.
 </process>
