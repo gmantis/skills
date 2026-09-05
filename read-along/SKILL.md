@@ -1,6 +1,6 @@
 ---
 name: read-along
-description: Read a book alongside the user and answer questions about it from the actual text, with strict spoiler control. Use whenever the working directory contains an .epub or .pdf book and the user asks anything about its plot, characters, ideas, or terminology — including bare questions like "who is X?", "what happened at the meeting?", "explain this concept". Also triggers on "/read-along", "read this book with me", "I'm N% into the book", "no spoilers", "I'm re-reading". Do NOT use for code repositories or for documents that are not books.
+description: Read a book alongside the user and answer questions about it from the actual text, with strict spoiler control. Use whenever the working directory contains an .epub or .pdf book and the user asks anything about its plot, characters, ideas, or terminology — including bare questions like "who is X?", "what happened at the meeting?", "explain this concept". Also triggers on "/read-along", "read this book with me", or any statement of reading position — "I'm N% into the book", "I just finished chapter 12", "I'm in part 2" — plus "no spoilers" and "I'm re-reading". Do NOT use for code repositories or for documents that are not books.
 ---
 
 # Read-Along
@@ -22,16 +22,34 @@ Then determine **which of three modes** applies. Never skip this.
 | Mode | Trigger | Source material allowed |
 |---|---|---|
 | **Non-fiction** | The book is non-fiction | Entire book. No spoiler concern. |
-| **Fiction — first read** | User states a position ("I'm 29% in", "just finished chapter 12", "up to where X dies") | Only text at or before that position. **No internet.** |
+| **Fiction — first read** | User states a position (see below) | Only text at or before that position. **No internet.** |
 | **Fiction — re-read** | User says they're re-reading / already finished / "spoilers are fine" | Entire book **plus** internet research (reviews, author interviews, series background, wikis). |
 
 **If the book is fiction and the user's message does not state a position and does not say they are re-reading: stop and ask.** Do not answer first and caveat afterward — the answer itself is the leak. Ask in one short line:
 
-> Where are you — roughly what % or chapter? Or is this a re-read (spoilers fine)?
+> Where are you — %, chapter, or part? Or is this a re-read (spoilers fine)?
 
 A position stated earlier **in the same conversation** carries forward; if the user later says "now I'm at 40%", use the new one. A position from a *previous session* does not carry forward — ask again.
 
 If it is ambiguous whether the book is fiction, treat it as fiction and ask.
+
+### Positions the user may give
+
+Any of these is a valid position, and they are all resolved to a percentage by `book_locate.py` (Step 3):
+
+- **Percentage** — "29%", "about a third in"
+- **Chapter** — "chapter 14", "ch14", "chapter fourteen", "chapter XIV"
+- **Part / volume / book** — "part 2", "volume 3 chapter 7", "book two"
+- **Section** — "section 4"
+- **Named division** — "prologue", "epilogue"
+- **Narrative landmark** — "up to where the newsroom gets attacked". Find the scene with a bounded search, then use the end of the chunk it lands in.
+
+**Distinguish finished from in-progress**, because they resolve differently:
+
+- *"I finished chapter 14"* → `--at end` (the default). Bound at the end of 14.
+- *"I'm partway through chapter 14"* → `--at start`. Bound at the **start** of 14, so the chapter they're inside is withheld. Tell them you've done this, and offer to raise it if they need something from the part they've already read.
+
+A bare unit with no verb — just "part 2" — is ambiguous between *in* and *finished*. Ask which; do not assume finished.
 
 ## Step 2 — Index the book
 
@@ -45,23 +63,37 @@ This writes ordered plain-text chunks plus `index.tsv` mapping each chunk to a s
 
 PDF support needs `pypdf` (`pip install pypdf`).
 
-## Step 3 — Search under the bound
+## Step 3 — Resolve the position, then search under it
 
-Always search through the wrapper, which refuses to run without an explicit bound:
+**If the user gave anything other than a percentage, resolve it first:**
 
 ```bash
-python ~/.claude/skills/read-along/scripts/book_search.py "<scratchpad>/bookidx" "Fallon|telekin" --max-pct 29
+python ~/.claude/skills/read-along/scripts/book_locate.py "<scratchpad>/bookidx" --resolve "chapter 14"
+```
+
+Prints the bound on stdout and what it matched on stderr (`[resolved to end of Chapter 14]`). Add `--at start` for a chapter the user is still inside. To see the book's divisions:
+
+```bash
+python ~/.claude/skills/read-along/scripts/book_locate.py "<scratchpad>/bookidx" --list --max-pct 32
+```
+
+**Always pass `--max-pct` when listing.** A table of contents is a spoiler surface in its own right — chapters get titled after the thing that happens in them, and the sheer count of remaining chapters tells the reader how much story is left. The tool reports how many divisions it withheld rather than printing them.
+
+**Then search through the wrapper**, which refuses to run without an explicit bound:
+
+```bash
+python ~/.claude/skills/read-along/scripts/book_search.py "<scratchpad>/bookidx" "Fallon|telekin" --max-pct 31.4
 ```
 
 ```bash
 python ~/.claude/skills/read-along/scripts/book_search.py "<scratchpad>/bookidx" "regex" --all
 ```
 
-The first form is fiction on a first read (user is 29% in). The second is non-fiction or a re-read.
+The first form is fiction on a first read. The second is non-fiction or a re-read.
 
 Do **not** use `grep`/`Grep` directly against the chunk files during a first read — it is too easy to widen the bound by accident. Use the wrapper. Read individual chunk files directly only after confirming from `index.tsv` that the chunk starts at or before the bound.
 
-Give the bound a **small buffer downward, never upward**: if the user says 29%, searching to 29 is right; if they say "chapter 12" and chapter 12 spans 30–33%, bound at 33.
+**The bound is strict, with no upward slack.** Positions inside a chunk are estimated by interpolation, so a match may be withheld that the user has in fact read — most commonly the very passage that prompted the question, sitting a fraction of a percent past a rounded-down position. The tool prints how many matches it withheld and the nearest one's position. When you see that, **ask the reader where they are** rather than widening the bound yourself.
 
 ## Step 4 — Answer
 
@@ -98,7 +130,7 @@ Maintain `NOTES.md` in the book's directory. Create it on the first substantive 
 
 ```markdown
 # <Title> — <Author>
-Notes through <position, e.g. 29%>. First read / Re-read.
+Notes through <position as the reader gave it, e.g. "chapter 14 (31%)">. First read / Re-read.
 
 ## Cast
 - **Name** — who they are, as currently known. (~N%)

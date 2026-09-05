@@ -137,6 +137,29 @@ def pdf_chunks(path, pages_per_chunk=5):
     return chunks
 
 
+HEADING_RX = re.compile(
+    r"^\s*(volume|book|part|chapter|section|interlude|appendix|prologue"
+    r"|epilogue|foreword|preface|afterword)\b.*",
+    re.I,
+)
+
+
+def heading(text):
+    """Best-guess division heading for a chunk, e.g. 'Chapter 14'.
+
+    Looked for in the opening lines only, and kept short. Used by
+    book_locate.py to turn "chapter 14" into a percentage. Returns "" when the
+    chunk has no recognizable heading, which is fine -- percentage still works.
+    """
+    for line in text.split("\n")[:12]:
+        line = line.strip()
+        if not line or len(line) > 80:
+            continue
+        if HEADING_RX.match(line):
+            return line.replace("\t", " ")
+    return ""
+
+
 def main():
     if len(sys.argv) < 3:
         raise SystemExit(__doc__)
@@ -163,19 +186,19 @@ def main():
         fn = f"{i:03d}_{re.sub(r'[^A-Za-z0-9_.-]', '_', name)}.txt"
         with open(os.path.join(out, fn), "w", encoding="utf-8") as f:
             f.write(txt)
-        rows.append((i, fn, len(txt), start, end))
+        rows.append((i, fn, len(txt), start, end, heading(txt)))
 
     with open(os.path.join(out, "index.tsv"), "w", encoding="utf-8") as f:
-        f.write("seq\tfile\tchars\tstart_pct\tend_pct\n")
-        for i, fn, n, s, e in rows:
-            f.write(f"{i}\t{fn}\t{n}\t{s:.1f}\t{e:.1f}\n")
+        f.write("seq\tfile\tchars\tstart_pct\tend_pct\ttitle\n")
+        for i, fn, n, s, e, t in rows:
+            f.write(f"{i}\t{fn}\t{n}\t{s:.1f}\t{e:.1f}\t{t}\n")
 
     with open(os.path.join(out, "SOURCE.txt"), "w", encoding="utf-8") as f:
         f.write(src + "\n")
 
     print(f"{len(rows)} chunks, {total} chars -> {out}")
-    for i, fn, n, s, e in rows:
-        print(f"{i:3d}  {s:5.1f}%-{e:5.1f}%  {fn}")
+    for i, fn, n, s, e, t in rows:
+        print(f"{i:3d}  {s:5.1f}%-{e:5.1f}%  {fn}  {t}")
 
 
 if __name__ == "__main__":
