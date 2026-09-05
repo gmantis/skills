@@ -44,6 +44,8 @@ def main():
 
     rx = re.compile(a.pattern, re.IGNORECASE if a.ignore_case else 0)
     hits = 0
+    suppressed = 0
+    nearest = None
     bound = 100.0 if a.all else a.max_pct
 
     with open(idx, encoding="utf-8") as f:
@@ -62,7 +64,13 @@ def main():
                 continue
             # approximate position of this line inside the chunk
             pos = start + span * (i / max(len(lines) - 1, 1))
-            if not a.all and pos > bound + 1.0:
+            # No upward slack: a line past the bound is withheld, even though
+            # the position estimate is approximate. Erring long is a spoiler;
+            # erring short is only a missed hit, and suppressed hits are
+            # counted and reported below so the gap is never silent.
+            if not a.all and pos > bound:
+                suppressed += 1
+                nearest = pos if nearest is None else min(nearest, pos)
                 continue
             hits += 1
             lo, hi = max(0, i - a.context), min(len(lines), i + a.context + 1)
@@ -71,7 +79,14 @@ def main():
                 mark = ">>" if j == i else "  "
                 print(f"{mark} {lines[j]}")
 
-    print(f"\n[{hits} match(es) within {'whole book' if a.all else f'first {bound:.0f}%'}]")
+    scope = "whole book" if a.all else f"first {bound:.1f}%"
+    print(f"\n[{hits} match(es) within {scope}]")
+    if suppressed:
+        print(
+            f"[{suppressed} further match(es) withheld beyond the bound; "
+            f"nearest is at ~{nearest:.1f}%. Position estimates are approximate, "
+            f"so ask the reader before raising the bound.]"
+        )
 
 
 if __name__ == "__main__":
