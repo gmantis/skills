@@ -33,6 +33,9 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--context", type=int, default=2)
     ap.add_argument("--ignore-case", action="store_true", default=True)
+    ap.add_argument("--max-hits", type=int, default=40,
+                    help="Stop printing after this many matches (default 40). "
+                         "Guards against a loose pattern flooding the caller.")
     a = ap.parse_args()
 
     if a.max_pct is None and not a.all:
@@ -45,6 +48,7 @@ def main():
     rx = re.compile(a.pattern, re.IGNORECASE if a.ignore_case else 0)
     hits = 0
     suppressed = 0
+    over = 0
     nearest = None
     bound = 100.0 if a.all else a.max_pct
 
@@ -73,6 +77,9 @@ def main():
                 nearest = pos if nearest is None else min(nearest, pos)
                 continue
             hits += 1
+            if hits > a.max_hits:
+                over += 1
+                continue
             lo, hi = max(0, i - a.context), min(len(lines), i + a.context + 1)
             print(f"\n===== {r['file']}  ~{pos:.1f}%  (chunk {start:.1f}-{end:.1f}%) line {i+1} =====")
             for j in range(lo, hi):
@@ -81,6 +88,12 @@ def main():
 
     scope = "whole book" if a.all else f"first {bound:.1f}%"
     print(f"\n[{hits} match(es) within {scope}]")
+    if over:
+        print(
+            f"[{over} of them not printed: --max-hits is {a.max_hits}. Tighten the "
+            f"pattern -- word boundaries (\\bopera\\b) stop it matching 'operatives' "
+            f"-- or raise --max-hits deliberately.]"
+        )
     if suppressed:
         print(
             f"[{suppressed} further match(es) withheld beyond the bound; "

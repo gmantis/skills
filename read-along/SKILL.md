@@ -91,7 +91,9 @@ python ~/.claude/skills/read-along/scripts/book_search.py "<scratchpad>/bookidx"
 
 The first form is fiction on a first read. The second is non-fiction or a re-read.
 
-Do **not** use `grep`/`Grep` directly against the chunk files during a first read — it is too easy to widen the bound by accident. Use the wrapper. Read individual chunk files directly only after confirming from `index.tsv` that the chunk starts at or before the bound.
+Do **not** use `grep`/`Grep` directly against the chunk files during a first read — it is too easy to widen the bound by accident. Use the wrapper. Read individual chunk files directly only after confirming from `index.tsv` that the chunk **ends** at or before the bound; for the partially-read chunk the reader is currently inside, slice it by proportion rather than reading the whole thing.
+
+**Use word boundaries in patterns.** `opera` also matches `operatives`; `\bopera\b` does not. Output is capped at `--max-hits` (default 40) and the tool says when it truncated — treat that as a signal to tighten the pattern, not to raise the cap.
 
 **The bound is strict, with no upward slack.** Positions inside a chunk are estimated by interpolation, so a match may be withheld that the user has in fact read — most commonly the very passage that prompted the question, sitting a fraction of a percent past a rounded-down position. The tool prints how many matches it withheld and the nearest one's position. When you see that, **ask the reader where they are** rather than widening the bound yourself.
 
@@ -116,13 +118,55 @@ Forbidden, even when technically responsive:
 - Foreshadowing hints: "you'll see", "that becomes important", "keep an eye on him", "for now", "at this point in the book". These are spoilers wearing a disguise — they tell the reader a payoff exists.
 - Web search, author interviews, reviews, wikis, series background, the back half of the blurb, or your own prior knowledge of the book. **Internet access is off in this mode.**
 - Structural tells: "she is only in the first half", "the POV shifts later", "there are two more classes introduced".
-- Confirming *or denying* a theory the user floats. If they ask "is Jade actually Fallon?", the honest answer is: nothing they have read confirms it yet, here is what the text has actually established, and here is what would settle it. Do not say "no" if the text has not said no — a denial is as much a leak as a yes.
+- Confirming *or denying* a theory the user floats. A denial leaks exactly as much as a yes. See below for what to do instead.
 
 If a question cannot be answered without going past the bound, say so plainly and offer the version you *can* answer:
 
 > That is answered later than where you are. What the book has shown so far is [X] — want me to lay out what is still open?
 
 **Fiction re-read and non-fiction have none of these restrictions.** Answer fully, connect across the whole book, and use the internet freely for context, criticism, and background.
+
+### When the reader floats a theory
+
+This is the most valuable thing the skill does, and the easiest to do badly. "Is Jade actually Fallon?" is not a request for a verdict — it's a request for a **better-organised version of the evidence they already hold.** Give them that.
+
+1. **Say plainly that the book hasn't answered it**, and that you are bounded and don't know either. Then stop apologising and do the work.
+2. **Build the case they asked for**, honestly and at full strength. Search under the bound and find the real textual support, including things they missed.
+3. **Then give the counter-case with equal weight.** A theory with no stated objection reads as confirmation.
+4. **Name the single fact that would have to give way** for the theory to hold — "Sara's power magnitude," "Fallon's loyalty." That is the sharpest possible answer that isn't a spoiler, and it's usually what the reader actually wanted.
+5. **If they've proposed several candidates, tabulate.** One row each, a *fits* column and a *doesn't* column. When every candidate needs one thing to be untrue, say so — that pattern is the author working, and pointing at it is criticism, not disclosure.
+6. **Never let the balance of the answer imply a verdict.** If the evidence genuinely leans, report that it leans and why, without closing it.
+
+Do not soften a real objection to be encouraging, and do not manufacture doubt about something the text has settled. If part of their theory *is* confirmed — a character's stated motive, say — confirm that part cleanly and keep the unresolved part open.
+
+### Reader-merged scenes
+
+Readers routinely fuse two similar scenes: a death in one place with a confrontation in another, a flashback with the present. When a question contains a false premise built this way, **separate the two scenes explicitly** and say which is which, rather than answering the muddled version. Mangled names are the same reflex — correct in a clause and move on.
+
+### Real-world questions the book raises
+
+A reader hitting "standard deviation," "opera," a military rank structure, or an unfamiliar historical reference is asking a genuine question about the world, not about the book. **Answer it properly and in full** — that is ordinary knowledge, not bounded material — and *then* show how the book uses it. The combination is usually more valuable than either half, because it explains why the author chose that detail.
+
+## Appreciation, not just lookup
+
+Answering "who is X?" is the floor. The reader wants to enjoy the book more, and most of what makes a book good is visible *behind* them — in the pages they've already read. All of this is available inside the bound.
+
+**Offer, briefly, when it's earned.** A short closing observation after a factual answer, not an essay bolted onto every reply. If they engage, go deeper; if they don't, drop it.
+
+Things worth noticing, all of them backward-facing:
+
+- **Structure.** Why this order? A book that alternates timelines is making an argument by juxtaposition — note which flashback got placed against which present-day scene, and what the pairing does. When a flashback timeline is closing on the present, that's the machine of the book, and it's fair to say so.
+- **Withholding.** What has the author deliberately not told them, and what does the withholding accomplish? This is the opposite of foreshadowing: you're describing a gap that already exists, not promising it gets filled.
+- **Epigraphs, headers, framing devices.** What they establish, and whether they're ironic against the chapter they head.
+- **Point of view.** Whose eyes, and what that choice conceals. A cruel character's POV makes the reader complicit; a powerless character's POV makes the same facility look different. Note when the book switches and what it buys.
+- **Motif and echo.** A repeated object, phrase, or gesture. Champagne at a test and champagne in a VR opera. A character's tic recurring in a stranger. Point at the repetition; let the reader draw the line.
+- **Prose texture.** Where the writing goes fast, where it slows, what it lingers on. Quote a short phrase to anchor it.
+- **The competence of a scene.** Why an interrogation lands, why a fight is legible, why a piece of exposition doesn't feel like exposition.
+- **Craft in the worldbuilding.** A magic or tech system with stated costs and limits is doing structural work — note when a limitation established early gets used to make a later scene tense.
+
+**The hard line stays.** "This pays off later," "watch him," "that detail matters" — all forbidden, even as praise. If you notice a setup that's clearly loaded, you may describe **what has been established** and that it is unresolved. You may not indicate that it resolves.
+
+**Don't flatten the book into themes.** Specific beats general: one well-chosen sentence about how a scene is built beats a paragraph about what the novel is "about."
 
 ## Step 5 — NOTES.md
 
@@ -148,8 +192,10 @@ Notes through <position as the reader gave it, e.g. "chapter 14 (31%)">. First r
 Rules for NOTES.md:
 - Never write anything past the reader's position into it during a first read.
 - Update the position line in the header each time the user gives a newer one.
-- Append; do not rewrite history. If something the reader learns later revises an earlier entry, add the revision with its own position marker rather than editing the old line — the note file is a record of what they knew when.
+- **Mark every entry with the position it came from.** That is what makes the file trustworthy — a reader can see when they learned a thing.
+- **Prefer appending, but restructure when the book does.** When a new part begins, a timeline gets dated, or the cast doubles, a full rewrite is the right call; a notes file that has outgrown its own shape stops being readable. When you rewrite, carry the position markers across and don't let a later fact silently overwrite what an earlier one said — if something was revised, show both with their markers.
 - If a `NOTES.md` already exists when a session starts, read it first: it is the cheapest context you will get.
+- Offer before doing a large rewrite. It's the user's file, and a big update costs real time.
 
 ## Other files in the book directory
 
