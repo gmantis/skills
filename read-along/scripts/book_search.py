@@ -33,6 +33,9 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--context", type=int, default=2)
     ap.add_argument("--ignore-case", action="store_true", default=True)
+    ap.add_argument("--map", action="store_true",
+                    help="Print only WHERE matches fall (per-chunk counts and "
+                         "spans), no content. Use this first on a broad term.")
     ap.add_argument("--max-hits", type=int, default=40,
                     help="Stop printing after this many matches (default 40). "
                          "Guards against a loose pattern flooding the caller.")
@@ -49,6 +52,7 @@ def main():
     hits = 0
     suppressed = 0
     over = 0
+    per_chunk = {}
     nearest = None
     bound = 100.0 if a.all else a.max_pct
 
@@ -77,6 +81,9 @@ def main():
                 nearest = pos if nearest is None else min(nearest, pos)
                 continue
             hits += 1
+            per_chunk[r["file"]] = per_chunk.get(r["file"], 0) + 1
+            if a.map:
+                continue
             if hits > a.max_hits:
                 over += 1
                 continue
@@ -86,8 +93,24 @@ def main():
                 mark = ">>" if j == i else "  "
                 print(f"{mark} {lines[j]}")
 
+    if a.map:
+        # Distribution only, no content. Cheap way to see WHERE a term lives
+        # before deciding what to read. A dense cluster is a scene; scattered
+        # singletons are passing mentions. Never conclude "the book does not
+        # say X" from hit counts -- go and read the clusters.
+        print(f"{'chunk':<28} {'span':>14}  {'hits':>5}  title")
+        for r in rows:
+            n = per_chunk.get(r["file"], 0)
+            if not n:
+                continue
+            span_s = f"{float(r['start_pct']):.1f}-{float(r['end_pct']):.1f}%"
+            print(f"{r['file']:<28} {span_s:>14}  {n:>5}  {r.get('title') or ''}")
+
     scope = "whole book" if a.all else f"first {bound:.1f}%"
     print(f"\n[{hits} match(es) within {scope}]")
+    if a.map:
+        print("[--map shows distribution only. Read the dense chunks before "
+              "making any claim about what the book does or does not say.]")
     if over:
         print(
             f"[{over} of them not printed: --max-hits is {a.max_hits}. Tighten the "

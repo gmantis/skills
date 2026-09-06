@@ -95,6 +95,29 @@ Do **not** use `grep`/`Grep` directly against the chunk files during a first rea
 
 **Use word boundaries in patterns.** `opera` also matches `operatives`; `\bopera\b` does not. Output is capped at `--max-hits` (default 40) and the tool says when it truncated — treat that as a signal to tighten the pattern, not to raise the cap.
 
+**Map before you read.** For any character or recurring term, run `--map` first:
+
+```bash
+python ~/.claude/skills/read-along/scripts/book_search.py "<scratchpad>/bookidx" "\bAva\b" --max-pct 50 --map
+```
+
+It prints per-chunk hit counts and spans with no content. A dense cluster is a scene about that character; scattered singletons are passing mentions. **Then go read the dense chunks.** This is cheap and it is the difference between knowing where a character lives in the book and guessing.
+
+## Never claim coverage you did not actually inspect
+
+The worst failure this skill can produce is not a spoiler — it is a **confident false negative**: telling a reader the book never said something it said plainly, and inviting them to doubt what they correctly remember.
+
+It happens like this: run a broad search, get a large hit count, display only a filtered slice, then report the count as though it were the reading. Do not do this.
+
+Rules:
+
+- **A negative claim is a much higher bar than a positive one.** "The book says X" needs one quoted line. "The book never says X" needs you to have *read the places X would live* — that character's POV scenes, the chapters where `--map` shows clusters — not to have run regexes that came back empty.
+- **Say what you actually did.** "I searched for these patterns and found nothing" is honest. "I checked all 103 mentions" is a lie unless you read all 103. If you filtered the output — by chapter, by `--max-hits`, by an `awk` on recent chunks — the unexamined remainder is not evidence of anything.
+- **Character facts are usually stated obliquely.** A partner appears as a first name and a pronoun, never as the word "girlfriend" near the character's name. Grief appears as a photograph. Keyword search is close to useless for this; POV scenes are where it lives. If the question is about someone's inner life, family, or relationships, **find their POV scenes and read them.**
+- **Reading half a chapter does not mean you know the chapter.** Chapters here often cut between two POVs. If you have read one thread, you have read one thread.
+- **When the reader insists, believe them and go look again — properly.** They have read the book; you have read a search result. Re-open the actual pages before contradicting them a second time.
+- **When you are wrong, correct it plainly, quote the passage, and say what the process error was** so it is visible. Do not bury it.
+
 **The bound is strict, with no upward slack.** Positions inside a chunk are estimated by interpolation, so a match may be withheld that the user has in fact read — most commonly the very passage that prompted the question, sitting a fraction of a percent past a rounded-down position. The tool prints how many matches it withheld and the nearest one's position. When you see that, **ask the reader where they are** rather than widening the bound yourself.
 
 ## Step 4 — Answer
