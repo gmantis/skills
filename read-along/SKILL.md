@@ -153,20 +153,14 @@ If a question cannot be answered without going past the bound, say so plainly an
 
 This is the most valuable thing the skill does, and the easiest to do badly. "Is Jade actually Fallon?" is not a request for a verdict — it's a request for a **better-organised version of the evidence they already hold.** Give them that.
 
-1. **Say plainly that the book hasn't answered it**, and that you are bounded and don't know either. Then stop apologising and do the work.
-2. **Build the case they asked for**, honestly and at full strength. Search under the bound and find the real textual support, including things they missed.
+1. **State the evidence that supports the theory** — the scenes, lines, or details that made them think it. Quote them.
+2. **State the evidence that cuts against it** — the scene where both were in the room, the age difference, the conflicting eye colour, the place where Jade's internal monologue makes no sense if she's Fallon.
 3. **Then give the counter-case with equal weight.** A theory with no stated objection reads as confirmation.
-4. **Name the single fact that would have to give way** for the theory to hold — "Sara's power magnitude," "Fallon's loyalty." That is the sharpest possible answer that isn't a spoiler, and it's usually what the reader actually wanted.
-5. **If they've proposed several candidates, tabulate.** One row each, a *fits* column and a *doesn't* column. When every candidate needs one thing to be untrue, say so — that pattern is the author working, and pointing at it is criticism, not disclosure.
-6. **Never let the balance of the answer imply a verdict.** If the evidence genuinely leans, report that it leans and why, without closing it.
+4. **End on what to watch for.** Not a hint about the answer, but the specific question the narrative has set up: "The book hasn't yet shown where Fallon was during the three years Jade was in prison. That's the gap."
 
 Do not soften a real objection to be encouraging, and do not manufacture doubt about something the text has settled. If part of their theory *is* confirmed — a character's stated motive, say — confirm that part cleanly and keep the unresolved part open.
 
-### Reader-merged scenes
-
-Readers routinely fuse two similar scenes: a death in one place with a confrontation in another, a flashback with the present. When a question contains a false premise built this way, **separate the two scenes explicitly** and say which is which, rather than answering the muddled version. Mangled names are the same reflex — correct in a clause and move on.
-
-### Real-world questions the book raises
+### Real-world knowledge is not a spoiler
 
 A reader hitting "standard deviation," "opera," a military rank structure, or an unfamiliar historical reference is asking a genuine question about the world, not about the book. **Answer it properly and in full** — that is ordinary knowledge, not bounded material — and *then* show how the book uses it. The combination is usually more valuable than either half, because it explains why the author chose that detail.
 
@@ -191,33 +185,38 @@ Things worth noticing, all of them backward-facing:
 
 **Don't flatten the book into themes.** Specific beats general: one well-chosen sentence about how a scene is built beats a paragraph about what the novel is "about."
 
-## Step 5 — NOTES.md
+## Step 5 — <bookname>-note.md
 
-Maintain `NOTES.md` in the book's directory. Create it on the first substantive question. Update it whenever a question surfaces something worth keeping. It is written **from the reader's current vantage point** — during a first read it must itself be spoiler-free, because the user will read it.
+Maintain `<bookname>-note.md` in the book's directory (for example, `Protocols-note.md` for *Protocols*). Derive `<bookname>` from the book title or file basename. Create it on the first substantive question. Update it whenever a question surfaces something worth keeping. It is written **from the reader's current vantage point** — during a first read it must itself be spoiler-free, because the user will read it.
 
 ```markdown
-# <Title> — <Author>
+# <Title>: Reading Notes & Session State — <Author>
 Notes through <position as the reader gave it, e.g. "chapter 14 (31%)">. First read / Re-read.
 
-## Cast
+## Cast / Key Figures
 - **Name** — who they are, as currently known. (~N%)
 
-## Terms & world
-- **Term** — what it means. (~N%)
+## Terms, Concepts & World
+- **Term / Concept** — what it means, biological mechanisms, etymology. (~N%)
 
-## Threads
+## Protocols / Actionable Takeaways
+- **Protocol / Action** — concrete steps, timings, rules, practical application. (~N%)
+
+## Threads / Open Inquiries
 - Open question or unresolved setup. (~N%)
 
-## Q&A log
+## Q&A Log
 - **<question asked>** — one-line answer. (~N%)
 ```
 
-Rules for NOTES.md:
+Rules for `<bookname>-note.md`:
+- Name the file `<bookname>-note.md` using the book title or clean slug (e.g., `Protocols-note.md`).
 - Never write anything past the reader's position into it during a first read.
 - Update the position line in the header each time the user gives a newer one.
-- **Mark every entry with the position it came from.** That is what makes the file trustworthy — a reader can see when they learned a thing.
+- **Mark every entry with the position it came from** (chapter, chunk, or percentage). That is what makes the file trustworthy — a reader can see when they learned a thing.
+- **Ground entries in the book's core mechanisms and verbatim quotes where useful** (avoid bloating the notes with external academic literature citations unless explicitly asked).
 - **Prefer appending, but restructure when the book does.** When a new part begins, a timeline gets dated, or the cast doubles, a full rewrite is the right call; a notes file that has outgrown its own shape stops being readable. When you rewrite, carry the position markers across and don't let a later fact silently overwrite what an earlier one said — if something was revised, show both with their markers.
-- If a `NOTES.md` already exists when a session starts, read it first: it is the cheapest context you will get.
+- If a `<bookname>-note.md` (or legacy `NOTES.md` / `reading_state.md`) already exists when a session starts, read it first: it is the cheapest context you will get.
 - Offer before doing a large rewrite. It's the user's file, and a big update costs real time.
 
 ## Other files in the book directory
