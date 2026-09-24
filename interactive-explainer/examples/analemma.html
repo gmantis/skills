@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analemma explorer: why sunrise is earliest in November in Singapore</title>
+<style>
+  :root{
+    --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --north:#6cc4ff; --south:#ffb35c; --early:#5ee38c; --late:#ff6f6f; --axis:#c9a0ff; --sun:#ffd84d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:18px 24px 4px}
+  header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600}
+  header p{margin:0;color:var(--muted);max-width:1050px;font-size:.9rem}
+  .layout{display:flex;gap:16px;padding:14px 24px 30px;align-items:flex-start}
+  aside{width:310px;flex-shrink:0;background:var(--panel);border-radius:10px;padding:14px 16px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  aside h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--north);margin:14px 0 8px}
+  aside h2:first-child{margin-top:0}
+  .presets{display:flex;flex-wrap:wrap;gap:5px}
+  .presets button,.seg button,.btn{background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:4px 8px;border-radius:6px;font-size:.76rem;cursor:pointer}
+  .presets button:hover,.seg button:hover,.btn:hover{border-color:var(--north)}
+  .seg{display:flex;gap:0;margin-bottom:10px}
+  .seg button{border-radius:0;flex:1;padding:6px}
+  .seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}
+  .seg button.on{background:#2b4a7a;border-color:var(--north)}
+  .ctl{margin-bottom:10px}
+  .ctl .lab{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted);margin-bottom:2px}
+  .ctl .lab output{color:var(--ink);font-weight:600;text-align:right}
+  .ctl .inp{display:flex;gap:6px;align-items:center}
+  .ctl input[type=range]{flex:1;min-width:0;accent-color:var(--north)}
+  .ctl input[type=number]{width:74px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 4px;font-size:.78rem}
+  .hint{font-size:.72rem;color:var(--muted);margin:-4px 0 10px}
+  .chk{display:flex;gap:7px;align-items:flex-start;font-size:.78rem;color:var(--muted);margin-bottom:8px}
+  .chk input{margin-top:3px}
+  .row{display:flex;gap:6px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .panel h3{margin:0 0 2px;font-size:.95rem;color:var(--north);font-weight:600}
+  .panel .sub{margin:0 0 8px;color:var(--muted);font-size:.8rem}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)}
+  .grid2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px}
+  #readout{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.3em}
+  #readout b{color:var(--ink);font-weight:600}
+  #explain{background:var(--panel2);border-left:3px solid var(--sun);padding:9px 12px;border-radius:6px;margin-bottom:10px;font-size:.88rem}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+  .stat{background:var(--panel2);border-radius:7px;padding:7px 10px}
+  .stat .k{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .stat .v{font-weight:600;font-size:.92rem}
+  .v.early{color:var(--early)} .v.late{color:var(--late)}
+  table{border-collapse:collapse;width:100%;font-size:.78rem;margin-top:6px}
+  th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}
+  th{color:var(--muted);font-weight:600}
+  td .ppr{display:block;color:var(--muted);font-size:.68rem}
+  tr.cur td{background:#1a2744}
+  details{font-size:.8rem;color:var(--muted)} details summary{cursor:pointer;color:var(--ink)}
+  code{background:var(--panel2);padding:0 4px;border-radius:3px}
+  .whatif{background:var(--panel2);border:1px solid #3a2f5c;border-radius:8px;padding:10px 10px 4px;margin-bottom:6px}
+  .whatif .seg button{font-size:.72rem;padding:5px 3px}
+  .ctl.overridden{opacity:.45}
+  .ctl.overridden .lab output::after{content:' (overridden)';font-weight:400;color:var(--axis)}
+  #orbitRead{margin-top:8px;font-size:.8rem;color:var(--muted)}
+  #orbitRead b{color:var(--ink);font-weight:600}
+  #whatExplain{background:var(--panel2);border-left:3px solid var(--axis);padding:9px 12px;border-radius:6px;margin-top:8px;font-size:.86rem}
+  #whatExplain:empty{display:none}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Analemma explorer: why Singapore's sunrise is earliest in November and latest in February</h1>
+  <p>After Helmer Aslaksen (NUS), <i>Which Day Does the Sun Rise Earliest in Singapore?</i> Near the equator the day length hardly changes,
+  yet sunrise drifts about 30 minutes over the year. That drift is the <b>equation of time</b>. Plot the Sun at the same clock time every morning
+  and you get a figure-8, the <b>rising analemma</b>. Its axis is tilted to the horizon by an angle equal to your latitude. Whichever point of the
+  figure-8 clears the horizon first gives the earliest sunrise. Move the sliders to watch latitude and the equation of time pull against each other.
+  Use <b>What if?</b> to switch off Earth's uneven orbital speed or its axial tilt and see what the analemma would look like without each one.</p>
+</header>
+
+<div class="layout">
+<aside>
+  <h2>Presets</h2>
+  <div class="presets" id="presets"></div>
+
+  <h2>What if?</h2>
+  <div class="whatif">
+    <div class="seg" id="whatSeg">
+      <button data-w="real" class="on">Real Earth</button>
+      <button data-w="const">Constant speed</button>
+      <button data-w="notilt">No tilt</button>
+      <button data-w="none">Neither</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="constSpeed"><span><b>Constant orbital speed</b>: a circular orbit (e = 0), so Earth moves at the same speed all year</span></label>
+    <label class="chk"><input type="checkbox" id="noTilt"><span><b>No axial tilt</b> (ε = 0): the Sun stays on the celestial equator all year</span></label>
+    <label class="chk"><input type="checkbox" id="ghosts" checked><span>Draw each cause on its own as a faint curve (tilt only, uneven speed only)</span></label>
+  </div>
+
+  <h2>Location</h2>
+  <div id="grp_loc"></div>
+  <div class="hint" id="corrHint"></div>
+
+  <h2>Orbit</h2>
+  <div id="grp_orb"></div>
+  <button class="btn" id="earthBtn">Reset orbit to Earth</button>
+
+  <h2>Sky view</h2>
+  <div class="seg" id="modeSeg">
+    <button data-mode="rise" class="on">Rising (morning, east)</button>
+    <button data-mode="set">Setting (evening, west)</button>
+  </div>
+  <div id="grp_view"></div>
+  <div class="row" style="margin:-4px 0 10px"><button class="btn" id="playBtn">▶ Animate the year</button></div>
+
+  <h2>Options</h2>
+  <label class="chk"><input type="checkbox" id="refr" checked><span>Refraction and solar disc: sunrise is when the Sun's centre is 0.833° below the horizon (standard almanac definition). Untick for the geometric centre at 0°.</span></label>
+  <label class="chk"><input type="checkbox" id="shift"><span>Kuching 1935–41 clock shift: +20 min from Sep 14 to Dec 14 (applies to the time chart and summary; the sky view uses standard time).</span></label>
+</aside>
+
+<main>
+  <section class="panel">
+    <h3 id="skyTitle">Rising analemma</h3>
+    <p class="sub" id="skySub"></p>
+    <canvas id="sky" data-h="470"></canvas>
+    <div id="readout"></div>
+    <div id="whatExplain"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Earth's orbit from above: where the uneven speed comes from</h3>
+    <p class="sub">Drawn to scale, with the Sun at one focus. Month dots are one calendar month apart, so they bunch up where Earth moves slowly (near aphelion) and spread out where it moves fast (near perihelion).
+    The hollow dot is an imaginary Earth moving at constant speed; the gap between it and the real Earth is the "uneven speed" part of the equation of time.
+    The purple tick shows which way the north pole leans (fixed in space), which causes the tilt part. Push the eccentricity slider up to exaggerate the speed change.</p>
+    <canvas id="orbit" data-h="400"></canvas>
+    <div id="orbitRead"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Sunrise, sunset and day length over the year</h3>
+    <p class="sub">Clock times in the chosen time zone. Every local extreme is marked. Where two extremes are within 1 minute of each other they're both labelled as the extreme (a "tie"). Hover to pick a day.</p>
+    <canvas id="time" data-h="470"></canvas>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <h3>Equation of time and declination</h3>
+      <p class="sub">EoT = apparent solar time − mean solar time. Positive means the Sun is ahead of the clock, so sunrise, noon and sunset all come earlier.</p>
+      <canvas id="eot" data-h="330"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Noon analemma</h3>
+      <p class="sub">The classic figure-8: EoT across, declination up, on equal degree scales (1 min = 0.25°). The rising analemma is this shape turned on its side.</p>
+      <canvas id="noon" data-h="330"></canvas>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h3>Summary</h3>
+    <div id="explain"></div>
+    <div class="stats" id="stats"></div>
+    <h3 style="margin-top:14px">Tug of war: latitude against the equation of time</h3>
+    <p class="sub" id="tugSub"></p>
+    <table id="tug"></table>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>How this is computed</summary>
+      <p>Kepler orbit with eccentricity <i>e</i>. The mean anomaly is M = 360°·(d − perihelion)/365.2422, solved for the true anomaly ν.
+      The longitude of perihelion is chosen so the March equinox (λ = 0) falls on day 79.4, about Mar 20. Sun's longitude λ = ν + ϖ, mean longitude L₀ = M + ϖ.
+      Declination δ = asin(sin ε sin λ). Right ascension α = atan2(cos ε sin λ, cos λ). Equation of time EoT = 4·(L₀ − α) minutes.
+      For Earth this agrees with the usual series formula (y·sin2L₀ − 2e·sinM + …) to within a few seconds.</p>
+      <p>Sunrise/sunset hour angle: cos H₀ = (sin h₀ − sin φ sin δ)/(cos φ cos δ), with h₀ = −0.833° or 0°. If |cos H₀| &gt; 1 the Sun never rises (polar night) or never sets (polar day).
+      Clock time = 12 h ∓ H₀/15 − EoT/60 + (UTC offset − longitude/15). Singapore (103.82° E, UTC+8) is +64.7 min, so its clocks run over an hour ahead of local solar time.</p>
+      <p>Sky view: the Sun's altitude/azimuth each day at one fixed clock time T, with hour angle H = 15°·(T − clock offset + EoT/60 − 12). The plot uses equal degree scales on both axes, so the angle between the analemma's axis and the horizon on screen is the real one.
+      "Auto" puts T at the year's mean sunrise (or sunset) time, so the figure-8 straddles the horizon. The dashed axis is where the Sun would be with no equation of time (fixed hour angle, δ from −ε to +ε). Where it meets the horizon it's tilted by exactly the latitude.
+      Days are whole days of a 365-day year evaluated at local noon, so dates can be off by about a day compared with an almanac.</p>
+    </details>
+  </section>
+</main>
+</div>
+
+<script id="model">
+// ===================== MODEL (pure functions, no DOM) =====================
+const RAD = Math.PI / 180;
+const YEAR_DAYS = 365.2422;
+const MARCH_EQUINOX_DOY = 79.4;           // ~Mar 20 (Jan 1 = day 1)
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_START = [1,32,60,91,121,152,182,213,244,274,305,335];
+const wrap360 = x => ((x % 360) + 360) % 360;
+const norm180 = x => wrap360(x + 180) - 180;
+
+function doyToDate(d){
+  let n = Math.round(d); n = ((n - 1) % 365 + 365) % 365 + 1;
+  let m = 11; while (MONTH_START[m] > n) m--;
+  return MONTHS[m] + ' ' + (n - MONTH_START[m] + 1);
+}
+function cycDist(a, b){ const x = Math.abs(a - b) % 365; return Math.min(x, 365 - x); }
+
+function trueAnomaly(Mdeg, e){
+  const M = Mdeg * RAD; let E = M + e * Math.sin(M);
+  for (let k = 0; k < 50; k++){
+    const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= dE; if (Math.abs(dE) < 1e-13) break;
+  }
+  return wrap360(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2)) / RAD);
+}
+// longitude of perihelion chosen so that the true longitude is 0 at the March equinox
+function orbitOf(p){
+  const ME = wrap360((MARCH_EQUINOX_DOY - p.peri) / YEAR_DAYS * 360);
+  return { varpi: wrap360(-trueAnomaly(ME, p.ecc)) };
+}
+function sunAt(d, p, orb){
+  orb = orb || orbitOf(p);
+  const M = wrap360((d - p.peri) / YEAR_DAYS * 360);
+  const L0 = wrap360(M + orb.varpi);
+  const nu = trueAnomaly(M, p.ecc);
+  const lam = wrap360(nu + orb.varpi);
+  const eps = p.eps * RAD, l = lam * RAD;
+  const decl = Math.asin(Math.sin(eps) * Math.sin(l)) / RAD;
+  const ra = wrap360(Math.atan2(Math.cos(eps) * Math.sin(l), Math.cos(l)) / RAD);
+  const eot = 4 * norm180(L0 - ra);       // minutes, + = Sun ahead of the clock
+  // exact split: L0 - ra = (M - nu) + (lam - ra)
+  const eotEcc = 4 * norm180(M - nu), eotTilt = 4 * norm180(lam - ra);
+  return { decl, eot, eotEcc, eotTilt, lam, M, L0, nu };
+}
+function riseHourAngle(latDeg, declDeg, h0Deg){
+  const f = latDeg * RAD, dl = declDeg * RAD;
+  const c = (Math.sin(h0Deg * RAD) - Math.sin(f) * Math.sin(dl)) / (Math.cos(f) * Math.cos(dl));
+  if (c > 1) return { polar: 'night', H0: 0 };
+  if (c < -1) return { polar: 'day', H0: 180 };
+  return { polar: null, H0: Math.acos(c) / RAD };
+}
+function clockOffsetHours(p){ return p.utc - p.lon / 15; }   // clock time minus local mean time
+
+function computeYear(p){
+  const orb = orbitOf(p), h0 = p.refr ? -0.833 : 0, corr = clockOffsetHours(p);
+  const days = [];
+  for (let d = 1; d <= 365; d++){
+    const s = sunAt(d, p, orb);
+    const ev = riseHourAngle(p.lat, s.decl, h0);
+    let sr = null, ss = null;
+    if (!ev.polar){
+      sr = 12 - ev.H0 / 15 - s.eot / 60 + corr;
+      ss = 12 + ev.H0 / 15 - s.eot / 60 + corr;
+    }
+    const shift = (p.shiftOn && d >= p.shiftStart && d <= p.shiftEnd) ? p.shiftMin / 60 : 0;
+    days.push({ d, decl: s.decl, eot: s.eot, eotEcc: s.eotEcc, eotTilt: s.eotTilt, lam: s.lam, nu: s.nu, L0: s.L0,
+      polar: ev.polar, dl: 2 * ev.H0 / 15,
+      sr, ss, srC: sr === null ? null : sr + shift, ssC: ss === null ? null : ss + shift });
+  }
+  return { days, corr, h0, orb };
+}
+
+function altAz(latDeg, declDeg, Hdeg){
+  const f = latDeg * RAD, dl = declDeg * RAD, H = Hdeg * RAD;
+  const sa = Math.sin(f) * Math.sin(dl) + Math.cos(f) * Math.cos(dl) * Math.cos(H);
+  const alt = Math.asin(Math.max(-1, Math.min(1, sa))) / RAD;
+  const az = wrap360(Math.atan2(-Math.cos(dl) * Math.sin(H), Math.cos(f) * Math.sin(dl) - Math.sin(f) * Math.cos(dl) * Math.cos(H)) / RAD);
+  return { alt, az };
+}
+const unwrapAz = (az, center) => center + norm180(az - center);
+
+// Sun's sky position each day at fixed clock time T (hours)
+function skyPositions(p, Y, T, center){
+  return Y.days.map(r => {
+    const H = 15 * (T - Y.corr + r.eot / 60 - 12);
+    const q = altAz(p.lat, r.decl, H);
+    return { d: r.d, alt: q.alt, az: unwrapAz(q.az, center), decl: r.decl };
+  });
+}
+// analemma axis: same clock time, no equation of time, declination -eps..+eps
+function axisHourAngle(Y, T){ return 15 * (T - Y.corr - 12); }
+function axisPositions(p, Y, T, center, n = 80){
+  const H = axisHourAngle(Y, T), out = [];
+  for (let k = 0; k <= n; k++){
+    const dl = -p.eps + 2 * p.eps * k / n, q = altAz(p.lat, dl, H);
+    out.push({ decl: dl, alt: q.alt, az: unwrapAz(q.az, center) });
+  }
+  return out;
+}
+function seasonDays(p){
+  const orb = orbitOf(p);
+  const defs = [[0, 'Mar equinox'], [90, 'Jun solstice'], [180, 'Sep equinox'], [270, 'Dec solstice']];
+  return defs.map(([t, name]) => {
+    const f = d => norm180(sunAt(d, p, orb).lam - t);
+    for (let d = 1; d <= 365; d++){
+      const a = f(d), b = f(d + 1);
+      if (a < 0 && b >= 0 && b - a < 90){
+        const day = d + (-a) / (b - a);
+        const di = ((Math.round(day) - 1) % 365) + 1;
+        return { t, name, day, di, date: doyToDate(di) };
+      }
+    }
+    return { t, name, day: null, di: null, date: '—' };
+  });
+}
+const meanOf = a => a.reduce((s, v) => s + v, 0) / a.length;
+
+// Local extrema of a daily series (cyclic unless there are gaps), pruning wiggles smaller than minProm
+function findExtrema(vals, minProm){
+  const n = vals.length, gaps = vals.some(v => v === null);
+  let ex = [];
+  for (let i = 0; i < n; i++){
+    const v = vals[i]; if (v === null) continue;
+    let ip = i - 1, inx = i + 1;
+    if (gaps){ if (ip < 0 || inx >= n) continue; } else { ip = (ip + n) % n; inx = inx % n; }
+    const a = vals[ip], b = vals[inx]; if (a === null || b === null) continue;
+    if (v < a && v <= b) ex.push({ i, type: 'min', v });
+    else if (v > a && v >= b) ex.push({ i, type: 'max', v });
+  }
+  const cyclic = !gaps;
+  for (;;){
+    const m = ex.length; if (m <= 2) break;
+    let best = -1, bd = Infinity;
+    const lim = cyclic ? m : m - 1;
+    for (let k = 0; k < lim; k++){
+      const A = ex[k], B = ex[(k + 1) % m];
+      if (A.type === B.type) continue;
+      const dd = Math.abs(A.v - B.v); if (dd < bd){ bd = dd; best = k; }
+    }
+    if (best < 0 || bd >= minProm) break;
+    const k2 = (best + 1) % m;
+    ex = ex.filter((_, idx) => idx !== best && idx !== k2);
+  }
+  return ex;
+}
+// Minima and maxima ranked: global, tie (within tieTol of global), local
+function eventsOf(vals, minProm, tieTol){
+  const out = { min: [], max: [], flat: false };
+  const vv = vals.filter(v => v !== null);
+  if (vv.length && Math.max(...vv) - Math.min(...vv) < minProm){ out.flat = true; return out; }
+  const ex = findExtrema(vals, minProm);
+  for (const kind of ['min', 'max']){
+    let g = null;
+    vals.forEach((v, i) => { if (v === null) return; if (!g || (kind === 'min' ? v < g.v : v > g.v)) g = { i, v }; });
+    if (!g) continue;
+    const list = ex.filter(e => e.type === kind).map(e => ({ i: e.i, v: e.v }));
+    if (!list.some(e => e.i === g.i)) list.push({ i: g.i, v: g.v, edge: true });
+    list.forEach(e => {
+      e.d = e.i + 1; e.kind = kind;
+      e.rank = e.i === g.i ? 'global' : (Math.abs(e.v - g.v) <= tieTol ? 'tie' : 'local');
+    });
+    list.sort((a, b) => a.i - b.i);
+    out[kind] = list;
+  }
+  return out;
+}
+</script>
+
+<script>
+// ===================== UI =====================
+const $ = id => document.getElementById(id);
+const FONT = "'Segoe UI', system-ui, -apple-system, Roboto, sans-serif";
+const COL = { north:'#6cc4ff', south:'#ffb35c', early:'#5ee38c', late:'#ff6f6f', axis:'#c9a0ff', sun:'#ffd84d',
+  ink:'#e6ebf5', muted:'#8e9ab2', grid:'rgba(140,160,200,0.12)', season:'#ffffff' };
+const PROM_H = 0.3 / 60, TIE_H = 1.0 / 60;
+const KUCHING = { shiftMin: 20, shiftStart: 257, shiftEnd: 348 };   // Sep 14 .. Dec 14
+const EARTH = { eps: 23.44, ecc: 0.0167, peri: 3 };
+
+// ---------- formatting ----------
+function fmtClock(h){
+  if (h === null || !isFinite(h)) return '—';
+  let m = Math.round(h * 60); m = ((m % 1440) + 1440) % 1440;
+  const hh = Math.floor(m / 60), mm = m % 60, h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return h12 + ':' + String(mm).padStart(2, '0') + (hh < 12 ? ' am' : ' pm');
+}
+function fmtDur(h){ const m = Math.round(h * 60); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; }
+function fmtMin(min){ min = Math.round(Math.abs(min)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h ' + (min % 60) + ' min'; }
+function fmtLat(v){ return Math.abs(v).toFixed(2) + '°' + (v > 0 ? ' N' : v < 0 ? ' S' : ''); }
+function fmtLon(v){ return Math.abs(v).toFixed(2) + '°' + (v > 0 ? ' E' : v < 0 ? ' W' : ''); }
+function fmtUtc(v){ const a = Math.abs(v), hh = Math.floor(a), mm = Math.round((a - hh) * 60);
+  return 'UTC' + (v < 0 ? '−' : '+') + hh + (mm ? ':' + String(mm).padStart(2, '0') : ''); }
+function sgn(v, d = 1){ return (v < 0 ? '−' : '+') + Math.abs(v).toFixed(d); }
+const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+
+// ---------- controls ----------
+const SPEC = [
+  { id:'lat',  group:'loc', label:'Latitude',  min:-66, max:66, step:0.01, def:1.35, fmt:fmtLat },
+  { id:'lon',  group:'loc', label:'Longitude', min:-180, max:180, step:0.01, def:103.82, fmt:fmtLon },
+  { id:'utc',  group:'loc', label:'Time zone (UTC offset, hours)', min:-12, max:14, step:0.25, def:8, fmt:fmtUtc },
+  { id:'eps',  group:'orb', label:'Axial tilt ε', min:0, max:45, step:0.01, def:23.44, fmt:v => v.toFixed(2) + '°' },
+  { id:'ecc',  group:'orb', label:'Orbital eccentricity e', min:0, max:0.25, step:0.0001, def:0.0167, fmt:v => v.toFixed(4) },
+  { id:'peri', group:'orb', label:'Perihelion date', min:1, max:365, step:1, def:3, fmt:v => doyToDate(v) },
+  { id:'toff', group:'view', label:'Sky reference clock time', min:-180, max:180, step:1, def:0, fmt:null },
+  { id:'day',  group:'view', label:'Highlighted day', min:1, max:365, step:1, def:305, fmt:v => doyToDate(v) },
+];
+const PRESETS = [
+  { name:'Singapore 1.35°N', lat:1.35, lon:103.82, utc:8 },
+  { name:'Kuching 1.55°N', lat:1.55, lon:110.35, utc:8 },
+  { name:'Kuching 1935–41 (+20 min)', lat:1.55, lon:110.35, utc:8, shift:true },
+  { name:'Equator', lat:0, lon:0, utc:0 },
+  { name:'5°N (two earliest sunrises)', lat:5, lon:0, utc:0 },
+  { name:'14°N (flat Sept)', lat:14, lon:0, utc:0, day:260 },
+  { name:'30°N', lat:30, lon:0, utc:0 },
+  { name:'Sydney 33.87°S', lat:-33.87, lon:151.21, utc:10 },
+  { name:'Reykjavík 64.15°N', lat:64.15, lon:-21.94, utc:0 },
+];
+let MODE = 'rise', LAST = null, playTimer = null;
+
+function val(id){ return parseFloat($(id).value); }
+function setVal(id, v){ $(id).value = v; $(id + '_n').value = v; }
+function buildControls(){
+  for (const s of SPEC){
+    const div = document.createElement('div'); div.className = 'ctl';
+    div.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div>
+      <div class="inp"><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}">
+      <input type="number" id="${s.id}_n" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}"></div>`;
+    $('grp_' + s.group).appendChild(div);
+    $(s.id).addEventListener('input', () => { $(s.id + '_n').value = $(s.id).value; render(); });
+    $(s.id + '_n').addEventListener('change', () => {
+      let v = parseFloat($(s.id + '_n').value); if (!isFinite(v)) v = s.def;
+      v = Math.min(s.max, Math.max(s.min, v)); setVal(s.id, v); render();
+    });
+  }
+  const pr = $('presets');
+  PRESETS.forEach(P => {
+    const b = document.createElement('button'); b.textContent = P.name;
+    b.addEventListener('click', () => {
+      setVal('lat', P.lat); setVal('lon', P.lon); setVal('utc', P.utc);
+      setVal('eps', EARTH.eps); setVal('ecc', EARTH.ecc); setVal('peri', EARTH.peri); setVal('toff', 0);
+      if (P.day) setVal('day', P.day);
+      $('shift').checked = !!P.shift; render();
+    });
+    pr.appendChild(b);
+  });
+  $('earthBtn').addEventListener('click', () => {
+    setVal('eps', EARTH.eps); setVal('ecc', EARTH.ecc); setVal('peri', EARTH.peri);
+    $('constSpeed').checked = false; $('noTilt').checked = false; syncWhat(); render();
+  });
+  document.querySelectorAll('#whatSeg button').forEach(b => b.addEventListener('click', () => {
+    const [c, t] = WHAT[b.dataset.w]; $('constSpeed').checked = c; $('noTilt').checked = t; syncWhat(); render();
+  }));
+  for (const id of ['constSpeed', 'noTilt']) $(id).addEventListener('change', () => { syncWhat(); render(); });
+  $('ghosts').addEventListener('change', render);
+  document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+    MODE = b.dataset.mode; document.querySelectorAll('#modeSeg button').forEach(x => x.classList.toggle('on', x === b)); render();
+  }));
+  $('refr').addEventListener('change', render); $('shift').addEventListener('change', render);
+  $('playBtn').addEventListener('click', togglePlay);
+}
+function togglePlay(){
+  if (playTimer){ clearInterval(playTimer); playTimer = null; $('playBtn').textContent = '▶ Animate the year'; return; }
+  $('playBtn').textContent = '❚❚ Pause';
+  playTimer = setInterval(() => { setVal('day', (val('day') % 365) + 1); render(); }, 70);
+}
+function setDay(d){ d = Math.max(1, Math.min(365, Math.round(d))); if (d !== val('day')){ setVal('day', d); render(); } }
+
+function params(){
+  const constSpeed = $('constSpeed').checked, noTilt = $('noTilt').checked;
+  return { lat: val('lat'), lon: val('lon'), utc: val('utc'),
+    eps: noTilt ? 0 : val('eps'), ecc: constSpeed ? 0 : val('ecc'), peri: val('peri'),
+    constSpeed, noTilt, refr: $('refr').checked, shiftOn: $('shift').checked, ...KUCHING, mode: MODE };
+}
+const WHAT = { real: [false, false], const: [true, false], notilt: [false, true], none: [true, true] };
+function syncWhat(){
+  const c = $('constSpeed').checked, t = $('noTilt').checked;
+  document.querySelectorAll('#whatSeg button').forEach(b => { const [bc, bt] = WHAT[b.dataset.w]; b.classList.toggle('on', bc === c && bt === t); });
+  $('ecc').closest('.ctl').classList.toggle('overridden', c);
+  $('eps').closest('.ctl').classList.toggle('overridden', t);
+  $('ecc').disabled = $('ecc_n').disabled = c;
+  $('eps').disabled = $('eps_n').disabled = t;
+}
+
+// ---------- compute everything for one render ----------
+function compute(){
+  const p = params(), Y = computeYear(p), D = Y.days;
+  const col = k => D.map(r => r[k]);
+  const R = { p, Y, srStd: col('sr'), ssStd: col('ss'), srC: col('srC'), ssC: col('ssC'), dl: col('dl'), eot: col('eot'), decl: col('decl') };
+  R.ev = {
+    srC: eventsOf(R.srC, PROM_H, TIE_H), ssC: eventsOf(R.ssC, PROM_H, TIE_H),
+    srStd: eventsOf(R.srStd, PROM_H, TIE_H), ssStd: eventsOf(R.ssStd, PROM_H, TIE_H),
+    dl: eventsOf(R.dl, 0.5 / 60, 0), eot: eventsOf(R.eot, 0.3, 0),
+  };
+  const rise = p.mode === 'rise';
+  const base = (rise ? R.srStd : R.ssStd).filter(v => v !== null);
+  R.autoT = base.length ? meanOf(base) : (rise ? 6 : 18) + Y.corr;
+  R.T = R.autoT + val('toff') / 60;
+  R.center = rise ? 90 : 270;
+  R.sky = skyPositions(p, Y, R.T, R.center);
+  R.axis = axisPositions(p, Y, R.T, R.center);
+  R.axisH = axisHourAngle(Y, R.T);
+  R.seasons = seasonDays(p);
+  // each cause on its own, at the same clock time: tilt only (circular orbit) and uneven speed only (no tilt)
+  R.ghosts = [];
+  if ($('ghosts').checked && p.eps > 0.05 && p.ecc > 0.0005){
+    for (const g of [{ key: 'tilt', name: 'tilt only (constant speed)', q: { ...p, ecc: 0 }, color: 'rgba(201,160,255,0.75)' },
+                     { key: 'ecc', name: 'uneven speed only (no tilt)', q: { ...p, eps: 0 }, color: 'rgba(120,235,215,0.75)' }]){
+      const GY = computeYear(g.q);
+      R.ghosts.push({ ...g, Y: GY, sky: skyPositions(g.q, GY, R.T, R.center) });
+    }
+  }
+  R.polarDay = D.filter(r => r.polar === 'day').length;
+  R.polarNight = D.filter(r => r.polar === 'night').length;
+  R.day = val('day');
+  return R;
+}
+
+// ---------- canvas helpers ----------
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.max(280, Math.floor(cv.clientWidth || cv.parentElement.clientWidth)), H = +cv.dataset.h;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { ctx, W, H };
+}
+function niceStep(span, target, list){
+  const raw = span / target;
+  if (list){ for (const s of list) if (s >= raw) return s; return list[list.length - 1]; }
+  const pw = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * pw >= raw) return m * pw;
+  return 10 * pw;
+}
+function spanPx(pts){ let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of pts){ x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return Math.max(x1 - x0, y1 - y0); }
+function line(ctx, x1, y1, x2, y2){ ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+function dot(ctx, x, y, r, fill, stroke){ ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = fill; ctx.fill(); if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke(); } }
+function diamond(ctx, x, y, r, fill){ ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = '#0a0f1c'; ctx.lineWidth = 1; ctx.stroke(); }
+function text(ctx, s, x, y, o = {}){
+  ctx.font = o.font || '11px ' + FONT; ctx.fillStyle = o.color || COL.muted;
+  ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'alphabetic'; ctx.fillText(s, x, y);
+}
+
+// Collision-avoiding label placer: tries positions around an anchor, avoiding other labels,
+// curve points and the given bounds. Draws a leader line when the label ends up far away.
+class Labeler {
+  constructor(ctx, bounds, obstacles){ this.ctx = ctx; this.b = bounds; this.boxes = []; this.obs = obstacles || []; }
+  reserve(x, y, w, h){ this.boxes.push({ x, y, w, h }); }
+  place(lines, ax, ay, o = {}){
+    if (!Array.isArray(lines)) lines = [lines];
+    const ctx = this.ctx, font = o.font || '11px ' + FONT, fs = parseFloat(/([\d.]+)px/.exec(font)[1]), lh = fs + 3;
+    ctx.font = font;
+    let w = 0; for (const s of lines) w = Math.max(w, ctx.measureText(s).width); w += 6;
+    const h = lh * lines.length + 3, B = this.b, pref = o.pref ?? 0, r0 = o.r0 ?? 7;
+    const offs = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180];
+    const dists = [r0, r0 + 8, r0 + 18, r0 + 32, r0 + 50, r0 + 75, r0 + 110];
+    let best = null;
+    search:
+    for (const dd of dists) for (const da of offs){
+      const a = (pref + da) * RAD, c = Math.cos(a), s = Math.sin(a);
+      const px = ax + dd * c, py = ay - dd * s, bx = px + (c - 1) * w / 2, by = py - (s + 1) * h / 2;
+      if (bx < B.x0 || by < B.y0 || bx + w > B.x1 || by + h > B.y1) continue;
+      let ov = 0; for (const q of this.boxes) if (bx < q.x + q.w && bx + w > q.x && by < q.y + q.h && by + h > q.y) ov++;
+      let ob = 0; for (const q of this.obs) if (q[0] >= bx - 1 && q[0] <= bx + w + 1 && q[1] >= by - 1 && q[1] <= by + h + 1) ob++;
+      const sc = ov * 1000 + ob * 25 + dd + Math.abs(da) * 0.05;
+      if (!best || sc < best.sc) best = { sc, bx, by, dd };
+      if (ov === 0 && ob === 0) break search;
+    }
+    if (!best){
+      best = { bx: Math.min(Math.max(ax + r0, B.x0), B.x1 - w), by: Math.min(Math.max(ay - h / 2, B.y0), B.y1 - h), dd: 99 };
+    }
+    const { bx, by } = best;
+    if (best.dd > r0 + 12 && o.leader !== false){
+      const nx = Math.min(Math.max(ax, bx), bx + w), ny = Math.min(Math.max(ay, by), by + h);
+      ctx.strokeStyle = o.leaderColor || 'rgba(210,220,240,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([]); line(ctx, ax, ay, nx, ny);
+    }
+    if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.78)'; ctx.fillRect(bx, by, w, h); }
+    ctx.font = font; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    lines.forEach((s, i) => { ctx.fillStyle = i === 0 ? (o.color || COL.ink) : (o.color2 || '#dfe6f2'); ctx.fillText(s, bx + 3, by + 2 + i * lh); });
+    this.boxes.push({ x: bx, y: by, w, h });
+    return best;
+  }
+}
+function eventTitle(e, names){
+  const k = e.kind === 'min' ? 0 : 1;
+  if (e.rank === 'global') return names[k];
+  if (e.rank === 'tie') return names[k] + ' (tie)';
+  return 'local ' + (k === 0 ? 'min' : 'max');
+}
+
+// ---------- panel 1: sky ----------
+function renderSky(R){
+  const { ctx, W, H } = setupCanvas($('sky'));
+  const p = R.p, rise = p.mode === 'rise';
+  const pad = { l: 46, r: 14, t: R.ghosts.length ? 46 : 30, b: 46 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  let a0 = Infinity, a1 = -Infinity, e0 = Infinity, e1 = -Infinity;
+  for (const q of R.sky.concat(R.axis, ...R.ghosts.map(g => g.sky))){ a0 = Math.min(a0, q.az); a1 = Math.max(a1, q.az); e0 = Math.min(e0, q.alt); e1 = Math.max(e1, q.alt); }
+  e0 = Math.min(e0, 0, R.Y.h0); e1 = Math.max(e1, 0);
+  const sa = Math.max(a1 - a0, 4), se = Math.max(e1 - e0, 2);
+  const s = Math.min(pw / (sa * 1.22), ph / (se * 1.5 + 1.5));
+  const cx = (a0 + a1) / 2, cy = (e0 + e1) / 2;
+  const X = az => pad.l + pw / 2 + (az - cx) * s, Y = alt => pad.t + ph / 2 - (alt - cy) * s;
+  const azL = cx - pw / 2 / s, azR = cx + pw / 2 / s, altB = cy - ph / 2 / s, altT = cy + ph / 2 / s;
+  const yH = Y(0);
+
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
+  const g = ctx.createLinearGradient(0, pad.t, 0, Math.max(yH, pad.t + 1));
+  g.addColorStop(0, '#0b1530'); g.addColorStop(1, '#1f3c66');
+  ctx.fillStyle = g; ctx.fillRect(pad.l, pad.t, pw, ph);
+  ctx.fillStyle = '#17150f'; ctx.fillRect(pad.l, yH, pw, pad.t + ph - yH);
+  const st = niceStep(pw / s, 9, [0.5, 1, 2, 5, 10, 15, 20, 30, 45]);
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+  for (let a = Math.ceil(azL / st) * st; a <= azR; a += st) line(ctx, X(a), pad.t, X(a), pad.t + ph);
+  for (let e = Math.ceil(altB / st) * st; e <= altT; e += st) line(ctx, pad.l, Y(e), pad.l + pw, Y(e));
+  ctx.strokeStyle = '#aab6cc'; ctx.lineWidth = 1.6; line(ctx, pad.l, yH, pad.l + pw, yH);
+  if (p.refr){ ctx.strokeStyle = 'rgba(255,216,77,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]); line(ctx, pad.l, Y(R.Y.h0), pad.l + pw, Y(R.Y.h0)); ctx.setLineDash([]); }
+
+  // axis
+  const axPx = R.axis.map(q => [X(q.az), Y(q.alt)]);
+  ctx.strokeStyle = COL.axis; ctx.lineWidth = 1.4; ctx.setLineDash([7, 5]);
+  ctx.beginPath(); axPx.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); ctx.setLineDash([]);
+
+  for (const gh of R.ghosts){
+    ctx.strokeStyle = gh.color; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+    gh.sky.forEach((q, i) => i ? ctx.lineTo(X(q.az), Y(q.alt)) : ctx.moveTo(X(q.az), Y(q.alt)));
+    ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // figure-8, coloured by direction of travel
+  const px = R.sky.map(q => [X(q.az), Y(q.alt)]);
+  ctx.lineWidth = 2.6;
+  for (let i = 0; i < 365; i++){
+    const j = (i + 1) % 365, north = R.decl[j] >= R.decl[i];
+    ctx.strokeStyle = north ? COL.north : COL.south; line(ctx, px[i][0], px[i][1], px[j][0], px[j][1]);
+  }
+
+  // extremes: tangent "horizon" segments
+  const evs = rise ? R.ev.srStd : R.ev.ssStd;
+  const names = rise ? ['Earliest sunrise', 'Latest sunrise'] : ['Earliest sunset', 'Latest sunset'];
+  const allEv = evs.min.concat(evs.max);
+  for (const e of allEv){
+    if (e.rank === 'local') continue;
+    const [x, y] = px[e.i], c = e.kind === 'min' ? COL.early : COL.late;
+    ctx.strokeStyle = c; ctx.globalAlpha = 0.8; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]);
+    line(ctx, x - 70, y, x + 70, y); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // axis tilt angle at the axis point with declination 0
+  const q0 = altAz(p.lat, 0, R.axisH), qa = altAz(p.lat, 1, R.axisH), qb = altAz(p.lat, -1, R.axisH);
+  let vx = X(unwrapAz(qa.az, R.center)) - X(unwrapAz(qb.az, R.center)), vy = Y(qa.alt) - Y(qb.alt);
+  if (vx < 0){ vx = -vx; vy = -vy; }
+  const ang = Math.atan2(-vy, vx) / RAD;
+  const P0x = X(unwrapAz(q0.az, R.center)), P0y = Y(q0.alt), L = Math.min(90, pw * 0.13);
+  if (p.eps > 0.5){
+    ctx.strokeStyle = COL.axis; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); line(ctx, P0x, P0y, P0x + L, P0y); ctx.setLineDash([]);
+    ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(P0x, P0y, L * 0.8, 0, -ang * RAD, ang > 0); ctx.stroke();
+  }
+
+  // markers
+  for (let m = 0; m < 12; m++){ const [x, y] = px[MONTH_START[m] - 1]; dot(ctx, x, y, 2.6, '#e8eef8'); }
+  for (const sd of R.seasons) if (sd.di){ const [x, y] = px[sd.di - 1]; diamond(ctx, x, y, 5, COL.season); }
+  for (const e of allEv){ const [x, y] = px[e.i]; dot(ctx, x, y, e.rank === 'local' ? 3.5 : 5, e.kind === 'min' ? COL.early : COL.late, '#0a0f1c'); }
+  const sp = px[R.day - 1];
+  ctx.save(); ctx.shadowColor = COL.sun; ctx.shadowBlur = 14; dot(ctx, sp[0], sp[1], 6.5, COL.sun); ctx.restore();
+
+  // ---- labels ----
+  const obs = px.concat(axPx);
+  const lab = new Labeler(ctx, { x0: pad.l + 2, y0: pad.t + 2, x1: pad.l + pw - 2, y1: pad.t + ph - 2 }, obs);
+  // horizon labels
+  ctx.font = '11px ' + FONT;
+  const hzTxt = (rise ? 'Eastern' : 'Western') + ' horizon (altitude 0°)';
+  const hw = ctx.measureText(hzTxt).width;
+  text(ctx, hzTxt, pad.l + pw - 6, yH - 5, { align: 'right', color: '#c9d3e4' }); lab.reserve(pad.l + pw - 8 - hw, yH - 17, hw + 4, 14);
+  if (p.refr){
+    const t2 = '−0.83°: upper limb on the horizon (' + (rise ? 'sunrise' : 'sunset') + ')', w2 = ctx.measureText(t2).width;
+    text(ctx, t2, pad.l + 6, Y(R.Y.h0) + 13, { color: 'rgba(255,216,77,0.8)' }); lab.reserve(pad.l + 4, Y(R.Y.h0) + 2, w2 + 4, 14);
+  }
+  // extremes
+  for (const e of allEv){
+    const [x, y] = px[e.i], top = (e.kind === 'min') === rise;
+    lab.place([eventTitle(e, names), doyToDate(e.d) + ' · ' + fmtClock(e.v)], x, y,
+      { pref: top ? 90 : -90, color: e.kind === 'min' ? COL.early : COL.late, font: (e.rank === 'local' ? '' : 'bold ') + '11px ' + FONT, r0: 9 });
+  }
+  // axis angle label
+  if (p.eps > 0.5){
+    const am = ang / 2 * RAD, lx = P0x + L * 0.8 * Math.cos(am), ly = P0y - L * 0.8 * Math.sin(am);
+    lab.place(['axis tilt ' + Math.abs(ang).toFixed(1) + '°', '≈ latitude ' + Math.abs(p.lat).toFixed(2) + '°'], lx, ly,
+      { pref: ang >= 0 ? -60 : 60, color: COL.axis, r0: 8 });
+  }
+  const tiny = spanPx(px) < 12;
+  if (tiny) lab.place(['The analemma has shrunk to a single point:', 'the Sun is in the same place at ' + fmtClock(R.T) + ' every day'], px[0][0], px[0][1], { pref: 60, color: COL.sun, r0: 14, font: 'bold 11px ' + FONT });
+  // seasons
+  if (!tiny) for (const sd of R.seasons) if (sd.di){
+    const [x, y] = px[sd.di - 1];
+    const cxp = X(cx), cyp = Y(cy), pref = Math.atan2(-(y - cyp), x - cxp) / RAD;
+    lab.place(sd.date + ' ' + sd.name.split(' ')[1], x, y, { pref, color: '#ffffff' });
+  }
+  // months
+  const cxp = X(cx), cyp = Y(cy);
+  if (!tiny) for (let m = 0; m < 12; m++){
+    const [x, y] = px[MONTH_START[m] - 1];
+    lab.place(MONTHS[m] + ' 1', x, y, { pref: Math.atan2(-(y - cyp), x - cxp) / RAD, color: '#b9c6da', font: '10.5px ' + FONT, r0: 5 });
+  }
+  if (!tiny) lab.place(doyToDate(R.day), sp[0], sp[1], { pref: 45, color: COL.sun, r0: 9, font: 'bold 11px ' + FONT });
+
+  // ticks and captions outside the plot
+  for (let a = Math.ceil(azL / st) * st; a <= azR; a += st)
+    text(ctx, +wrap360(a).toFixed(1) + '°', X(a), pad.t + ph + 13, { align: 'center' });
+  const cstep = 22.5 * s < 40 ? 45 : 22.5;
+  for (let a = Math.ceil(azL / cstep) * cstep; a <= azR; a += cstep){
+    const k = Math.round(wrap360(a) / 22.5) % 16;
+    text(ctx, COMPASS[k], X(a), pad.t + ph + 27, { align: 'center', color: COL.north, font: 'bold 11px ' + FONT });
+  }
+  for (let e = Math.ceil(altB / st) * st; e <= altT; e += st)
+    text(ctx, +e.toFixed(1) + '°', pad.l - 5, Y(e) + 4, { align: 'right' });
+  text(ctx, rise ? '← north' : '← south', pad.l, H - 5); text(ctx, rise ? 'south →' : 'north →', pad.l + pw, H - 5, { align: 'right' });
+  text(ctx, 'azimuth (equal degree scale on both axes)', pad.l + pw / 2, H - 5, { align: 'center' });
+  // legend
+  let lx = pad.l;
+  const leg = (c, dash, t) => { ctx.strokeStyle = c; ctx.lineWidth = 2.4; ctx.setLineDash(dash); line(ctx, lx, 13, lx + 18, 13); ctx.setLineDash([]);
+    text(ctx, t, lx + 23, 17, { color: '#c9d3e4' }); lx += 30 + ctx.measureText(t).width + 10; };
+  leg(COL.north, [], 'Sun moving north (Dec→Jun)'); leg(COL.south, [], 'moving south (Jun→Dec)'); leg(COL.axis, [6, 4], 'axis (no equation of time)');
+  text(ctx, 'Sun at ' + fmtClock(R.T) + ' every day', pad.l + pw, 17, { align: 'right', color: COL.sun, font: 'bold 11px ' + FONT });
+  if (R.ghosts.length){
+    lx = pad.l; const ly = 35;
+    for (const gh of R.ghosts){
+      ctx.strokeStyle = gh.color; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); line(ctx, lx, ly - 4, lx + 18, ly - 4); ctx.setLineDash([]);
+      text(ctx, gh.name, lx + 23, ly, { color: gh.color }); lx += 30 + ctx.measureText(gh.name).width + 10;
+    }
+  }
+
+  R.skyPx = px;
+}
+
+// ---------- strip charts (time panel and EoT panel) ----------
+function drawStrips(cv, strips, R){
+  const { ctx, W, H } = setupCanvas(cv);
+  const pad = { l: 64, r: 12, t: 6, b: 20 }, gap = 12, pw = W - pad.l - pad.r;
+  const tot = strips.reduce((a, s) => a + s.frac, 0), avail = H - pad.t - pad.b - gap * (strips.length - 1);
+  const X = d => pad.l + (d - 1) / 364 * pw;
+  let y = pad.t;
+  for (const st of strips){
+    st.h = avail * st.frac / tot; st.y0 = y; y += st.h + gap;
+    const vv = st.vals.concat(st.std || [], ...(st.ghosts || []).map(g => g.vals)).filter(v => v !== null && isFinite(v));
+    let lo = vv.length ? Math.min(...vv) : 0, hi = vv.length ? Math.max(...vv) : 1;
+    const rng = Math.max(hi - lo, st.minRange), c = (hi + lo) / 2;
+    lo = c - rng / 2 - rng * st.padLo; hi = c + rng / 2 + rng * st.padHi;
+    st.lo = lo; st.hi = hi; st.Y = v => st.y0 + st.h - (v - lo) / (hi - lo) * st.h;
+  }
+  const sols = R.seasons.filter(s => s.di && s.t % 180 === 90);
+  for (const st of strips){
+    const y0 = st.y0, y1 = st.y0 + st.h;
+    ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, y0, pw, st.h);
+    ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+    for (const m of MONTH_START) line(ctx, X(m), y0, X(m), y1);
+    const step = niceStep(st.hi - st.lo, 4, st.steps);
+    for (let v = Math.ceil(st.lo / step) * step; v <= st.hi; v += step){
+      if (st.tickRange && (v < st.tickRange[0] - 1e-9 || v > st.tickRange[1] + 1e-9)) continue;
+      ctx.strokeStyle = COL.grid; line(ctx, pad.l, st.Y(v), pad.l + pw, st.Y(v));
+      text(ctx, st.tick(v), pad.l - 5, st.Y(v) + 4, { align: 'right' });
+    }
+    if (st.zero && st.lo < 0 && st.hi > 0){ ctx.strokeStyle = 'rgba(220,230,245,0.45)'; line(ctx, pad.l, st.Y(0), pad.l + pw, st.Y(0)); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.setLineDash([2, 4]);
+    for (const s of sols) line(ctx, X(s.day), y0, X(s.day), y1);
+    ctx.setLineDash([]);
+    // polar shading
+    if (st.polar){
+      let i = 0;
+      while (i < 365){
+        if (!st.polar[i]){ i++; continue; }
+        let j = i; while (j + 1 < 365 && st.polar[j + 1] === st.polar[i]) j++;
+        ctx.fillStyle = st.polar[i] === 'day' ? 'rgba(255,216,77,0.10)' : 'rgba(120,140,255,0.12)';
+        ctx.fillRect(X(i + 1), y0, Math.max(2, X(j + 1) - X(i + 1)), st.h);
+        if (X(j + 1) - X(i + 1) > 60) text(ctx, 'polar ' + st.polar[i], (X(i + 1) + X(j + 1)) / 2, y0 + st.h / 2, { align: 'center', color: '#c9d3e4' });
+        i = j + 1;
+      }
+    }
+    const curve = (vals, color, dash, width) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash); ctx.beginPath();
+      let on = false;
+      vals.forEach((v, i) => {
+        if (v === null){ on = false; return; }
+        const pv = i > 0 ? vals[i - 1] : null;
+        if (on && pv !== null && Math.abs(v - pv) > st.jump) on = false;
+        on ? ctx.lineTo(X(i + 1), st.Y(v)) : ctx.moveTo(X(i + 1), st.Y(v)); on = true;
+      });
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    if (st.std) curve(st.std, 'rgba(200,210,230,0.45)', [4, 4], 1.4);
+    if (st.ghosts) for (const g of st.ghosts) curve(g.vals, g.color, [5, 4], 1.5);
+    curve(st.vals, st.color, [], 2.2);
+    // labels
+    const obs = []; st.vals.forEach((v, i) => { if (v !== null) obs.push([X(i + 1), st.Y(v)]); });
+    const lab = new Labeler(ctx, { x0: pad.l + 2, y0: y0 + 1, x1: pad.l + pw - 2, y1: y1 - 1 }, obs);
+    ctx.font = 'bold 11px ' + FONT; const tw = ctx.measureText(st.title).width;
+    ctx.fillStyle = 'rgba(12,19,35,0.85)'; ctx.fillRect(pad.l + 3, y0 + 3, tw + 8, 16);
+    text(ctx, st.title, pad.l + 7, y0 + 15, { color: st.color, font: 'bold 11px ' + FONT }); lab.reserve(pad.l + 3, y0 + 3, tw + 8, 16);
+    if (st.ghosts){
+      let gy = y0 + 15;
+      for (const g of st.ghosts){
+        ctx.font = '10.5px ' + FONT; const gw = ctx.measureText(g.name).width, gx = pad.l + pw - gw - 8;
+        ctx.fillStyle = 'rgba(12,19,35,0.85)'; ctx.fillRect(gx - 26, gy - 12, gw + 32, 15);
+        ctx.strokeStyle = g.color; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); line(ctx, gx - 22, gy - 4, gx - 5, gy - 4); ctx.setLineDash([]);
+        text(ctx, g.name, gx, gy, { color: g.color, font: '10.5px ' + FONT }); lab.reserve(gx - 26, gy - 12, gw + 32, 15);
+        gy += 15;
+      }
+    }
+    if (st === strips[0]) for (const s of sols){
+      const t = s.name.slice(0, 3) + ' solstice'; ctx.font = '10px ' + FONT; const w = ctx.measureText(t).width;
+      const x = Math.min(Math.max(X(s.day) + 3, pad.l + tw + 16), pad.l + pw - w - 4);
+      text(ctx, t, x, y0 + 13, { color: 'rgba(255,255,255,0.55)', font: '10px ' + FONT }); lab.reserve(x - 1, y0 + 3, w + 2, 13);
+    }
+    if (st.ev) for (const e of st.ev.min.concat(st.ev.max)){
+      if (st.skipLocal && e.rank === 'local') continue;
+      const x = X(e.d), yy = st.Y(e.v), c = e.kind === 'min' ? st.cMin : st.cMax;
+      dot(ctx, x, yy, e.rank === 'local' ? 3 : 4.5, c, '#0a0f1c');
+      lab.place(st.label(e), x, yy, { pref: e.kind === 'min' ? -90 : 90, color: c, font: (e.rank === 'local' ? '' : 'bold ') + '10.5px ' + FONT, r0: 6 });
+    }
+    if (st.marks) for (const mk of st.marks){
+      const x = X(mk.d), yy = st.Y(mk.v); diamond(ctx, x, yy, 4.5, '#fff');
+      lab.place(mk.text, x, yy, { pref: mk.pref, color: '#ffffff', font: '10.5px ' + FONT });
+    }
+    // highlighted day
+    const hv = st.vals[R.day - 1];
+    ctx.strokeStyle = 'rgba(255,216,77,0.55)'; ctx.lineWidth = 1; line(ctx, X(R.day), y0, X(R.day), y1);
+    if (hv !== null) dot(ctx, X(R.day), st.Y(hv), 4, COL.sun);
+  }
+  for (let m = 0; m < 12; m++) text(ctx, MONTHS[m], X(MONTH_START[m]) + 3, H - 6);
+  return { X, pad, pw };
+}
+
+function renderTime(R){
+  const p = R.p, tz = fmtUtc(p.utc), polar = R.Y.days.map(r => r.polar);
+  const clockSteps = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 240, 360].map(m => m / 60);
+  const lbl = names => e => [eventTitle(e, names), doyToDate(e.d) + ' · ' + fmtClock(e.v)];
+  const strips = [
+    { title: 'Sunrise (' + tz + (p.shiftOn ? ', with Kuching shift; dashed = without' : '') + ')', vals: R.srC, std: p.shiftOn ? R.srStd : null, ev: R.ev.srC,
+      label: lbl(['Earliest sunrise', 'Latest sunrise']), tick: fmtClock, steps: clockSteps, color: '#ffcf6e', cMin: COL.early, cMax: COL.late,
+      frac: 0.39, minRange: 10 / 60, padLo: 0.45, padHi: 0.45, jump: 0.25, polar },
+    { title: 'Sunset (' + tz + ')', vals: R.ssC, std: p.shiftOn ? R.ssStd : null, ev: R.ev.ssC,
+      label: lbl(['Earliest sunset', 'Latest sunset']), tick: fmtClock, steps: clockSteps, color: '#ff9a6b', cMin: COL.early, cMax: COL.late,
+      frac: 0.39, minRange: 10 / 60, padLo: 0.45, padHi: 0.45, jump: 0.25, polar },
+    { title: 'Day length', vals: R.dl, ev: R.ev.dl, skipLocal: true,
+      label: e => [(e.kind === 'min' ? 'Shortest day ' : 'Longest day ') + doyToDate(e.d), fmtDur(e.v)], tick: fmtDur, steps: clockSteps,
+      color: '#8fd3ff', cMin: '#8fd3ff', cMax: '#8fd3ff', tickRange: [0, 24], frac: 0.26, minRange: 10 / 60, padLo: 0.5, padHi: 0.6, jump: 30 },
+  ];
+  R.timeGeo = drawStrips($('time'), strips, R);
+}
+
+function renderEot(R){
+  const marks = R.seasons.filter(s => s.di).map(s => ({ d: s.di, v: R.decl[s.di - 1], text: s.date + ' ' + s.name.split(' ')[1], pref: s.t === 90 ? -90 : s.t === 270 ? 90 : 0 }));
+  const strips = [
+    { title: 'Equation of time (min)', vals: R.eot, ev: R.ev.eot, zero: true,
+      ghosts: R.ghosts.length ? [
+        { name: 'tilt part: ±' + Math.max(...R.Y.days.map(r => Math.abs(r.eotTilt))).toFixed(1) + ' min, twice a year', vals: R.Y.days.map(r => r.eotTilt), color: R.ghosts[0].color },
+        { name: 'uneven-speed part: ±' + Math.max(...R.Y.days.map(r => Math.abs(r.eotEcc))).toFixed(1) + ' min, once a year', vals: R.Y.days.map(r => r.eotEcc), color: R.ghosts[1].color },
+      ] : null,
+      label: e => [(e.rank === 'global' ? 'EoT ' + e.kind + ' ' : '') + sgn(e.v) + ' min', doyToDate(e.d)], tick: v => sgn(v, 0),
+      steps: [1, 2, 5, 10, 15, 20, 30, 60], color: '#ffd84d', cMin: COL.late, cMax: COL.early, frac: 0.55, minRange: 2, padLo: 0.4, padHi: 0.4, jump: 30 },
+    { title: 'Declination', vals: R.decl, zero: true, marks, tick: v => v.toFixed(0) + '°',
+      steps: [1, 2, 5, 10, 15, 20, 30], color: '#c8d4ff', frac: 0.45, minRange: 2, padLo: 0.3, padHi: 0.3, jump: 90 },
+  ];
+  R.eotGeo = drawStrips($('eot'), strips, R);
+}
+
+// ---------- panel 3b: noon analemma ----------
+function renderNoon(R){
+  const { ctx, W, H } = setupCanvas($('noon'));
+  const pad = { l: 38, r: 10, t: 12, b: 30 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const xs = R.eot.map(v => v * 0.25), ys = R.decl;
+  const gxs = R.ghosts.flatMap(g => g.Y.days.map(r => r.eot * 0.25)), gys = R.ghosts.flatMap(g => g.Y.days.map(r => r.decl));
+  const x0 = Math.min(...xs, ...gxs, -1), x1 = Math.max(...xs, ...gxs, 1), y0 = Math.min(...ys, ...gys, -1), y1 = Math.max(...ys, ...gys, 1);
+  const s = Math.min(pw / ((x1 - x0) * 1.2 + 14), ph / ((y1 - y0) * 1.12));
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const X = v => pad.l + pw / 2 + (v - cx) * s, Y = v => pad.t + ph / 2 - (v - cy) * s;
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+  const yst = niceStep(ph / s, 6, [1, 2, 5, 10, 15, 20]);
+  for (let v = Math.ceil((cy - ph / 2 / s) / yst) * yst; v <= cy + ph / 2 / s; v += yst){ line(ctx, pad.l, Y(v), pad.l + pw, Y(v)); text(ctx, v.toFixed(0) + '°', pad.l - 4, Y(v) + 4, { align: 'right' }); }
+  const xstMin = niceStep((x1 - x0) * 4, 3, [1, 2, 5, 10, 15, 20, 30, 60]);
+  for (let m = Math.floor(x0 * 4 / xstMin) * xstMin; m <= Math.ceil(x1 * 4 / xstMin) * xstMin + 1e-9; m += xstMin){
+    const x = X(m / 4); line(ctx, x, pad.t, x, pad.t + ph); text(ctx, sgn(m, 0), x, pad.t + ph + 12, { align: 'center' });
+  }
+  ctx.strokeStyle = 'rgba(220,230,245,0.45)'; line(ctx, X(0), pad.t, X(0), pad.t + ph); line(ctx, pad.l, Y(0), pad.l + pw, Y(0));
+  for (const gh of R.ghosts){
+    ctx.strokeStyle = gh.color; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+    gh.Y.days.forEach((r, i) => i ? ctx.lineTo(X(r.eot * 0.25), Y(r.decl)) : ctx.moveTo(X(r.eot * 0.25), Y(r.decl)));
+    ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const px = xs.map((v, i) => [X(v), Y(ys[i])]);
+  ctx.lineWidth = 2.4;
+  for (let i = 0; i < 365; i++){ const j = (i + 1) % 365; ctx.strokeStyle = R.decl[j] >= R.decl[i] ? COL.north : COL.south; line(ctx, px[i][0], px[i][1], px[j][0], px[j][1]); }
+  for (let m = 0; m < 12; m++){ const q = px[MONTH_START[m] - 1]; dot(ctx, q[0], q[1], 2.4, '#e8eef8'); }
+  for (const sd of R.seasons) if (sd.di){ const q = px[sd.di - 1]; diamond(ctx, q[0], q[1], 4.5, '#fff'); }
+  const eMax = R.ev.eot.max.find(e => e.rank === 'global'), eMin = R.ev.eot.min.find(e => e.rank === 'global');
+  if (eMax) dot(ctx, px[eMax.i][0], px[eMax.i][1], 4.5, COL.early, '#0a0f1c');
+  if (eMin) dot(ctx, px[eMin.i][0], px[eMin.i][1], 4.5, COL.late, '#0a0f1c');
+  const sp = px[R.day - 1]; ctx.save(); ctx.shadowColor = COL.sun; ctx.shadowBlur = 12; dot(ctx, sp[0], sp[1], 5.5, COL.sun); ctx.restore();
+  const lab = new Labeler(ctx, { x0: pad.l + 2, y0: pad.t + 2, x1: pad.l + pw - 2, y1: pad.t + ph - 2 }, px);
+  if (eMax) lab.place(['widest east: ' + doyToDate(eMax.d), sgn(eMax.v) + ' min'], px[eMax.i][0], px[eMax.i][1], { pref: 0, color: COL.early, font: 'bold 10.5px ' + FONT });
+  if (eMin) lab.place(['widest west: ' + doyToDate(eMin.d), sgn(eMin.v) + ' min'], px[eMin.i][0], px[eMin.i][1], { pref: 180, color: COL.late, font: 'bold 10.5px ' + FONT });
+  const tiny = spanPx(px) < 12;
+  if (tiny) lab.place(['a single point:', 'EoT 0, declination 0 every day'], px[0][0], px[0][1], { pref: 45, color: COL.sun, r0: 12, font: 'bold 10.5px ' + FONT });
+  if (!tiny) for (const sd of R.seasons) if (sd.di){ const q = px[sd.di - 1]; lab.place(sd.date, q[0], q[1], { pref: q[0] > X(cx) ? 0 : 180, color: '#fff', font: '10.5px ' + FONT }); }
+  if (!tiny) for (let m = 0; m < 12; m++){ const q = px[MONTH_START[m] - 1]; lab.place(MONTHS[m], q[0], q[1], { pref: q[0] >= X(cx) ? 0 : 180, color: '#b9c6da', font: '10px ' + FONT, r0: 4 }); }
+  if (!tiny) lab.place(doyToDate(R.day), sp[0], sp[1], { pref: 90, color: COL.sun, font: 'bold 10.5px ' + FONT });
+  text(ctx, '← Sun behind clock     EoT (min)     Sun ahead →', pad.l + pw / 2, H - 4, { align: 'center' });
+  // Note: with "ahead" the Sun has already crossed the meridian at clock noon, i.e. it is west of it.
+  R.noonPx = px;
+}
+
+// ---------- orbit (top view) + apparent speed ----------
+const V_MEAN_KMS = 29.78, N_MEAN = 360 / YEAR_DAYS;
+function earthHelio(p, orb, d){
+  const s = sunAt(d, p, orb), e = p.ecc, r = (1 - e * e) / (1 + e * Math.cos(s.nu * RAD));
+  const th = (s.lam + 180) * RAD, thM = (s.L0 + 180) * RAD;
+  return { s, r, x: r * Math.cos(th), y: r * Math.sin(th), xm: r * Math.cos(thM), ym: r * Math.sin(thM) };
+}
+function apparentSpeeds(p, r){   // Sun's apparent motion in deg/day: along the ecliptic, and eastward along the equator (right ascension)
+  const e = p.ecc, dLam = N_MEAN * Math.pow(1 + e * Math.cos(r.nu * RAD), 2) / Math.pow(1 - e * e, 1.5);
+  const cd = Math.cos(r.decl * RAD);
+  return { dLam, dRa: dLam * Math.cos(p.eps * RAD) / (cd * cd) };
+}
+function renderOrbit(R){
+  const { ctx, W, H } = setupCanvas($('orbit'));
+  const p = R.p, e = p.ecc, orb = R.Y.orb;
+  const oW = Math.min(W * 0.46, H + 40), S = Math.min(oW, H - 40) / (2 * (1 + e)) * 0.78;
+  const pdir = (orb.varpi + 180) * RAD;                 // heliocentric direction of perihelion
+  const sx = oW / 2 + 6 + e * S * Math.cos(pdir), sy = H / 2 + 4 - e * S * Math.sin(pdir);
+  const P = (x, y) => [sx + x * S, sy - y * S];
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(0, 0, oW + 12, H);
+
+  // orbit and apsides
+  ctx.strokeStyle = 'rgba(160,180,215,0.55)'; ctx.lineWidth = 1.3; ctx.beginPath();
+  for (let k = 0; k <= 360; k++){
+    const nu = k * RAD, rr = (1 - e * e) / (1 + e * Math.cos(nu)), [x, y] = P(rr * Math.cos(nu + pdir), rr * Math.sin(nu + pdir));
+    k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  const [px1, py1] = P((1 - e) * Math.cos(pdir), (1 - e) * Math.sin(pdir)), [ax1, ay1] = P(-(1 + e) * Math.cos(pdir), -(1 + e) * Math.sin(pdir));
+  if (e > 0.0005){ ctx.strokeStyle = 'rgba(255,216,77,0.3)'; ctx.setLineDash([3, 4]); line(ctx, px1, py1, ax1, ay1); ctx.setLineDash([]); }
+  ctx.save(); ctx.shadowColor = COL.sun; ctx.shadowBlur = 18; dot(ctx, sx, sy, 9, COL.sun); ctx.restore();
+
+  const lab = new Labeler(ctx, { x0: 4, y0: 4, x1: oW + 8, y1: H - 4 }, []);
+  lab.reserve(sx - 10, sy - 10, 20, 20);
+  lab.place('Sun', sx, sy, { pref: -45, color: COL.sun, r0: 12, leader: false });
+  // month dots (equal time steps -> unequal spacing)
+  for (let m = 0; m < 12; m++){
+    const E = earthHelio(p, orb, MONTH_START[m]), [x, y] = P(E.x, E.y);
+    dot(ctx, x, y, 3, '#e8eef8');
+    lab.place(MONTHS[m] + ' 1', x, y, { pref: Math.atan2(E.y, E.x) / RAD, color: '#b9c6da', font: '10.5px ' + FONT, r0: 6, leader: false });
+  }
+  if (e > 0.0005){
+    const aph = ((Math.round(p.peri + YEAR_DAYS / 2) - 1) % 365) + 1;
+    diamond(ctx, px1, py1, 5, COL.early); diamond(ctx, ax1, ay1, 5, COL.late);
+    lab.place(['perihelion ' + doyToDate(p.peri), 'fastest · ' + (1 - e).toFixed(3) + ' AU'], px1, py1, { pref: pdir / RAD, color: COL.early, r0: 10 });
+    lab.place(['aphelion ' + doyToDate(aph), 'slowest · ' + (1 + e).toFixed(3) + ' AU'], ax1, ay1, { pref: pdir / RAD + 180, color: COL.late, r0: 10 });
+  } else {
+    lab.place(['circular orbit:', 'same speed all year'], sx, sy + 0.45 * S, { pref: -90, color: COL.early, r0: 4, leader: false });
+  }
+  // today: real Earth, constant-speed Earth, velocity, axis lean
+  const E = earthHelio(p, orb, R.day), [ex, ey] = P(E.x, E.y), [mx, my] = P(E.xm, E.ym);
+  const Ea = earthHelio(p, orb, R.day - 0.5), Eb = earthHelio(p, orb, R.day + 0.5);
+  const vRel = Math.hypot(Eb.x - Ea.x, Eb.y - Ea.y) / (2 * Math.PI / YEAR_DAYS);
+  const ux = (Eb.x - Ea.x), uy = (Eb.y - Ea.y), un = Math.hypot(ux, uy) || 1, AL = 42 * vRel;
+  const tx = ex + ux / un * AL, ty = ey - uy / un * AL;
+  ctx.strokeStyle = '#8fd3ff'; ctx.lineWidth = 2; line(ctx, ex, ey, tx, ty);
+  const ah = Math.atan2(ty - ey, tx - ex); ctx.beginPath(); ctx.moveTo(tx, ty);
+  ctx.lineTo(tx - 7 * Math.cos(ah - 0.4), ty - 7 * Math.sin(ah - 0.4)); ctx.lineTo(tx - 7 * Math.cos(ah + 0.4), ty - 7 * Math.sin(ah + 0.4)); ctx.closePath();
+  ctx.fillStyle = '#8fd3ff'; ctx.fill();
+  if (Math.hypot(mx - ex, my - ey) > 1.5){
+    const a1 = Math.atan2(-(ey - sy), ex - sx), a2 = Math.atan2(-(my - sy), mx - sx), rr = Math.hypot(ex - sx, ey - sy);
+    ctx.strokeStyle = 'rgba(120,235,215,0.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, rr, -a1, -a2, norm180((a2 - a1) / RAD) > 0); ctx.stroke();
+  }
+  ctx.strokeStyle = '#e8eef8'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mx, my, 6, 0, 2 * Math.PI); ctx.stroke();
+  const lean = 28 * Math.sin(p.eps * RAD) / Math.sin(EARTH.eps * RAD);
+  if (p.eps > 0.05){ ctx.strokeStyle = COL.axis; ctx.lineWidth = 2.5; line(ctx, ex, ey, ex, ey - Math.min(lean, 40)); }
+  dot(ctx, ex, ey, 6.5, '#4aa8ff', '#0a0f1c');
+  lab.reserve(ex - 8, ey - 8, 16, 16);
+  lab.place([doyToDate(R.day) + ': Earth', fmtSpeed(vRel)], ex, ey, { pref: Math.atan2(E.y, E.x) / RAD + 180, color: '#8fd3ff', font: 'bold 10.5px ' + FONT, r0: 12 });
+  if (p.eps > 0.05) lab.place('N pole leans this way', ex, ey - Math.min(lean, 40), { pref: 90, color: COL.axis, font: '10px ' + FONT, r0: 5 });
+  else lab.place('no tilt', ex, ey, { pref: 90, color: COL.axis, font: '10px ' + FONT, r0: 10 });
+  text(ctx, 'Seen from above the north pole · Earth moves anticlockwise', 8, H - 8, { font: '10.5px ' + FONT });
+
+  // right: apparent speed of the Sun over the year
+  const cx0 = oW + 70, cx1 = W - 14, cy0 = 34, cy1 = H - 34;
+  if (cx1 - cx0 < 160) return;
+  const sp = R.Y.days.map(r => apparentSpeeds(p, r));
+  const all = sp.flatMap(q => [q.dLam, q.dRa]).concat([N_MEAN]);
+  let lo = Math.min(...all), hi = Math.max(...all); const c = (lo + hi) / 2, rg = Math.max(hi - lo, 0.02);
+  lo = c - rg * 0.62; hi = c + rg * 0.62;
+  const X = d => cx0 + (d - 1) / 364 * (cx1 - cx0), Yv = v => cy1 - (v - lo) / (hi - lo) * (cy1 - cy0);
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(cx0, cy0, cx1 - cx0, cy1 - cy0);
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1;
+  for (const m of MONTH_START) line(ctx, X(m), cy0, X(m), cy1);
+  for (let m = 0; m < 12; m++) text(ctx, MONTHS[m], X(MONTH_START[m]) + 3, cy1 + 13, { font: '10px ' + FONT });
+  const st = niceStep(hi - lo, 4, [0.005, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2]);
+  for (let v = Math.ceil(lo / st) * st; v <= hi; v += st){ line(ctx, cx0, Yv(v), cx1, Yv(v)); text(ctx, v.toFixed(3) + '°', cx0 - 4, Yv(v) + 4, { align: 'right', font: '10px ' + FONT }); }
+  ctx.strokeStyle = 'rgba(220,230,245,0.55)'; ctx.setLineDash([4, 4]); line(ctx, cx0, Yv(N_MEAN), cx1, Yv(N_MEAN)); ctx.setLineDash([]);
+  const plot = (k, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); sp.forEach((q, i) => i ? ctx.lineTo(X(i + 1), Yv(q[k])) : ctx.moveTo(X(i + 1), Yv(q[k]))); ctx.stroke(); };
+  plot('dLam', 'rgba(120,235,215,0.95)', 2); plot('dRa', '#ffd84d', 2);
+  ctx.strokeStyle = 'rgba(255,216,77,0.55)'; line(ctx, X(R.day), cy0, X(R.day), cy1);
+  dot(ctx, X(R.day), Yv(sp[R.day - 1].dLam), 3.5, 'rgba(120,235,215,1)'); dot(ctx, X(R.day), Yv(sp[R.day - 1].dRa), 3.5, COL.sun);
+  text(ctx, "Sun's apparent motion against the stars (degrees per day)", cx0, 14, { color: COL.ink, font: 'bold 11px ' + FONT });
+  const leg = [['rgba(120,235,215,0.95)', 'along the ecliptic: set by orbital speed'], ['#ffd84d', 'eastward along the equator: what sets the clock (orbit + tilt)'], ['rgba(220,230,245,0.7)', 'average 0.986°/day = a clock day']];
+  let ly = cy0 + 14;
+  for (const [col, t] of leg){
+    ctx.font = '10.5px ' + FONT; const tw = ctx.measureText(t).width;
+    ctx.fillStyle = 'rgba(12,19,35,0.85)'; ctx.fillRect(cx0 + 4, ly - 11, tw + 30, 15);
+    ctx.strokeStyle = col; ctx.lineWidth = 2; line(ctx, cx0 + 8, ly - 4, cx0 + 24, ly - 4); text(ctx, t, cx0 + 28, ly, { color: col, font: '10.5px ' + FONT }); ly += 15;
+  }
+  text(ctx, 'Above the dashed line the Sun gains on the clock each day; below it, it falls behind.', cx0, H - 6, { font: '10.5px ' + FONT });
+  R.orbitGeo = { cx0, cx1 };
+}
+function fmtSpeed(vRel){ return (V_MEAN_KMS * vRel).toFixed(2) + ' km/s (' + sgn((vRel - 1) * 100, 1) + '%)'; }
+function renderOrbitRead(R){
+  const p = R.p, r = R.Y.days[R.day - 1], E = earthHelio(p, R.Y.orb, R.day);
+  const vRel = Math.sqrt(Math.max(0, 2 / E.r - 1)), q = apparentSpeeds(p, r);
+  const ratio = p.ecc > 0 ? ((1 + p.ecc) / (1 - p.ecc)) : 1;
+  $('orbitRead').innerHTML = `<b>${doyToDate(R.day)}</b>: Earth is <b>${E.r.toFixed(4)} AU</b> from the Sun, moving at <b>${fmtSpeed(vRel)}</b> vs the average.
+    The Sun appears to move <b>${q.dLam.toFixed(4)}°/day</b> along the ecliptic and <b>${q.dRa.toFixed(4)}°/day</b> eastward along the equator (a clock day assumes ${N_MEAN.toFixed(4)}°).
+    Today's equation of time = uneven-speed part <b>${sgn(r.eotEcc)} min</b> + tilt part <b>${sgn(r.eotTilt)} min</b> = <b>${sgn(r.eot)} min</b>.<br>
+    ${p.ecc > 0 ? `Speed at perihelion is <b>${((ratio - 1) * 100).toFixed(1)}%</b> faster than at aphelion; the Sun's apparent motion is <b>${((ratio * ratio - 1) * 100).toFixed(1)}%</b> faster.` : 'Circular orbit: Earth moves at the same speed all year.'}
+    ${p.eps > 0 ? `Tilt ${p.eps.toFixed(2)}°: even at steady speed, the Sun's eastward motion is ${((1 / Math.cos(p.eps * RAD) - 1) * 100).toFixed(1)}% faster at the solstices and ${((1 - Math.cos(p.eps * RAD)) * 100).toFixed(1)}% slower at the equinoxes.` : 'No tilt: the ecliptic and the equator coincide, so the two speed curves are the same.'}`;
+}
+
+// ---------- what-if explanation ----------
+function whatExplain(R){
+  const p = R.p, eotAmp = (Math.max(...R.eot) - Math.min(...R.eot)) / 2;
+  const srv = R.srStd.filter(v => v !== null), swingMin = srv.length ? (Math.max(...srv) - Math.min(...srv)) * 60 : 0;
+  const both = p.constSpeed && p.noTilt;
+  const zeroE = p.ecc < 0.0005, zeroT = p.eps < 0.05;
+  if (!p.constSpeed && !p.noTilt && !(zeroE || zeroT)){
+    return R.ghosts.length ? `<b>Two causes, added together.</b> The purple dashed curve is the analemma with the <i>tilt only</i> (circular orbit): a symmetric figure-8 whose two loops are the same size.
+      The teal dashed curve is the <i>uneven speed only</i> (no tilt): a flat line, because the Sun stays on the equator and just drifts east and west once a year.
+      Add them and you get the real, lopsided figure-8: the loop is bigger where the two parts add (around perihelion, ${doyToDate(p.peri)}) and smaller where they partly cancel. Use <b>What if?</b> to switch one off.` : '';
+  }
+  if (both || (zeroE && zeroT)) return `<b>No tilt and constant speed:</b> the Sun is back at the same spot at the same clock time every day. The analemma shrinks to a single point.
+    Sunrise, noon and sunset happen at the same clock time all year, and the day length never changes. Every wiggle in the real curves comes from these two causes.`;
+  if (p.noTilt || zeroT) return `<b>No tilt:</b> the Sun stays on the celestial equator all year (declination 0°), so there are no seasons and the day length is the same everywhere, every day.
+    The figure-8 flattens into a <b>straight east–west line</b>. The Sun slides back and forth along it once a year, running up to ±${eotAmp.toFixed(1)} min ahead of or behind the clock, only because Earth speeds up near perihelion and slows down near aphelion.
+    Sunrise still drifts by <b>${fmtMin(swingMin)}</b>: earliest around ${doyToDate(R.ev.srStd.min.find(e => e.rank === 'global')?.d ?? 1)}, latest around ${doyToDate(R.ev.srStd.max.find(e => e.rank === 'global')?.d ?? 1)}.`;
+  return `<b>Constant speed</b> (circular orbit): the Sun moves along the ecliptic at a steady 0.986° a day. But the ecliptic is tilted to the equator, and clocks follow the Sun's eastward progress <i>along the equator</i>.
+    That progress is fastest at the solstices and slowest at the equinoxes, so the equation of time becomes a clean twice-a-year wave of ±${eotAmp.toFixed(1)} min.
+    The analemma becomes a <b>symmetric figure-8</b> with two equal loops, crossing itself at the equinoxes. At this latitude sunrise now drifts by <b>${fmtMin(swingMin)}</b>.`;
+}
+
+// ---------- summary ----------
+function listEv(list, fmt, ev){ return ev && ev.flat ? 'same every day' : list.filter(e => e.rank !== 'local').map(e => doyToDate(e.d) + ' · ' + fmt(e.v)).join('<br>') || '—'; }
+function swing(ev){ if (ev.flat) return '0 min'; const a = ev.min.find(e => e.rank === 'global'), b = ev.max.find(e => e.rank === 'global'); return a && b ? fmtMin((b.v - a.v) * 60) : '—'; }
+
+function explain(R){
+  const p = R.p, rise = p.mode === 'rise', evName = rise ? 'sunrise' : 'sunset';
+  const where = 'At ' + (p.lat === 0 ? 'the equator' : fmtLat(p.lat));
+  const dlMin = Math.min(...R.dl), dlMax = Math.max(...R.dl);
+  const latAmp = (dlMax - dlMin) * 60 / 4;
+  const gMax = R.ev.eot.max.find(e => e.rank === 'global'), gMin = R.ev.eot.min.find(e => e.rank === 'global');
+  const eotAmp = gMax && gMin ? (gMax.v - gMin.v) / 2 : 0;
+  if (latAmp < 0.05 && eotAmp < 0.05) return 'With no axial tilt and a circular orbit the Sun rises and sets at the same clock time every day: there is no analemma, just a point.';
+  let polar = '';
+  if (R.polarDay || R.polarNight) polar = `The Sun never sets on ${R.polarDay} days and never rises on ${R.polarNight} days (polar day/night), so latitude overwhelms everything. `;
+  const ev = rise ? R.ev.srC : R.ev.ssC;
+  const longSol = R.seasons[p.lat >= 0 ? 1 : 3], shortSol = R.seasons[p.lat >= 0 ? 3 : 1];
+  const side = (e, eotE, sol) => {
+    if (!eotE || !sol.di) return '';
+    return cycDist(e.d, eotE.d) <= cycDist(e.d, sol.di)
+      ? `EoT side: ${eotE.kind === 'max' ? 'peak' : 'low'} ${doyToDate(eotE.d)}` : `solstice side: ${sol.date}`;
+  };
+  // rise: earliest ↔ (EoT max, long-day solstice), latest ↔ (EoT min, short-day solstice); set: the opposite solstices
+  const early = ev.min.filter(e => e.rank !== 'local'), late = ev.max.filter(e => e.rank !== 'local');
+  const fmtList = (list, eotE, sol) => list.map(e => `${doyToDate(e.d)} (${side(e, eotE, sol)})`).join(' and ');
+  const ratio = eotAmp > 0 ? latAmp / eotAmp : Infinity;
+  let head = ratio < 0.3 ? 'the equation of time dominates' : ratio > 1.2 ? 'latitude dominates' : 'the two are in a tug of war';
+  if (early.length > 1 || late.length > 1) head = 'the two are almost exactly balanced, so there are two near-equal extremes';
+  const dlTxt = latAmp < 0.05 ? 'the day length never changes' : `the day length varies by ${fmtMin((dlMax - dlMin) * 60)} over the year (±${latAmp.toFixed(1)} min on ${evName})`;
+  return `${polar}${where}, ${dlTxt}, compared with ±${eotAmp.toFixed(1)} min from the equation of time. So <b>${head}</b>: `
+    + `earliest ${evName} ${fmtList(early, gMax, rise ? longSol : shortSol)}, latest ${evName} ${fmtList(late, gMin, rise ? shortSol : longSol)}.`;
+}
+
+function renderSummary(R){
+  const p = R.p;
+  $('explain').innerHTML = explain(R);
+  const dlE = R.ev.dl, dMin = dlE.min.find(e => e.rank === 'global'), dMax = dlE.max.find(e => e.rank === 'global');
+  const gMax = R.ev.eot.max.find(e => e.rank === 'global'), gMin = R.ev.eot.min.find(e => e.rank === 'global');
+  const cards = [
+    ['Earliest sunrise', listEv(R.ev.srC.min, fmtClock, R.ev.srC), 'early'],
+    ['Latest sunrise', listEv(R.ev.srC.max, fmtClock, R.ev.srC), 'late'],
+    ['Sunrise swing', swing(R.ev.srC), ''],
+    ['Earliest sunset', listEv(R.ev.ssC.min, fmtClock, R.ev.ssC), 'early'],
+    ['Latest sunset', listEv(R.ev.ssC.max, fmtClock, R.ev.ssC), 'late'],
+    ['Sunset swing', swing(R.ev.ssC), ''],
+    ['Shortest / longest day', dMin && dMax ? `${fmtDur(dMin.v)} ${doyToDate(dMin.d)}<br>${fmtDur(dMax.v)} ${doyToDate(dMax.d)}` : '—', ''],
+    ['Equation of time', gMax && gMin ? `max ${sgn(gMax.v)} min ${doyToDate(gMax.d)}<br>min ${sgn(gMin.v)} min ${doyToDate(gMin.d)}` : '—', ''],
+    ['Clock − local solar time', `${sgn(R.Y.corr * 60)} min<br><span style="font-weight:400;font-size:.75rem;color:var(--muted)">${fmtUtc(p.utc)} vs ${fmtLon(p.lon)}</span>`, ''],
+    ['Solstices & equinoxes', R.seasons.map(s => s.date).join(', '), ''],
+  ];
+  if (R.polarDay || R.polarNight) cards.push(['Polar day / night', `${R.polarDay} days / ${R.polarNight} days`, '']);
+  $('stats').innerHTML = cards.map(([k, v, c]) => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+}
+
+const PAPER = { 0:['Nov 3','Feb 10','Feb 10','Nov 3'], 1:['Nov 1','Feb 12','Feb 9','Nov 4'], 2:['Oct 30','Feb 14','Feb 7','Nov 5'],
+  3:['Oct 28','Feb 16, Jul 20','Feb 5','Nov 7'], 4:['Oct 26','Jul 19','Feb 4','Nov 8'], 5:['Oct 24, May 23','Jul 17','Feb 2','Nov 10'],
+  6:['May 24','Jul 16','Jan 31','Nov 11'], 7:['May 25','Jul 15','Jan 30','Nov 12'], 15:['Jun 2','Jul 8','Jan 21','Nov 21'] };
+function renderTug(R){
+  const p = R.p, sign = p.lat < 0 ? -1 : 1, hs = sign > 0 ? 'N' : 'S';
+  const earth = Math.abs(p.eps - EARTH.eps) < 0.02 && Math.abs(p.ecc - EARTH.ecc) < 0.0003 && Math.abs(p.peri - EARTH.peri) < 1.5 && sign > 0;
+  $('tugSub').innerHTML = `Dates of the four extremes at several latitudes, recomputed live with the current tilt, eccentricity, perihelion and refraction setting.
+    Two dates in a cell mean two local extremes within 1 min of each other.${earth ? ' Grey: the values in Aslaksen\'s table.' : ''}`;
+  const lats = [0, 1, 2, 3, 4, 5, 6, 7, 14, 15];
+  const cur = Math.abs(p.lat);
+  if (!lats.some(l => Math.abs(l - cur) < 0.005)) lats.push(cur);
+  lats.sort((a, b) => a - b);
+  const cell = list => list.filter(e => e.rank !== 'local').map(e => doyToDate(e.d)).join(', ') || '—';
+  let html = `<tr><th>Latitude</th><th>Earliest sunrise</th><th>Latest sunset</th><th>Latest sunrise</th><th>Earliest sunset</th></tr>`;
+  for (const L of lats){
+    const Y = computeYear({ ...p, lat: sign * L, shiftOn: false });
+    const sr = eventsOf(Y.days.map(r => r.sr), PROM_H, TIE_H), ss = eventsOf(Y.days.map(r => r.ss), PROM_H, TIE_H);
+    const vals = [cell(sr.min), cell(ss.max), cell(sr.max), cell(ss.min)];
+    const pap = earth && PAPER[L] ? PAPER[L] : null;
+    html += `<tr class="${Math.abs(L - cur) < 0.005 ? 'cur' : ''}"><td>${+L.toFixed(2)}° ${L ? hs : ''}</td>` +
+      vals.map((v, k) => `<td>${v}${pap ? `<span class="ppr">paper: ${pap[k]}</span>` : ''}</td>`).join('') + '</tr>';
+  }
+  $('tug').innerHTML = html;
+}
+
+function renderReadout(R){
+  const r = R.Y.days[R.day - 1], q = R.sky[R.day - 1];
+  $('readout').innerHTML = `<b>${doyToDate(R.day)}</b>: declination <b>${sgn(r.decl, 2)}°</b>, equation of time <b>${sgn(r.eot)} min</b>
+    (Sun ${r.eot >= 0 ? 'ahead of' : 'behind'} the clock) · sunrise <b>${fmtClock(r.srC)}</b> · sunset <b>${fmtClock(r.ssC)}</b>
+    · day length <b>${fmtDur(r.dl)}</b>${r.polar ? ' (polar ' + r.polar + ')' : ''} · at ${fmtClock(R.T)} the Sun is at altitude <b>${q.alt.toFixed(2)}°</b>, azimuth <b>${wrap360(q.az).toFixed(1)}°</b>`;
+}
+
+function render(){
+  const R = compute(); LAST = R;
+  const p = R.p, rise = p.mode === 'rise';
+  for (const s of SPEC) if (s.fmt) $(s.id + '_o').textContent = s.fmt(val(s.id));
+  const toff = val('toff');
+  $('toff_o').textContent = fmtClock(R.T) + (toff === 0 ? ' (auto)' : ` (auto ${toff > 0 ? '+' : '−'}${Math.abs(toff)} min)`);
+  $('corrHint').textContent = `Clocks here run ${sgn(R.Y.corr * 60)} min ${R.Y.corr >= 0 ? 'ahead of' : 'behind'} local mean solar time. This shifts every clock time equally; the dates don't change.`;
+  $('skyTitle').textContent = rise ? 'Rising analemma: the Sun at one fixed clock time every morning, looking east'
+                                   : 'Setting analemma: the Sun at one fixed clock time every evening, looking west';
+  $('skySub').innerHTML = `Each dot is the Sun's position at <b>${fmtClock(R.T)}</b> (${fmtUtc(p.utc)}) on one day of the year. Auto time = the year's mean ${rise ? 'sunrise' : 'sunset'}, so the figure-8 straddles the horizon.
+    ${rise ? 'The highest point is the first to clear the horizon (earliest sunrise); the lowest is the last (latest sunrise).'
+           : 'The highest point is the last to dip below the horizon (latest sunset); the lowest is the first (earliest sunset).'}
+    The dashed tangent lines show where the horizon sits on those days. Hover the figure to pick a day.`;
+  renderSky(R); renderOrbit(R); renderTime(R); renderEot(R); renderNoon(R); renderSummary(R); renderTug(R); renderReadout(R);
+  renderOrbitRead(R); $('whatExplain').innerHTML = whatExplain(R);
+}
+
+// ---------- hover ----------
+function nearestIdx(pxs, x, y, maxD){ let bi = -1, bd = maxD * maxD; pxs.forEach((q, i) => { const d = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (d < bd){ bd = d; bi = i; } }); return bi; }
+function hookHover(){
+  const pos = (cv, ev) => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  $('sky').addEventListener('mousemove', ev => { if (!LAST || !LAST.skyPx) return; const [x, y] = pos($('sky'), ev); const i = nearestIdx(LAST.skyPx, x, y, 24); if (i >= 0) setDay(i + 1); });
+  $('noon').addEventListener('mousemove', ev => { if (!LAST || !LAST.noonPx) return; const [x, y] = pos($('noon'), ev); const i = nearestIdx(LAST.noonPx, x, y, 20); if (i >= 0) setDay(i + 1); });
+  $('orbit').addEventListener('mousemove', ev => { const G = LAST && LAST.orbitGeo; if (!G) return; const [x] = pos($('orbit'), ev);
+    if (x >= G.cx0 && x <= G.cx1) setDay(1 + (x - G.cx0) / (G.cx1 - G.cx0) * 364); });
+  for (const [id, key] of [['time', 'timeGeo'], ['eot', 'eotGeo']]){
+    $(id).addEventListener('mousemove', ev => { const G = LAST && LAST[key]; if (!G) return; const [x] = pos($(id), ev);
+      if (x >= G.pad.l && x <= G.pad.l + G.pw) setDay(1 + (x - G.pad.l) / G.pw * 364); });
+  }
+}
+
+buildControls(); syncWhat(); hookHover();
+let rt = null; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 80); });
+render();
+</script>
+</body>
+</html>

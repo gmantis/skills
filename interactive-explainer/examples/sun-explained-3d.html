@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Declination and the equation of time, in 3D</title>
+<style>
+  :root{
+    --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --equator:#5aa9ff; --ecliptic:#ff9f43; --sun:#ffd84d; --tilt:#c9a0ff; --speed:#6fe3cf; --meridian:#7ee07e; --axis:#f39cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px}
+  header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  a{color:var(--equator)}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:390px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card{background:var(--panel);border-radius:10px;padding:13px 15px}
+  .stepnav{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .stepnav button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:.95rem}
+  .stepnav button:hover{border-color:var(--equator)}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--equator);color:var(--ink)}
+  #stepTitle{margin:6px 0 6px;font-size:1.02rem;color:var(--sun)}
+  #stepText{font-size:.87rem}
+  #stepText p{margin:0 0 8px}
+  #stepText ul{margin:0 0 8px;padding-left:18px}
+  #stepText li{margin-bottom:3px}
+  #stepText .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
+  #stepText button,.btn{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:3px 8px;font-size:.78rem;cursor:pointer;margin:2px 2px 2px 0}
+  #stepText button:hover,.btn:hover{border-color:var(--equator)}
+  .c-eq{color:var(--equator)} .c-ec{color:var(--ecliptic)} .c-sun{color:var(--sun)} .c-tilt{color:var(--tilt)} .c-speed{color:var(--speed)} .c-mer{color:var(--meridian)} .c-axis{color:var(--axis)}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--equator)}
+  .ctl{margin-bottom:9px}
+  .ctl .lab{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+  .ctl .lab output{color:var(--ink);font-weight:600}
+  .ctl input[type=range]{width:100%;accent-color:var(--equator)}
+  .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  #play{font-size:.9rem;padding:5px 14px}
+  .layers{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px}
+  .layers label{font-size:.76rem;color:var(--muted);display:flex;gap:6px;align-items:flex-start}
+  .layers input{margin-top:3px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .views{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .panel{background:var(--panel);border-radius:10px;padding:10px 12px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--equator);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)}
+  canvas.drag{cursor:grab} canvas.drag:active{cursor:grabbing}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)}
+  #readout b{color:var(--ink);font-weight:600}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  canvas.chart{cursor:crosshair}
+  @media (max-width:1350px){.views{grid-template-columns:1fr}}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Declination and the equation of time, in 3D</h1>
+  <p>Two numbers describe where the Sun is at noon on any day. <b>Declination</b> says how far north or south it is. The <b>equation of time</b> says how far it is ahead of or behind the clock.
+  Step through the explanation on the left. Drag either 3D view to rotate it and scroll to zoom. Click or drag on the charts to pick a day.
+  For sunrise and sunset times, see the <a href="analemma.html">analemma explorer</a>.</p>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav">
+      <button id="prev" title="Previous step">‹</button>
+      <div class="dots" id="dots"></div>
+      <button id="next" title="Next step">›</button>
+    </div>
+    <h2 id="stepTitle"></h2>
+    <div id="stepText"></div>
+  </div>
+
+  <div class="card">
+    <h4>Time</h4>
+    <div class="ctl">
+      <div class="lab"><span>Day of the year</span><output id="day_o"></output></div>
+      <input type="range" id="day" min="1" max="365" step="1" value="305">
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <button class="btn" id="play">▶ Play the year</button>
+      <span style="font-size:.76rem;color:var(--muted)">speed</span>
+      <input type="range" id="speed" min="3" max="60" step="1" value="20" style="flex:1">
+      <output id="speed_o" style="font-size:.76rem;min-width:58px"></output>
+    </div>
+    <h4>Earth</h4>
+    <div class="ctl"><div class="lab"><span>Axial tilt ε</span><output id="eps_o"></output></div><input type="range" id="eps" min="0" max="45" step="0.01" value="23.44"></div>
+    <div class="ctl"><div class="lab"><span>Orbital eccentricity e (how uneven the speed is)</span><output id="ecc_o"></output></div><input type="range" id="ecc" min="0" max="0.3" step="0.0001" value="0.0167"></div>
+    <div class="ctl"><div class="lab"><span>Perihelion date (closest and fastest)</span><output id="peri_o"></output></div><input type="range" id="peri" min="1" max="365" step="1" value="3"></div>
+    <button class="btn" id="earth">Reset to real Earth</button>
+  </div>
+
+  <div class="card">
+    <h4>Show in the 3D views</h4>
+    <div class="layers" id="layers"></div>
+  </div>
+</aside>
+
+<main>
+  <div class="views">
+    <section class="panel">
+      <h3><span>Orbit view: Earth going round the Sun</span><button class="btn" id="resetO">Reset view</button></h3>
+      <p class="sub">Not to scale: Earth and Sun are drawn far too big. The yellow line on the globe is the latitude where the Sun is straight overhead today, which is the declination.</p>
+      <canvas id="orbit3d" class="drag" data-h="500"></canvas>
+    </section>
+    <section class="panel">
+      <h3><span>Sky view: the sphere of sky around Earth</span><button class="btn" id="resetS">Reset view</button></h3>
+      <p class="sub">Earth at the centre, with the sky drawn as a sphere around it and seen from outside. The stars stay fixed; the Sun creeps around the ecliptic once a year.</p>
+      <canvas id="sky3d" class="drag" data-h="500"></canvas>
+    </section>
+  </div>
+  <div id="readout"></div>
+  <div class="charts">
+    <section class="panel"><h3>Declination over the year</h3><p class="sub">The Sun's latitude. Up and down once a year, between +ε and −ε. Only the tilt causes it.</p><canvas id="decChart" class="chart" data-h="230"></canvas></section>
+    <section class="panel"><h3>Equation of time over the year</h3><p class="sub">Sun ahead of the clock (+) or behind it (−). It is the sum of the tilt part (twice a year) and the speed part (once a year).</p><canvas id="eotChart" class="chart" data-h="230"></canvas></section>
+    <section class="panel"><h3>Where the equation of time comes from: each day's error</h3><p class="sub">How much longer or shorter than 24 h each "Sun day" (noon to noon on a sundial) is. The equation of time is these seconds added up, day after day.</p><canvas id="dayChart" class="chart" data-h="230"></canvas></section>
+    <section class="panel"><h3>The analemma: the two numbers plotted against each other</h3><p class="sub">Equation of time across and declination up. The width is stretched ×3 so the loops are easier to see; in the real sky the 8 is 3× narrower. The bright tail shows the last two months, so you can see which way the Sun travels round the 8.</p><canvas id="anaChart" class="chart" data-h="230"></canvas></section>
+  </div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL ============================
+const RAD = Math.PI / 180, YEAR_DAYS = 365.2422, MARCH_EQUINOX_DOY = 79.4, N_MEAN = 360 / YEAR_DAYS;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_START = [1,32,60,91,121,152,182,213,244,274,305,335];
+const wrap360 = x => ((x % 360) + 360) % 360;
+const norm180 = x => wrap360(x + 180) - 180;
+
+function doyToDate(d){
+  let n = Math.round(d); n = ((n - 1) % 365 + 365) % 365 + 1;
+  let m = 11; while (MONTH_START[m] > n) m--;
+  return MONTHS[m] + ' ' + (n - MONTH_START[m] + 1);
+}
+function trueAnomaly(Mdeg, e){
+  const M = Mdeg * RAD; let E = M + e * Math.sin(M);
+  for (let k = 0; k < 50; k++){ const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); E -= dE; if (Math.abs(dE) < 1e-13) break; }
+  return wrap360(2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2)) / RAD);
+}
+function orbitOf(p){ const ME = wrap360((MARCH_EQUINOX_DOY - p.peri) / YEAR_DAYS * 360); return { varpi: wrap360(-trueAnomaly(ME, p.ecc)) }; }
+function sunAt(d, p, orb){
+  const M = wrap360((d - p.peri) / YEAR_DAYS * 360), L0 = wrap360(M + orb.varpi), nu = trueAnomaly(M, p.ecc);
+  const lam = wrap360(nu + orb.varpi), eps = p.eps * RAD, l = lam * RAD;
+  const decl = Math.asin(Math.sin(eps) * Math.sin(l)) / RAD;
+  const ra = wrap360(Math.atan2(Math.cos(eps) * Math.sin(l), Math.cos(l)) / RAD);
+  const e = p.ecc, dLam = N_MEAN * Math.pow(1 + e * Math.cos(nu * RAD), 2) / Math.pow(1 - e * e, 1.5);
+  const cd = Math.cos(decl * RAD), dRa = dLam * Math.cos(eps) / (cd * cd);
+  return { M, L0, nu, lam, ra, decl, dLam, dRa,
+    eot: 4 * norm180(L0 - ra), eotEcc: 4 * norm180(M - nu), eotTilt: 4 * norm180(lam - ra),
+    daySec: 240 * (dRa - N_MEAN),               // Sun day minus 24 h, seconds
+    r: (1 - e * e) / (1 + e * Math.cos(nu * RAD)) };
+}
+function seasonDays(p, orb){
+  return [[0, 'Mar equinox'], [90, 'Jun solstice'], [180, 'Sep equinox'], [270, 'Dec solstice']].map(([t, name]) => {
+    const f = d => norm180(sunAt(d, p, orb).lam - t);
+    for (let d = 1; d <= 365; d++){ const a = f(d), b = f(d + 1); if (a < 0 && b >= 0 && b - a < 90) return { t, name, day: d + (-a) / (b - a) }; }
+    return { t, name, day: null };
+  });
+}
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const P = { eps: 23.44, ecc: 0.0167, peri: 3 };
+const EARTH = { eps: 23.44, ecc: 0.0167, peri: 3 };
+let ORB = orbitOf(P), YEAR = [], SEASONS = [], DAY = 305, playing = false, dirty = true, STEP = 0;
+function recompute(){
+  ORB = orbitOf(P);
+  YEAR = []; for (let d = 1; d <= 365; d++) YEAR.push(sunAt(d, P, ORB));
+  SEASONS = seasonDays(P, ORB);
+  dirty = true;
+}
+const LAYERS = [
+  ['grid', 'Hour lines on the sky sphere'], ['dec', 'Declination arc'],
+  ['mean', 'Mean Sun and equation-of-time arc'], ['meridian', 'Your meridian at 12:00'],
+  ['f1', 'Sun at steady speed on the ecliptic'], ['split', 'Split into tilt and speed parts'],
+  ['lamalpha', 'Distance along ecliptic vs equator'], ['seasons', 'Earth at the 4 seasons'],
+  ['months', 'Month markers'], ['follow', 'Sky view turns to keep the Sun in front'],
+];
+const L = { follow: true, grid: true, dec: true, mean: false, meridian: false, f1: false, split: false, lamalpha: false, seasons: false, months: true };
+
+// ============================ FORMAT ============================
+const sgn = (v, d = 1) => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(d);
+function fmtClock(h){ let m = Math.round(h * 60); m = ((m % 1440) + 1440) % 1440; const hh = Math.floor(m / 60), mm = m % 60, h12 = hh % 12 === 0 ? 12 : hh % 12; return h12 + ':' + String(mm).padStart(2, '0') + (hh < 12 ? ' am' : ' pm'); }
+function latNS(v){ return Math.abs(v) < 0.05 ? 'the equator (0°)' : Math.abs(v).toFixed(1) + '° ' + (v > 0 ? 'N' : 'S'); }
+
+// ============================ STEPS ============================
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const STEPS = [
+  { title: '1 · Declination: the Sun\'s latitude',
+    params: EARTH, layers: { dec: true, mean: false, meridian: false, f1: false, split: false, lamalpha: false, seasons: false },
+    html: () => `
+      <p><b class="c-sun">Declination</b> is how far north or south of the equator the Sun is. The easiest way to picture it:
+      it is <b>the latitude on Earth where the Sun is straight overhead at noon</b>. That's the yellow line on the globe in the orbit view.</p>
+      <p>On ${D('date')} the Sun is overhead at ${D('decNS')}. Press <b>▶ Play the year</b> and watch the line move. It reaches the
+      <span class="c-ec">Tropic of Cancer</span> (${D('epsN')}) around Jun 21, crosses the equator around Sep 23, reaches the
+      <span class="c-ec">Tropic of Capricorn</span> (${D('epsS')}) around Dec 21, and is back over the equator around Mar 20.</p>
+      <p>The small side view in the orbit panel shows sunlight arriving from the left. The point it hits head-on, where the Sun is overhead, is always at latitude = declination.</p>
+      <p>Singapore is at 1.35° N, so the Sun passes almost straight overhead there twice a year: around Mar 23 and around Sep 20.</p>` },
+  { title: '2 · Why it changes: a tilted axis that keeps pointing the same way',
+    params: EARTH, layers: { dec: true, mean: false, meridian: false, f1: false, split: false, lamalpha: false, seasons: true },
+    html: () => `
+      <p>Earth's axis (<span class="c-axis">pink</span>) is tilted ${D('eps')} from upright compared with its orbit. The key point is that
+      it <b>keeps pointing the same way in space</b> all year, towards the Pole Star. The four faint Earths show this.</p>
+      <ul><li><b>June:</b> the north end leans towards the Sun, so the Sun is overhead at +ε (Tropic of Cancer). This is northern summer.</li>
+      <li><b>December:</b> the north end leans away, so the Sun is overhead at −ε (Tropic of Capricorn).</li>
+      <li><b>March and September:</b> the lean is sideways, neither towards nor away, so the Sun is over the equator.</li></ul>
+      <p>That's one full swing per orbit, so declination goes up and down <b>once a year</b>. That motion gives the analemma its height.</p>
+      <p>Try it: <button data-set="eps=0">tilt = 0°</button> <button data-set="eps=23.44">tilt = 23.44°</button>
+      <button data-set="eps=45">tilt = 45°</button>. With no tilt the yellow line stays on the equator all year: declination is 0 every day and there are no seasons.</p>` },
+  { title: '3 · The same thing seen from Earth: the sphere of sky',
+    params: EARTH, layers: { dec: true, mean: false, meridian: false, f1: false, split: false, lamalpha: false, seasons: false },
+    html: () => `
+      <p>Now put Earth at the centre (sky view) and imagine the sky as a huge sphere around it, with the stars painted on it.</p>
+      <ul><li>Earth's equator, projected out onto the sky, is the <b class="c-eq">celestial equator</b>.</li>
+      <li>Earth's axis points to the <b>celestial poles</b>.</li>
+      <li>As Earth orbits, we see the Sun move slowly across the background stars along a circle called the <b class="c-ec">ecliptic</b>.
+      It moves about 1° a day and takes one year to go round.</li></ul>
+      <p>The ecliptic is tilted to the celestial equator by ${D('eps')}. That is Earth's axial tilt again, seen from the inside.</p>
+      <p><b class="c-sun">Declination</b> is the Sun's angle above or below the celestial equator, measured along a line through the poles
+      (the thick yellow arc). On ${D('date')} it is ${D('dec')}.</p>
+      <p>The ecliptic crosses the equator at two points: the March equinox point ♈ and the September equinox point. It is furthest from the equator a quarter of the way round, at the solstices.</p>` },
+  { title: '4 · The equation of time: the Sun against the clock',
+    params: EARTH, layers: { dec: true, mean: true, meridian: true, f1: false, split: false, lamalpha: false, seasons: false },
+    html: () => `
+      <p>A clock assumes the Sun moves eastward across the stars by exactly the same amount every day: 360° a year, or ${D('nMean')} a day.
+      So clocks follow an imaginary <b>mean Sun</b> (white ring) that moves along the celestial equator at that perfectly steady rate.
+      <b>12:00 local mean time</b> is the moment your <b class="c-mer">meridian</b> (green, the north–south line overhead) points at the mean Sun.</p>
+      <p>The real Sun doesn't keep this pace. Today it moves ${D('dRa')} a day eastward along the equator, so today's "Sun day"
+      (noon to noon on a sundial) is ${D('dayDiff')} than 24 h. These seconds build up. Right now the real Sun is ${D('eotDeg')} ${D('eotDir')}
+      of the mean Sun (white arc), and every degree is 4 minutes.
+      So when the clock says 12:00, a sundial says ${D('sundial')}.</p>
+      <p>That offset is the <b>equation of time: ${D('eot')}</b>. You can see the daily seconds in the third chart. The equation of time is their running total.</p>
+      <p>Why doesn't the Sun keep a steady pace? There are two reasons, covered in the next two steps.</p>` },
+  { title: '5 · Cause 1: Earth\'s speed changes',
+    params: { eps: 0, ecc: 0.0167, peri: 3 }, layers: { dec: false, mean: true, meridian: false, f1: true, split: false, lamalpha: false, seasons: false },
+    html: () => `
+      <p>First, remove the tilt. It has been set to <b>ε = 0</b> for this step, so the ecliptic lies exactly on the equator and only the orbit matters.</p>
+      <p>Earth's orbit is slightly oval (an ellipse). Earth moves fastest at <b>perihelion</b> (${D('periDate')}, closest to the Sun)
+      and slowest at <b>aphelion</b> (${D('aphDate')}), about ${D('speedRatio')} faster at its fastest. Watch the orbit view: the month dots are spread out near perihelion and bunched up near aphelion.
+      Seen from Earth, the Sun moves along the ecliptic faster in January and slower in July.</p>
+      <p>The <b class="c-speed">teal ring</b> is a Sun that moves at a perfectly steady speed and matches the real Sun at perihelion. With no tilt it is the same as the mean Sun.
+      After perihelion the real Sun pulls further east along its path, so it reaches your meridian later and the sundial runs slow. After aphelion it drops back.
+      The gap swings <b>once a year</b>, by up to ±${D('eccAmp')}.</p>
+      <p><button data-set="ecc=0.1">Exaggerate the ellipse (e = 0.1)</button> <button data-set="ecc=0.0167">Real Earth (e = 0.0167)</button></p>` },
+  { title: '6 · Cause 2: the tilt',
+    params: { eps: 23.44, ecc: 0, peri: 3 }, layers: { dec: false, mean: true, meridian: false, f1: true, split: false, lamalpha: true, seasons: false },
+    html: () => `
+      <p>Now the other way round. The orbit has been set to a <b>perfect circle (e = 0)</b> for this step, so the Sun moves along the ecliptic at a steady ${D('nMean')} a day.
+      The teal ring and the real Sun are now the same point.</p>
+      <p>The remaining problem is that clocks measure progress along the <b class="c-eq">equator</b>, and the <b class="c-ec">ecliptic</b> is tilted.
+      Starting from ♈, the Sun has gone <b class="c-ec">λ = ${D('lam')}</b> along the ecliptic but only <b class="c-eq">α = ${D('ra')}</b> along the equator (${D('lamMinusRa')}).</p>
+      <ul><li><b>Near the equinoxes</b> the ecliptic crosses the equator at a slant of ε. Part of each day's movement goes north or south instead of east, so eastward progress is slow (× cos ε = ${D('cosEps')}).</li>
+      <li><b>Near the solstices</b> the ecliptic runs parallel to the equator, but ε away from it, where the grey hour lines are closer together. Each degree travelled covers more of an hour, so eastward progress is fast (× 1/cos ε = ${D('secEps')}).</li></ul>
+      <p>That's slow, fast, slow, fast: <b>two cycles a year</b>, up to ±${D('tiltAmp')}.
+      <button data-set="eps=45">Exaggerate the tilt (45°)</button> <button data-set="eps=23.44">Real tilt</button></p>` },
+  { title: '7 · Both together: the equation of time and the analemma',
+    params: EARTH, layers: { dec: true, mean: true, meridian: true, f1: false, split: true, lamalpha: false, seasons: false },
+    html: () => `
+      <p>Real Earth has both causes. Along the equator, the gap between the real Sun and the mean Sun splits into two pieces:
+      the <b class="c-tilt">tilt part</b> (${D('eotTilt')} today) and the <b class="c-speed">speed part</b> (${D('eotEcc')}). Together they give <b>${D('eot')}</b>.</p>
+      <p>The tilt part repeats twice a year and the speed part once, so they add in some months and cancel in others.
+      That's why the equation of time has uneven peaks: ${D('eotMax')} and ${D('eotMin')}, with only small bumps in between.</p>
+      <p>Now plot the two numbers against each other, equation of time across and declination up, and you get the <b>analemma</b> (last chart).
+      Declination goes up and down once a year while the equation of time swings twice, so the path crosses itself and makes an 8.
+      The speed part makes one loop bigger than the other.</p>
+      <p>In Singapore the day length hardly changes, so sunrise follows the equation of time almost exactly: earliest around Nov 1, latest around Feb 9.
+      The <a href="analemma.html">analemma explorer</a> has the sunrise and sunset details.</p>` },
+];
+
+// ============================ 3D HELPERS ============================
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const unit = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+function seg(a, b, n = 24){ const o = []; for (let i = 0; i <= n; i++){ const t = i / n; o.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]); } return o; }
+function curve(f, t0, t1, n){ const o = []; for (let i = 0; i <= n; i++) o.push(f(t0 + (t1 - t0) * i / n)); return o; }
+
+class Cam {
+  constructor(az, el){ this.az0 = az; this.el0 = el; this.reset(); }
+  reset(){ this.az = this.az0; this.el = this.el0; this.zoom = 1; }
+  setup(W, H, scale, fx = 0.5, fy = 0.5, azAdd = 0){
+    const a = (this.az + azAdd) * RAD, e = this.el * RAD;
+    this.e = [Math.cos(e) * Math.cos(a), Math.cos(e) * Math.sin(a), Math.sin(e)];
+    this.r = [-Math.sin(a), Math.cos(a), 0];
+    this.u = [-Math.sin(e) * Math.cos(a), -Math.sin(e) * Math.sin(a), Math.cos(e)];
+    this.cx = W * fx; this.cy = H * fy; this.S = scale * this.zoom; this.D = 5;
+  }
+  proj(p){ const x = dot(p, this.r), y = dot(p, this.u), z = dot(p, this.e), k = this.D / (this.D - z); return { x: this.cx + x * this.S * k, y: this.cy - y * this.S * k, z, k }; }
+  basis(){ return { right: this.r, up: this.u, e: this.e }; }
+}
+// polyline with depth: segments behind `thr` are faded; pass = 'back' | 'front' | undefined (both)
+function poly(ctx, cam, pts, st, pass, thr = 0){
+  const Pp = pts.map(p => cam.proj(p)), isBack = k => (Pp[k].z + Pp[k + 1].z) / 2 < thr;
+  ctx.strokeStyle = st.color; ctx.lineWidth = st.width || 1.5; ctx.setLineDash(st.dash || []);
+  let i = 0;
+  while (i < Pp.length - 1){
+    const back = isBack(i); let j = i;
+    while (j < Pp.length - 1 && isBack(j) === back) j++;
+    if (!(pass && ((pass === 'back') !== back))){
+      ctx.globalAlpha = (back ? (st.backAlpha ?? 0.28) : 1) * (st.alpha ?? 1);
+      ctx.beginPath(); ctx.moveTo(Pp[i].x, Pp[i].y); for (let k = i + 1; k <= j; k++) ctx.lineTo(Pp[k].x, Pp[k].y); ctx.stroke();
+    }
+    i = j;
+  }
+  ctx.globalAlpha = 1; ctx.setLineDash([]);
+}
+function disc(ctx, x, y, r, fill, stroke, lw = 1.5){ ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); if (fill){ ctx.fillStyle = fill; ctx.fill(); } if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function txt(ctx, s, x, y, o = {}){
+  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif'; ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
+  const w = ctx.measureText(s).width, CW = ctx.canvas.clientWidth || 9999;
+  let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+  const nbx = Math.max(4, Math.min(CW - w - 4, bx)); x += nbx - bx; bx = nbx;   // keep labels inside the canvas
+  if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.72)'; ctx.fillRect(bx - 3, y - 7, w + 6, 14); }
+  ctx.fillStyle = o.color || '#dfe6f2'; ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(s, x, y); ctx.globalAlpha = 1;
+}
+function label3(ctx, cam, p, s, o = {}){
+  const q = cam.proj(p); txt(ctx, s, q.x + (o.dx || 0), q.y + (o.dy || 0), { ...o, alpha: q.z < (o.thr ?? 0) ? 0.45 : 1 });
+}
+function arrowHead(ctx, x1, y1, x2, y2, color, size = 7){
+  const a = Math.atan2(y2 - y1, x2 - x1); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(a - 0.45), y2 - size * Math.sin(a - 0.45)); ctx.lineTo(x2 - size * Math.cos(a + 0.45), y2 - size * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+}
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.floor(cv.clientWidth)), H = +cv.dataset.h;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { ctx, W, H, dpr };
+}
+
+// Per-pixel globe: day/night shading, equator, tropics, polar circles, meridians, and the parallel where the Sun is overhead
+const GLOBES = {};
+function renderGlobe(ctx, cx, cy, r, B, axis, sun, epsDeg, decDeg, slot, dpr, o = {}){
+  const R = Math.max(3, Math.round(r * dpr)), N = 2 * R + 2;
+  let g = GLOBES[slot];
+  if (!g || g.N !== N){ const c = document.createElement('canvas'); c.width = c.height = N; g = GLOBES[slot] = { c, x: c.getContext('2d'), N }; }
+  const img = g.x.createImageData(N, N), px = img.data;
+  let b1 = cross(axis, [0, 0, 1]); if (Math.hypot(...b1) < 1e-6) b1 = [1, 0, 0]; b1 = unit(b1); const b2 = cross(axis, b1);
+  const lw = 1.2 / R, eps = epsDeg * RAD, dec = decDeg * RAD, pc = Math.PI / 2 - eps, step = 30 * RAD;
+  const Rr = B.right, Uu = B.up, Ee = B.e;
+  for (let j = 0; j < N; j++){
+    const v = (R + 1 - (j + 0.5)) / R;
+    for (let i = 0; i < N; i++){
+      const u = (i + 0.5 - (R + 1)) / R, rr = u * u + v * v; if (rr > 1) continue;
+      const w = Math.sqrt(1 - rr);
+      const nx = u * Rr[0] + v * Uu[0] + w * Ee[0], ny = u * Rr[1] + v * Uu[1] + w * Ee[1], nz = u * Rr[2] + v * Uu[2] + w * Ee[2];
+      const lat = Math.asin(Math.max(-1, Math.min(1, nx * axis[0] + ny * axis[1] + nz * axis[2])));
+      const lit = nx * sun[0] + ny * sun[1] + nz * sun[2];
+      const t = Math.min(1, Math.max(0, (lit + 0.06) / 0.12)), br = (0.4 + 0.6 * Math.max(0, lit)) * (0.6 + 0.4 * w);
+      let cr = 10 + (40 * br - 10) * t, cg = 18 + (112 * br - 18) * t, cb = 36 + (196 * br - 36) * t;
+      const mix = (R2, G2, B2, a) => { cr += (R2 - cr) * a; cg += (G2 - cg) * a; cb += (B2 - cb) * a; };
+      const lon = Math.atan2(nx * b2[0] + ny * b2[1] + nz * b2[2], nx * b1[0] + ny * b1[1] + nz * b1[2]);
+      const k = lon / step; if (Math.abs(k - Math.round(k)) * step * Math.cos(lat) < lw * 0.8) mix(160, 180, 220, 0.3);
+      if (eps > 0.01 && Math.abs(Math.abs(lat) - pc) < lw) mix(180, 200, 235, 0.45);
+      if (eps > 0.01 && Math.abs(Math.abs(lat) - eps) < lw) mix(255, 159, 67, 0.85);
+      if (Math.abs(lat) < lw) mix(235, 242, 252, 0.9);
+      if (Math.abs(lat - dec) < lw * 1.7) mix(255, 216, 77, 1);
+      const a = Math.min(1, (1 - Math.sqrt(rr)) * R + 0.4), q = (j * N + i) * 4;
+      px[q] = cr; px[q + 1] = cg; px[q + 2] = cb; px[q + 3] = 255 * a;
+    }
+  }
+  g.x.putImageData(img, 0, 0);
+  ctx.drawImage(g.c, cx - (R + 1) / dpr, cy - (R + 1) / dpr, N / dpr, N / dpr);
+  if (o.subsolar !== false){
+    const sz = dot(sun, Ee);
+    if (sz > -0.05){ const sx = cx + dot(sun, Rr) * r, sy = cy - dot(sun, Uu) * r; disc(ctx, sx, sy, Math.max(2.5, r * 0.07), '#ffd84d', '#0a0f1c', 1); return [sx, sy]; }
+  }
+  return null;
+}
+
+// ============================ ORBIT VIEW ============================
+const camO = new Cam(-62, 28), camS = new Cam(-30, 16);
+function earthPos(d){ const s = sunAt(d, P, ORB), th = (s.lam + 180) * RAD; return { s, p: [s.r * Math.cos(th), s.r * Math.sin(th), 0] }; }
+function drawOrbit(S){
+  const { ctx, W, H, dpr } = setupCanvas($('orbit3d'));
+  camO.setup(W, H, Math.min(W, H) * 0.33, 0.43, 0.42);
+  const e = P.ecc, axis = [0, Math.sin(P.eps * RAD), Math.cos(P.eps * RAD)];
+  const E = earthPos(DAY), Ep = E.p, sunDir = [Math.cos(S.lam * RAD), Math.sin(S.lam * RAD), 0];
+  const thr = camO.proj(Ep).z;
+  const orbitPts = curve(nu => { const r = (1 - e * e) / (1 + e * Math.cos(nu * RAD)), th = (nu + ORB.varpi + 180) * RAD; return [r * Math.cos(th), r * Math.sin(th), 0]; }, 0, 360, 240);
+  // plane
+  const plane = curve(t => [1.38 * Math.cos(t * RAD), 1.38 * Math.sin(t * RAD), 0], 0, 360, 120).map(p => camO.proj(p));
+  ctx.fillStyle = 'rgba(70,95,150,0.10)'; ctx.beginPath(); plane.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,140,190,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+  const axLen = 0.25;
+  const lines = pass => {
+    poly(ctx, camO, orbitPts, { color: 'rgba(175,195,230,0.85)', width: 1.6, backAlpha: 0.85 }, pass, thr);
+    poly(ctx, camO, seg([0, 0, 0], Ep, 30), { color: 'rgba(255,216,77,0.7)', width: 1.3, dash: [4, 5], backAlpha: 0.7 }, pass, thr);
+    poly(ctx, camO, seg([1.05, 0, 0], [1.5, 0, 0], 6), { color: 'rgba(200,210,235,0.6)', width: 1.2, backAlpha: 0.6 }, pass, thr);
+    if (P.eps > 0.01) poly(ctx, camO, seg(add(Ep, mul(axis, -axLen)), add(Ep, mul(axis, axLen)), 30), { color: '#f39cff', width: 2.6, backAlpha: 1 }, pass, thr);
+    else poly(ctx, camO, seg(add(Ep, [0, 0, -axLen]), add(Ep, [0, 0, axLen]), 30), { color: '#f39cff', width: 2.6, backAlpha: 1 }, pass, thr);
+  };
+  const sun0 = camO.proj([0, 0, 0]);
+  const drawSun = () => { ctx.save(); ctx.shadowColor = '#ffd84d'; ctx.shadowBlur = 30; disc(ctx, sun0.x, sun0.y, 0.085 * camO.S * sun0.k, '#ffd84d'); ctx.restore(); };
+  lines('back');
+  if (sun0.z < thr) drawSun();
+  // season snapshots
+  if (L.seasons) for (const sd of SEASONS){
+    if (sd.day == null) continue;
+    const G = earthPos(sd.day), q = camO.proj(G.p), gs = [Math.cos(G.s.lam * RAD), Math.sin(G.s.lam * RAD), 0];
+    poly(ctx, camO, seg(add(G.p, mul(axis, -0.16)), add(G.p, mul(axis, 0.16)), 2), { color: 'rgba(243,156,255,0.75)', width: 2 });
+    renderGlobe(ctx, q.x, q.y, 0.055 * camO.S * q.k, camO.basis(), axis, gs, P.eps, G.s.decl, 'season' + sd.t, dpr, { subsolar: false });
+    const tip = camO.proj(add(G.p, mul(axis, 0.16)));
+    const words = { 0: 'Mar: lean is sideways', 90: 'Jun: N pole leans toward Sun', 180: 'Sep: lean is sideways', 270: 'Dec: N pole leans away' }[sd.t];
+    txt(ctx, words, tip.x, tip.y - 10, { align: 'center', color: '#f3c6ff', font: '10.5px Segoe UI, sans-serif' });
+  }
+  // month markers
+  if (L.months) for (let m = 0; m < 12; m++){
+    const q = camO.proj(earthPos(MONTH_START[m]).p); disc(ctx, q.x, q.y, 2.6, '#e8eef8');
+    const out = camO.proj(mul(earthPos(MONTH_START[m]).p, 1.13)); txt(ctx, MONTHS[m] + ' 1', out.x, out.y, { align: 'center', color: '#b9c6da', font: '10px Segoe UI, sans-serif', bg: false });
+  }
+  // apsides
+  if (e > 0.0005){
+    const pd = (ORB.varpi + 180) * RAD, pp = [(1 - e) * Math.cos(pd), (1 - e) * Math.sin(pd), 0], ap = [-(1 + e) * Math.cos(pd), -(1 + e) * Math.sin(pd), 0];
+    const qp = camO.proj(pp), qa = camO.proj(ap);
+    disc(ctx, qp.x, qp.y, 4, '#5ee38c'); disc(ctx, qa.x, qa.y, 4, '#ff6f6f');
+    const op = camO.proj(mul(pp, 0.72)), oa = camO.proj(mul(ap, 0.75));
+    txt(ctx, 'perihelion ' + doyToDate(P.peri) + ': fastest', op.x, op.y, { align: 'center', color: '#5ee38c' });
+    txt(ctx, 'aphelion ' + doyToDate(P.peri + YEAR_DAYS / 2) + ': slowest', oa.x, oa.y, { align: 'center', color: '#ff6f6f' });
+  }
+  const aq1 = camO.proj([1.35, 0, 0]), aq2 = camO.proj([1.5, 0, 0]);
+  arrowHead(ctx, aq1.x, aq1.y, aq2.x, aq2.y, 'rgba(200,210,235,0.8)');
+  txt(ctx, 'towards ♈ (March equinox direction)', aq2.x, aq2.y - 13, { align: 'center', color: '#c9d3e4', font: '10px Segoe UI, sans-serif' });
+  // Earth
+  const eq = camO.proj(Ep), er = 0.105 * camO.S * eq.k;
+  renderGlobe(ctx, eq.x, eq.y, er, camO.basis(), P.eps > 0.01 ? axis : [0, 0, 1], sunDir, P.eps, S.decl, 'earthO', dpr);
+  lines('front');
+  if (sun0.z >= thr) drawSun();
+  txt(ctx, 'Sun', sun0.x, sun0.y + 0.085 * camO.S * sun0.k + 12, { align: 'center', color: '#ffd84d', bg: false, font: 'bold 11px Segoe UI, sans-serif' });
+  const tip = camO.proj(add(Ep, mul(P.eps > 0.01 ? axis : [0, 0, 1], axLen + 0.03)));
+  txt(ctx, 'N', tip.x, tip.y, { align: 'center', color: '#f39cff', font: 'bold 11px Segoe UI, sans-serif', bg: false });
+  txt(ctx, doyToDate(DAY) + ': Earth', eq.x, eq.y + er + 13, { align: 'center', color: '#8fd3ff', font: 'bold 11px Segoe UI, sans-serif' });
+  txt(ctx, 'Sun overhead at ' + latNS(S.decl), eq.x, eq.y + er + 28, { align: 'center', color: '#ffd84d' });
+
+  // side-view inset: sunlight from the left
+  const bw = Math.min(W * 0.38, 250), bh = bw * 0.78, bx = W - bw - 8, by = H - bh - 8;
+  ctx.fillStyle = 'rgba(8,12,24,0.92)'; ctx.strokeStyle = '#2a3a5c'; ctx.lineWidth = 1; ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+  txt(ctx, 'Side view: sunlight arriving from the left', bx + 6, by + 11, { color: '#c9d3e4', font: '10.5px Segoe UI, sans-serif', bg: false });
+  const gr = bh * 0.3, gx = bx + bw * 0.6, gy = by + bh * 0.55;
+  const ev = unit(cross([0, 0, 1], sunDir)), az = Math.atan2(ev[1], ev[0]);
+  const Bi = { e: ev, right: [-Math.sin(az), Math.cos(az), 0], up: [0, 0, 1] };
+  for (const f of [-0.75, -0.4, 0, 0.4, 0.75]){
+    const yy = gy - f * gr, xe = gx - Math.sqrt(1 - f * f) * gr;
+    ctx.strokeStyle = f === 0 ? '#ffd84d' : 'rgba(255,216,77,0.45)'; ctx.lineWidth = f === 0 ? 2 : 1.2;
+    ctx.beginPath(); ctx.moveTo(bx + 8, yy); ctx.lineTo(xe - 3, yy); ctx.stroke(); arrowHead(ctx, bx + 8, yy, xe - 2, yy, f === 0 ? '#ffd84d' : 'rgba(255,216,77,0.6)', 6);
+  }
+  const ax2 = P.eps > 0.01 ? axis : [0, 0, 1];
+  const ar = [dot(ax2, Bi.right), dot(ax2, Bi.up)], al = Math.hypot(ar[0], ar[1]) || 1;
+  ctx.strokeStyle = '#f39cff'; ctx.lineWidth = 2; ctx.beginPath();
+  ctx.moveTo(gx - ar[0] / al * gr * 1.3, gy + ar[1] / al * gr * 1.3); ctx.lineTo(gx + ar[0] / al * gr * 1.3, gy - ar[1] / al * gr * 1.3); ctx.stroke();
+  const ss = renderGlobe(ctx, gx, gy, gr, Bi, ax2, sunDir, P.eps, S.decl, 'inset', dpr);
+  txt(ctx, 'N', gx + ar[0] / al * gr * 1.42, gy - ar[1] / al * gr * 1.42, { align: 'center', color: '#f39cff', font: 'bold 11px Segoe UI, sans-serif', bg: false });
+  txt(ctx, 'overhead: ' + latNS(S.decl), bx + 8, gy - 12, { color: '#ffd84d', font: 'bold 10.5px Segoe UI, sans-serif' });
+  txt(ctx, 'yellow line = latitude of the Sun overhead', bx + 6, by + bh - 9, { color: '#ffd84d', font: '10px Segoe UI, sans-serif', bg: false });
+  // legend
+  txt(ctx, 'Drag to rotate · scroll to zoom', 8, 12, { color: '#8e9ab2', bg: false, font: '10.5px Segoe UI, sans-serif' });
+  txt(ctx, 'pink = Earth\'s axis · orange = tropics · white = equator', 8, 27, { color: '#8e9ab2', bg: false, font: '10.5px Segoe UI, sans-serif' });
+}
+
+// ============================ SKY VIEW ============================
+function drawSky(S){
+  const { ctx, W, H, dpr } = setupCanvas($('sky3d'));
+  camS.setup(W, H, Math.min(W, H) * 0.36, 0.5, 0.5, L.follow ? S.ra : 0);
+  const eps = P.eps * RAD;
+  const eqP = (ra, dec, r = 1) => [r * Math.cos(dec * RAD) * Math.cos(ra * RAD), r * Math.cos(dec * RAD) * Math.sin(ra * RAD), r * Math.sin(dec * RAD)];
+  const ecl = (lam, r = 1) => [r * Math.cos(lam * RAD), r * Math.sin(lam * RAD) * Math.cos(eps), r * Math.sin(lam * RAD) * Math.sin(eps)];
+  const eqArc = (a0, a1, r = 1) => curve(a => eqP(a, 0, r), a0, a1, Math.max(4, Math.ceil(Math.abs(a1 - a0) / 1.5)));
+  const eclArc = (l0, l1, r = 1) => curve(l => ecl(l, r), l0, l1, Math.max(4, Math.ceil(Math.abs(l1 - l0) / 1.5)));
+  const { ra, decl, lam, L0 } = S;
+  const lines = pass => {
+    if (L.grid){
+      for (let h = 0; h < 360; h += 15) poly(ctx, camS, curve(d => eqP(h, d), -90, 90, 36), { color: 'rgba(150,165,200,0.22)', width: 1, backAlpha: 0.35 }, pass);
+      for (const d of [-60, -30, 30, 60]) poly(ctx, camS, curve(a => eqP(a, d), 0, 360, 90), { color: 'rgba(150,165,200,0.16)', width: 1, backAlpha: 0.35 }, pass);
+    }
+    poly(ctx, camS, seg([0, 0, -1.3], [0, 0, 1.3], 30), { color: 'rgba(243,156,255,0.8)', width: 1.4, dash: [5, 4], backAlpha: 0.5 }, pass);
+    poly(ctx, camS, curve(a => eqP(a, 0), 0, 360, 180), { color: '#5aa9ff', width: 2.2 }, pass);
+    poly(ctx, camS, curve(l => ecl(l), 0, 360, 180), { color: '#ff9f43', width: 2.2 }, pass);
+    if (L.meridian) poly(ctx, camS, curve(d => eqP(L0, d, 1.0), -90, 90, 60), { color: '#7ee07e', width: 2 }, pass);
+    if (L.lamalpha){
+      poly(ctx, camS, eclArc(0, lam, 0.9), { color: '#ff9f43', width: 4, backAlpha: 0.35 }, pass);
+      poly(ctx, camS, eqArc(0, ra, 0.8), { color: '#5aa9ff', width: 4, backAlpha: 0.35 }, pass);
+    }
+    if (L.dec) { poly(ctx, camS, curve(d => eqP(ra, d), 0, decl, 30), { color: '#ffd84d', width: 4 }, pass); poly(ctx, camS, seg([0, 0, 0], eqP(ra, decl), 20), { color: 'rgba(255,216,77,0.45)', width: 1, dash: [3, 4] }, pass); }
+    if (L.f1) poly(ctx, camS, eclArc(lam, lam + norm180(L0 - lam), 1.0), { color: '#6fe3cf', width: 4 }, pass);
+    if (L.mean) poly(ctx, camS, eqArc(ra, ra + norm180(L0 - ra), 1.0), { color: '#ffffff', width: 4.5 }, pass);
+    if (L.split){
+      poly(ctx, camS, eqArc(ra, ra + norm180(lam - ra), 1.08), { color: '#c9a0ff', width: 4 }, pass);
+      poly(ctx, camS, eqArc(lam, lam + norm180(L0 - lam), 1.16), { color: '#6fe3cf', width: 4 }, pass);
+    }
+  };
+  lines('back');
+  const c0 = camS.proj([0, 0, 0]), er = 0.13 * camS.S * c0.k;
+  renderGlobe(ctx, c0.x, c0.y, er, camS.basis(), [0, 0, 1], eqP(ra, decl), P.eps, decl, 'earthS', dpr);
+  lines('front');
+  const pt = (p, r, fill, stroke, lw) => { const q = camS.proj(p); ctx.globalAlpha = q.z < 0 ? 0.45 : 1; disc(ctx, q.x, q.y, r, fill, stroke, lw); ctx.globalAlpha = 1; return q; };
+  // equinox / solstice points
+  // keep the area round the Sun and the ecliptic caption free of marker labels
+  const camRa = camS.az + (L.follow ? ra : 0), eclLabLam = lam - 75;
+  const busy = l => Math.abs(norm180(l - lam)) < 28 || Math.abs(norm180(l - eclLabLam)) < 18;
+  const marks = [[0, '♈ Mar equinox point'], [90, 'Jun solstice point'], [180, 'Sep equinox point'], [270, 'Dec solstice point']];
+  for (const [l, s] of marks){ pt(ecl(l), 3.5, '#ffffff'); if (!busy(l)) label3(ctx, camS, ecl(l, 1.12), s, { align: 'center', color: '#ffffff', font: '10.5px Segoe UI, sans-serif' }); }
+  if (L.months) YEAR.forEach((y, i) => { const m = MONTH_START.indexOf(i + 1); if (m < 0) return; pt(ecl(y.lam), 2.3, '#ffd9b0'); if (!busy(y.lam)) label3(ctx, camS, ecl(y.lam, 1.07), MONTHS[m], { align: 'center', color: '#ffcf9e', font: '9.5px Segoe UI, sans-serif', bg: false }); });
+  label3(ctx, camS, [0, 0, 1.38], 'north celestial pole', { align: 'center', color: '#f3c6ff' });
+  label3(ctx, camS, [0, 0, -1.38], 'south celestial pole', { align: 'center', color: '#f3c6ff' });
+  label3(ctx, camS, eqP(camRa - 45, 0, 1.0), 'celestial equator', { align: 'center', color: '#5aa9ff', font: 'bold 11px Segoe UI, sans-serif', dy: 12 });
+  label3(ctx, camS, ecl(eclLabLam, 1.02), 'ecliptic: the Sun\'s path', { align: 'center', color: '#ff9f43', font: 'bold 11px Segoe UI, sans-serif', dy: -12 });
+  if (L.meridian) label3(ctx, camS, eqP(L0, 52, 1.04), 'your meridian at 12:00', { color: '#7ee07e', dx: 6 });
+  if (L.lamalpha){
+    label3(ctx, camS, ecl(lam / 2, 0.9), 'λ = ' + lam.toFixed(1) + '° along the ecliptic', { align: 'center', color: '#ff9f43', dy: -11 });
+    label3(ctx, camS, eqP(ra / 2, 0, 0.8), 'α = ' + ra.toFixed(1) + '° along the equator', { align: 'center', color: '#5aa9ff', dy: 11 });
+  }
+  // which screen side the mean Sun is on, relative to the real Sun's foot, so labels go on the free side
+  const qFoot = camS.proj(eqP(ra, 0)), qMean = camS.proj(eqP(L0, 0)), meanLeft = qMean.x < qFoot.x;
+  const side = left => left ? { align: 'right', dx: -11 } : { align: 'left', dx: 11 };
+  const up = decl < 0 ? -1 : 1;            // screen-y sign pointing away from the Sun's side of the equator
+  if (L.f1){ pt(ecl(L0), 6, null, '#6fe3cf', 2.2); label3(ctx, camS, ecl(L0, 1.0), 'Sun at steady speed', { ...side(meanLeft), color: '#6fe3cf', dy: L.mean ? -15 * up : 0 }); }
+  if (L.split){ pt(eqP(lam, 0), 3.5, '#c9a0ff');
+    const anchor = eqP(ra + norm180(L0 - ra) / 2, 0, 0.97);
+    label3(ctx, camS, anchor, 'tilt part ' + sgn(S.eotTilt) + ' min', { align: 'center', color: '#c9a0ff', dy: 30 * up });
+    label3(ctx, camS, anchor, 'speed part ' + sgn(S.eotEcc) + ' min', { align: 'center', color: '#6fe3cf', dy: 45 * up }); }
+  if (L.mean){ pt(eqP(L0, 0), 6.5, 'rgba(10,15,28,0.6)', '#ffffff', 2.4);
+    label3(ctx, camS, eqP(L0, 0), 'mean Sun (the clock)', { ...side(meanLeft), color: '#ffffff' });
+    label3(ctx, camS, eqP(ra + norm180(L0 - ra) / 2, 0, 0.97), 'equation of time ' + sgn(S.eot) + ' min', { align: 'center', color: '#ffffff', dy: 15 * up, font: 'bold 11px Segoe UI, sans-serif' }); }
+  if (L.dec){ pt(eqP(ra, 0), 3, '#ffd84d'); label3(ctx, camS, eqP(ra, decl / 2), 'declination ' + sgn(decl) + '°', { ...side(!meanLeft), color: '#ffd84d', font: 'bold 11px Segoe UI, sans-serif' }); }
+  const sq = camS.proj(eqP(ra, decl)); ctx.save(); ctx.shadowColor = '#ffd84d'; ctx.shadowBlur = 16; ctx.globalAlpha = sq.z < 0 ? 0.6 : 1; disc(ctx, sq.x, sq.y, 8, '#ffd84d'); ctx.restore();
+  txt(ctx, 'real Sun · ' + doyToDate(DAY), sq.x, sq.y + (decl >= 0 ? -18 : 18), { align: 'center', color: '#ffd84d', font: 'bold 11px Segoe UI, sans-serif' });
+  txt(ctx, 'Drag to rotate · scroll to zoom', 8, 12, { color: '#8e9ab2', bg: false, font: '10.5px Segoe UI, sans-serif' });
+  txt(ctx, 'grey lines through the poles = hour lines (15° = 1 hour of Earth\'s turning)', 8, H - 10, { color: '#8e9ab2', bg: false, font: '10.5px Segoe UI, sans-serif' });
+}
+
+// ============================ CHARTS ============================
+function chartFrame(cv, yLo, yHi, fmtY, stepY){
+  const { ctx, W, H } = setupCanvas(cv), pad = { l: 46, r: 10, t: 10, b: 20 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const X = d => pad.l + (d - 1) / 364 * pw, Y = v => pad.t + ph - (v - yLo) / (yHi - yLo) * ph;
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
+  ctx.strokeStyle = 'rgba(140,160,200,0.12)'; ctx.lineWidth = 1;
+  for (const m of MONTH_START){ ctx.beginPath(); ctx.moveTo(X(m), pad.t); ctx.lineTo(X(m), pad.t + ph); ctx.stroke(); }
+  for (let v = Math.ceil(yLo / stepY) * stepY; v <= yHi + 1e-9; v += stepY){ ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(pad.l + pw, Y(v)); ctx.stroke(); txt(ctx, fmtY(v), pad.l - 5, Y(v), { align: 'right', bg: false, color: '#8e9ab2', font: '10px Segoe UI, sans-serif' }); }
+  for (let m = 0; m < 12; m++) txt(ctx, MONTHS[m], X(MONTH_START[m]) + 3, H - 8, { bg: false, color: '#8e9ab2', font: '10px Segoe UI, sans-serif' });
+  if (yLo < 0 && yHi > 0){ ctx.strokeStyle = 'rgba(220,230,245,0.4)'; ctx.beginPath(); ctx.moveTo(pad.l, Y(0)); ctx.lineTo(pad.l + pw, Y(0)); ctx.stroke(); }
+  const line = (vals, color, w = 2, dash = []) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); vals.forEach((v, i) => i ? ctx.lineTo(X(i + 1), Y(v)) : ctx.moveTo(X(i + 1), Y(v))); ctx.stroke(); ctx.setLineDash([]); };
+  const cursor = () => { ctx.strokeStyle = 'rgba(255,216,77,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(DAY), pad.t); ctx.lineTo(X(DAY), pad.t + ph); ctx.stroke(); };
+  cv._geo = { pad, pw };
+  return { ctx, W, H, X, Y, line, cursor, pad, pw, ph };
+}
+const niceStep = (span, target) => { const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; };
+function drawCharts(S){
+  // declination
+  { const top = Math.max(P.eps + 6, 6), C = chartFrame($('decChart'), -top, top, v => v.toFixed(0) + '°', niceStep(2 * top, 5));
+    if (P.eps > 0.01){ C.ctx.strokeStyle = 'rgba(255,159,67,0.55)'; C.ctx.setLineDash([4, 4]);
+      for (const s of [1, -1]){ C.ctx.beginPath(); C.ctx.moveTo(C.pad.l, C.Y(s * P.eps)); C.ctx.lineTo(C.pad.l + C.pw, C.Y(s * P.eps)); C.ctx.stroke(); }
+      C.ctx.setLineDash([]);
+      txt(C.ctx, 'Tropic of Cancer +' + P.eps.toFixed(2) + '°', C.pad.l + C.pw - 4, C.Y(P.eps) - 8, { align: 'right', color: '#ff9f43', font: '10px Segoe UI, sans-serif' });
+      txt(C.ctx, 'Tropic of Capricorn −' + P.eps.toFixed(2) + '°', C.pad.l + C.pw - 4, C.Y(-P.eps) + 8, { align: 'right', color: '#ff9f43', font: '10px Segoe UI, sans-serif' }); }
+    C.line(YEAR.map(y => y.decl), '#ffd84d', 2.2); C.cursor(); disc(C.ctx, C.X(DAY), C.Y(S.decl), 4, '#ffd84d');
+    txt(C.ctx, sgn(S.decl) + '°', C.X(DAY) + 6, C.Y(S.decl) - 10, { color: '#ffd84d', font: 'bold 10.5px Segoe UI, sans-serif' }); }
+  // equation of time
+  { const vals = YEAR.flatMap(y => [y.eot, y.eotEcc, y.eotTilt]), m = Math.max(3, ...vals.map(Math.abs)) + 3;
+    const C = chartFrame($('eotChart'), -m, m, v => sgn(v, 0), niceStep(2 * m, 5));
+    C.line(YEAR.map(y => y.eotTilt), '#c9a0ff', 1.6, [5, 4]); C.line(YEAR.map(y => y.eotEcc), '#6fe3cf', 1.6, [5, 4]); C.line(YEAR.map(y => y.eot), '#ffd84d', 2.4);
+    C.cursor(); disc(C.ctx, C.X(DAY), C.Y(S.eot), 4, '#ffd84d');
+    let ly = C.pad.t + 10;
+    for (const [c, t] of [['#ffd84d', 'total: ' + sgn(S.eot) + ' min'], ['#c9a0ff', 'tilt part: ' + sgn(S.eotTilt)], ['#6fe3cf', 'speed part: ' + sgn(S.eotEcc)]]){ txt(C.ctx, t, C.pad.l + 6, ly, { color: c, font: '10.5px Segoe UI, sans-serif' }); ly += 15; }
+    txt(C.ctx, 'Sun ahead ↑ / behind ↓', C.pad.l + C.pw - 4, C.pad.t + 10, { align: 'right', color: '#8e9ab2', font: '10px Segoe UI, sans-serif' }); }
+  // daily seconds
+  { const vals = YEAR.map(y => y.daySec), m = Math.max(5, ...vals.map(Math.abs)) * 1.25;
+    const C = chartFrame($('dayChart'), -m, m, v => sgn(v, 0) + ' s', niceStep(2 * m, 5));
+    C.ctx.fillStyle = 'rgba(255,111,111,0.10)'; C.ctx.fillRect(C.pad.l, C.pad.t, C.pw, C.Y(0) - C.pad.t);
+    C.ctx.fillStyle = 'rgba(94,227,140,0.08)'; C.ctx.fillRect(C.pad.l, C.Y(0), C.pw, C.pad.t + C.ph - C.Y(0));
+    C.line(vals, '#8fd3ff', 2.2); C.cursor(); disc(C.ctx, C.X(DAY), C.Y(S.daySec), 4, '#8fd3ff');
+    txt(C.ctx, 'Sun day longer than 24 h: sundial falls behind', C.pad.l + 6, C.pad.t + 10, { color: '#ff9a9a', font: '10px Segoe UI, sans-serif' });
+    txt(C.ctx, 'shorter: sundial gains', C.pad.l + 6, C.pad.t + C.ph - 10, { color: '#8fe3a8', font: '10px Segoe UI, sans-serif' });
+    txt(C.ctx, (S.daySec >= 0 ? '+' : '−') + Math.abs(S.daySec).toFixed(1) + ' s', C.X(DAY) + 6, C.Y(S.daySec) - 10, { color: '#8fd3ff', font: 'bold 10.5px Segoe UI, sans-serif' }); }
+  // analemma
+  { const { ctx, W, H } = setupCanvas($('anaChart'));
+    const STRETCH = 3, xs = YEAR.map(y => y.eot * 0.25 * STRETCH), ys = YEAR.map(y => y.decl);
+    const x0 = Math.min(...xs, -1), x1 = Math.max(...xs, 1), y0 = Math.min(...ys, -1), y1 = Math.max(...ys, 1);
+    const s = Math.min((W - 60) / ((x1 - x0) * 1.3 + 8), (H - 30) / ((y1 - y0) * 1.1));
+    const cx = W / 2, cy = H / 2 - 4, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    const X = v => cx + (v - mx) * s, Y = v => cy - (v - my) * s;
+    ctx.fillStyle = '#0c1323'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(220,230,245,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(0), 6); ctx.lineTo(X(0), H - 22); ctx.moveTo(10, Y(0)); ctx.lineTo(W - 10, Y(0)); ctx.stroke();
+    ctx.strokeStyle = 'rgba(160,180,215,0.45)'; ctx.lineWidth = 1.6; ctx.beginPath(); xs.forEach((v, i) => i ? ctx.lineTo(X(v), Y(ys[i])) : ctx.moveTo(X(v), Y(ys[i]))); ctx.closePath(); ctx.stroke();
+    const di = Math.floor(DAY) - 1;
+    for (let k = 60; k > 0; k--){
+      const i = ((di - k) % 365 + 365) % 365, j = ((di - k + 1) % 365 + 365) % 365;
+      ctx.strokeStyle = `rgba(255,216,77,${(1 - k / 61).toFixed(3)})`; ctx.lineWidth = 3.2;
+      ctx.beginPath(); ctx.moveTo(X(xs[i]), Y(ys[i])); ctx.lineTo(X(xs[j]), Y(ys[j])); ctx.stroke();
+    }
+    for (let m = 0; m < 12; m++){ const i = MONTH_START[m] - 1, lx = X(xs[i]), ly = Y(ys[i]); disc(ctx, lx, ly, 2.3, '#e8eef8');
+      txt(ctx, MONTHS[m], lx + (xs[i] >= mx ? 6 : -6), ly, { align: xs[i] >= mx ? 'left' : 'right', color: '#b9c6da', font: '10px Segoe UI, sans-serif', bg: false }); }
+    ctx.save(); ctx.shadowColor = '#ffd84d'; ctx.shadowBlur = 12; disc(ctx, X(S.eot * 0.25 * STRETCH), Y(S.decl), 6, '#ffd84d'); ctx.restore();
+    txt(ctx, '← Sun behind the clock     equation of time     Sun ahead →', W / 2, H - 10, { align: 'center', color: '#8e9ab2', bg: false, font: '10px Segoe UI, sans-serif' });
+    txt(ctx, 'declination ↑', 8, 12, { color: '#8e9ab2', bg: false, font: '10px Segoe UI, sans-serif' });
+    $('anaChart')._ana = { X, Y, xs, ys }; }
+}
+
+// ============================ DYNAMIC TEXT / READOUT ============================
+function dynValues(S){
+  const tiltAmp = Math.max(...YEAR.map(y => Math.abs(y.eotTilt))), eccAmp = Math.max(...YEAR.map(y => Math.abs(y.eotEcc)));
+  let iMax = 0, iMin = 0; YEAR.forEach((y, i) => { if (y.eot > YEAR[iMax].eot) iMax = i; if (y.eot < YEAR[iMin].eot) iMin = i; });
+  const dd = S.daySec, lmr = norm180(S.lam - S.ra);
+  return {
+    date: doyToDate(DAY), dec: sgn(S.decl) + '°', decNS: latNS(S.decl), eps: P.eps.toFixed(2) + '°',
+    epsN: P.eps.toFixed(2) + '° N', epsS: P.eps.toFixed(2) + '° S',
+    eot: sgn(S.eot) + ' min', eotEcc: sgn(S.eotEcc) + ' min', eotTilt: sgn(S.eotTilt) + ' min',
+    eotDeg: (Math.abs(S.eot) / 4).toFixed(2) + '°', eotDir: S.eot >= 0 ? 'west' : 'east',
+    sundial: fmtClock(12 + S.eot / 60), nMean: N_MEAN.toFixed(4) + '°', dRa: S.dRa.toFixed(4) + '°',
+    dayDiff: Math.abs(dd).toFixed(1) + ' s ' + (dd >= 0 ? 'longer' : 'shorter'),
+    periDate: doyToDate(P.peri), aphDate: doyToDate(P.peri + YEAR_DAYS / 2),
+    speedRatio: (((1 + P.ecc) / (1 - P.ecc) - 1) * 100).toFixed(1) + '%',
+    eccAmp: eccAmp.toFixed(1) + ' min', tiltAmp: tiltAmp.toFixed(1) + ' min',
+    lam: S.lam.toFixed(1) + '°', ra: S.ra.toFixed(1) + '°',
+    lamMinusRa: 'difference ' + sgn(lmr, 2) + '° = ' + sgn(4 * lmr) + ' min',
+    cosEps: Math.cos(P.eps * RAD).toFixed(3), secEps: (1 / Math.cos(P.eps * RAD)).toFixed(3),
+    eotMax: sgn(YEAR[iMax].eot) + ' min on ' + doyToDate(iMax + 1), eotMin: sgn(YEAR[iMin].eot) + ' min on ' + doyToDate(iMin + 1),
+  };
+}
+function renderReadout(S, dv){
+  $('readout').innerHTML = `<b>${dv.date}</b> · declination <b>${dv.dec}</b> (Sun overhead at ${dv.decNS})
+    · equation of time <b>${dv.eot}</b> = tilt part <b>${dv.eotTilt}</b> + speed part <b>${dv.eotEcc}</b>
+    · at 12:00 on the clock a sundial reads <b>${dv.sundial}</b>
+    · today's Sun day is <b>${dv.dayDiff}</b> than 24 h
+    · Earth–Sun distance <b>${S.r.toFixed(4)} AU</b>; the Sun moves <b>${S.dLam.toFixed(4)}°</b>/day along the ecliptic and <b>${S.dRa.toFixed(4)}°</b>/day eastward along the equator (clock: ${dv.nMean}).`;
+}
+
+// ============================ MAIN ============================
+function renderAll(){
+  const S = sunAt(DAY, P, ORB);
+  drawOrbit(S); drawSky(S); drawCharts(S);
+  const dv = dynValues(S);
+  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
+  renderReadout(S, dv);
+  $('day_o').textContent = doyToDate(DAY);
+  if (+$('day').value !== Math.floor(DAY)) $('day').value = Math.floor(DAY);
+}
+function syncParamUI(){
+  $('eps').value = P.eps; $('ecc').value = P.ecc; $('peri').value = P.peri;
+  $('eps_o').textContent = P.eps.toFixed(2) + '°'; $('ecc_o').textContent = P.ecc.toFixed(4); $('peri_o').textContent = doyToDate(P.peri);
+}
+function setParams(o){ Object.assign(P, o); syncParamUI(); recompute(); }
+function syncLayersUI(){ for (const [k] of LAYERS) $('ly_' + k).checked = L[k]; }
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i));
+  const st = STEPS[STEP];
+  if (st.params) setParams({ ...st.params });
+  Object.assign(L, st.layers); syncLayersUI();
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1;
+  dirty = true;
+}
+function init(){
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  $('stepText').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-set]'); if (!b) return;
+    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('='); o[k.trim()] = parseFloat(v); }); setParams(o);
+  });
+  for (const [k, name] of LAYERS){
+    const lab = document.createElement('label'); lab.innerHTML = `<input type="checkbox" id="ly_${k}"><span>${name}</span>`; $('layers').appendChild(lab);
+    lab.querySelector('input').addEventListener('change', e => { L[k] = e.target.checked; dirty = true; });
+  }
+  $('day').addEventListener('input', () => { DAY = +$('day').value; dirty = true; });
+  $('speed').addEventListener('input', () => { $('speed_o').textContent = $('speed').value + ' days/s'; }); $('speed_o').textContent = $('speed').value + ' days/s';
+  $('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '❚❚ Pause' : '▶ Play the year'; };
+  for (const id of ['eps', 'ecc', 'peri']) $(id).addEventListener('input', () => setParams({ [id]: +$(id).value }));
+  $('earth').onclick = () => setParams({ ...EARTH });
+  $('resetO').onclick = () => { camO.reset(); dirty = true; }; $('resetS').onclick = () => { camS.reset(); dirty = true; };
+  for (const [id, cam] of [['orbit3d', camO], ['sky3d', camS]]){
+    const cv = $(id); let drag = null;
+    cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => { if (!drag) return; cam.az -= (e.clientX - drag[0]) * 0.4; cam.el = Math.max(-89, Math.min(89, cam.el + (e.clientY - drag[1]) * 0.4)); drag = [e.clientX, e.clientY]; dirty = true; });
+    cv.addEventListener('pointerup', () => drag = null); cv.addEventListener('pointercancel', () => drag = null);
+    cv.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = Math.max(0.5, Math.min(3, cam.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1))); dirty = true; }, { passive: false });
+  }
+  for (const id of ['decChart', 'eotChart', 'dayChart']){
+    const cv = $(id);
+    const pick = e => { const g = cv._geo; if (!g) return; const x = e.clientX - cv.getBoundingClientRect().left; DAY = Math.max(1, Math.min(365, 1 + (x - g.pad.l) / g.pw * 364)); dirty = true; };
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pick(e); });
+    cv.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
+  }
+  { const cv = $('anaChart');
+    const pick = e => { const A = cv._ana; if (!A) return; const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      let bi = 0, bd = Infinity; A.xs.forEach((v, i) => { const d = (A.X(v) - x) ** 2 + (A.Y(A.ys[i]) - y) ** 2; if (d < bd){ bd = d; bi = i; } }); DAY = bi + 1; dirty = true; };
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pick(e); });
+    cv.addEventListener('pointermove', e => { if (e.buttons) pick(e); }); }
+  window.addEventListener('resize', () => dirty = true);
+  recompute(); syncParamUI(); goStep(0);
+  let last = null;
+  const frame = t => {
+    if (playing){ if (last !== null){ DAY += (t - last) / 1000 * +$('speed').value; if (DAY >= 366) DAY -= 365; dirty = true; } last = t; } else last = null;
+    if (dirty){ dirty = false; renderAll(); }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

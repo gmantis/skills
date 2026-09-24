@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  SKELETON for the interactive-explainer skill. Everything marked REPLACE is placeholder.
+  Demo model: an observed quantity = cause A (once per cycle) + cause B (twice per cycle).
+  Keep the structure: MODEL (pure) -> STATE -> STEPS -> 3D/chart helpers -> renderers -> main loop.
+-->
+<style>
+  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --a:#c9a0ff; --b:#6fe3cf; --total:#ffd84d; --accent:#5aa9ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button,.btn,#stepText button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--total)}
+  #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} #stepText .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  .ctl{margin-bottom:9px} .ctl .lab{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+  .ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .ctl.overridden{opacity:.45}
+  .seg{display:flex;margin-bottom:8px} .seg button{flex:1;border-radius:0;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px;font-size:.75rem;cursor:pointer}
+  .seg button:first-child{border-radius:6px 0 0 6px} .seg button:last-child{border-radius:0 6px 6px 0} .seg button.on{background:#2b4a7a;border-color:var(--accent)}
+  .chk{display:flex;gap:7px;font-size:.78rem;color:var(--muted);margin-bottom:6px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)} canvas.drag{cursor:grab} canvas.chart{cursor:crosshair}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TITLE (REPLACE)</h1>
+  <p>One-paragraph framing of the puzzle from the source document (REPLACE). Say what the reader will be able to do: step through, toggle causes off, drag the 3D view, click charts.</p>
+</header>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <h2 id="stepTitle"></h2><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if?</h4>
+    <div class="seg" id="whatSeg"><button data-w="real" class="on">Real</button><button data-w="noA">No cause A</button><button data-w="noB">No cause B</button><button data-w="none">Neither</button></div>
+    <label class="chk"><input type="checkbox" id="offA"><span>Switch off cause A</span></label>
+    <label class="chk"><input type="checkbox" id="offB"><span>Switch off cause B</span></label>
+    <label class="chk"><input type="checkbox" id="ghosts" checked><span>Draw each cause on its own as a faint curve</span></label>
+  </div>
+  <div class="card">
+    <h4>Time</h4>
+    <div class="ctl"><div class="lab"><span>Position in the cycle</span><output id="t_o"></output></div><input type="range" id="t" min="0" max="1" step="0.001" value="0.3"></div>
+    <button class="btn" id="play">▶ Play</button>
+    <h4 style="margin-top:12px">Parameters</h4>
+    <div id="params"></div>
+    <button class="btn" id="reset">Reset to real values</button>
+  </div>
+</aside>
+<main>
+  <div class="grid2">
+    <section class="panel"><h3>3D view (REPLACE)</h3><p class="sub">Drag to rotate, scroll to zoom.</p><canvas id="view3d" class="drag" data-h="440"></canvas></section>
+    <section class="panel"><h3>Chart over the cycle</h3><p class="sub">Total and its two parts. Click or drag to pick a moment.</p><canvas id="chart" class="chart" data-h="440"></canvas></section>
+  </div>
+  <div id="readout"></div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL (pure functions, no DOM) — REPLACE ============================
+const RAD = Math.PI / 180, N = 365;
+const REAL = { ampA: 7.7, ampB: 9.9, phaseB: 0 };
+function modelAt(t, p){                       // t in [0,1): one cycle
+  const a = p.offA ? 0 : p.ampA * Math.sin(2 * Math.PI * t);
+  const b = p.offB ? 0 : p.ampB * Math.sin(4 * Math.PI * t + p.phaseB * RAD);
+  return { a, b, total: a + b, lat: (p.offB ? 0 : 23.4) * Math.sin(2 * Math.PI * t) };
+}
+function series(p){ const o = []; for (let i = 0; i < N; i++) o.push(modelAt(i / N, p)); return o; }
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const SPEC = [   // REPLACE: one entry per physical parameter
+  { id: 'ampA', label: 'Cause A size', min: 0, max: 20, step: 0.1, fmt: v => v.toFixed(1) },
+  { id: 'ampB', label: 'Cause B size', min: 0, max: 20, step: 0.1, fmt: v => v.toFixed(1) },
+  { id: 'phaseB', label: 'Cause B phase', min: -180, max: 180, step: 1, fmt: v => v.toFixed(0) + '°' },
+];
+const P = { ...REAL, offA: false, offB: false };
+let T = 0.3, SER = [], playing = false, dirty = true, STEP = 0;
+const recompute = () => { SER = series(P); dirty = true; };
+
+// ============================ STEPS (guided tour) — REPLACE ============================
+// Each step: title, params to apply on entry (always give full params so going back restores state),
+// layers/toggles, and html with dynamic numbers via D('key') filled by dynValues() every frame.
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const STEPS = [
+  { title: '1 · The puzzle', params: { ...REAL, offA: false, offB: false },
+    html: () => `<p>State the question from the document in plain words. Right now the total is ${D('total')}.</p>` },
+  { title: '2 · Cause A on its own', params: { ...REAL, offA: false, offB: true },
+    html: () => `<p>Cause B is switched off for this step. Cause A swings <b>once per cycle</b>, up to ±${D('ampA')}.
+      <button data-set="ampA=15">Exaggerate A</button> <button data-set="ampA=7.7">Real A</button></p>` },
+  { title: '3 · Cause B on its own', params: { ...REAL, offA: true, offB: false },
+    html: () => `<p>Now A is off. B swings <b>twice per cycle</b>, up to ±${D('ampB')}.</p>` },
+  { title: '4 · Both together', params: { ...REAL, offA: false, offB: false },
+    html: () => `<p>The total is A + B: ${D('a')} + ${D('b')} = ${D('total')}. They add in some parts of the cycle and cancel in others.</p>` },
+];
+
+// ============================ HELPERS: canvas, 3D camera, depth-split lines, labels ============================
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const unit = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const seg = (a, b, n = 24) => { const o = []; for (let i = 0; i <= n; i++){ const t = i / n; o.push([0, 1, 2].map(k => a[k] + (b[k] - a[k]) * t)); } return o; };
+const curve = (f, t0, t1, n) => { const o = []; for (let i = 0; i <= n; i++) o.push(f(t0 + (t1 - t0) * i / n)); return o; };
+const sgn = (v, d = 1) => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(d);
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.floor(cv.clientWidth)), H = +cv.dataset.h;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { ctx, W, H, dpr };
+}
+class Cam {   // orbit camera: z is up; az/el in degrees; azAdd lets the view follow a moving subject
+  constructor(az, el){ this.az0 = az; this.el0 = el; this.reset(); }
+  reset(){ this.az = this.az0; this.el = this.el0; this.zoom = 1; }
+  setup(W, H, scale, fx = 0.5, fy = 0.5, azAdd = 0){
+    const a = (this.az + azAdd) * RAD, e = this.el * RAD;
+    this.e = [Math.cos(e) * Math.cos(a), Math.cos(e) * Math.sin(a), Math.sin(e)];
+    this.r = [-Math.sin(a), Math.cos(a), 0];
+    this.u = [-Math.sin(e) * Math.cos(a), -Math.sin(e) * Math.sin(a), Math.cos(e)];
+    this.cx = W * fx; this.cy = H * fy; this.S = scale * this.zoom; this.D = 5;
+  }
+  proj(p){ const x = dot(p, this.r), y = dot(p, this.u), z = dot(p, this.e), k = this.D / (this.D - z); return { x: this.cx + x * this.S * k, y: this.cy - y * this.S * k, z, k }; }
+  basis(){ return { right: this.r, up: this.u, e: this.e }; }
+}
+// Draw a 3D polyline split into runs behind/in front of depth `thr`; pass='back'|'front' lets you draw an opaque object in between.
+function poly(ctx, cam, pts, st, pass, thr = 0){
+  const Pp = pts.map(p => cam.proj(p)), isBack = k => (Pp[k].z + Pp[k + 1].z) / 2 < thr;
+  ctx.strokeStyle = st.color; ctx.lineWidth = st.width || 1.5; ctx.setLineDash(st.dash || []);
+  let i = 0;
+  while (i < Pp.length - 1){
+    const back = isBack(i); let j = i; while (j < Pp.length - 1 && isBack(j) === back) j++;
+    if (!(pass && ((pass === 'back') !== back))){
+      ctx.globalAlpha = (back ? (st.backAlpha ?? 0.28) : 1);
+      ctx.beginPath(); ctx.moveTo(Pp[i].x, Pp[i].y); for (let k = i + 1; k <= j; k++) ctx.lineTo(Pp[k].x, Pp[k].y); ctx.stroke();
+    }
+    i = j;
+  }
+  ctx.globalAlpha = 1; ctx.setLineDash([]);
+}
+function disc(ctx, x, y, r, fill, stroke, lw = 1.5){ ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); if (fill){ ctx.fillStyle = fill; ctx.fill(); } if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+// Text with a dark backing box, clamped inside the canvas so labels never get cut off.
+function txt(ctx, s, x, y, o = {}){
+  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif'; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(s).width, CW = ctx.canvas.clientWidth || 9999;
+  let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+  const nbx = Math.max(4, Math.min(CW - w - 4, bx)); x += nbx - bx; bx = nbx;
+  if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.72)'; ctx.fillRect(bx - 3, y - 7, w + 6, 14); }
+  ctx.fillStyle = o.color || '#dfe6f2'; ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(s, x, y); ctx.globalAlpha = 1;
+}
+function label3(ctx, cam, p, s, o = {}){ const q = cam.proj(p); txt(ctx, s, q.x + (o.dx || 0), q.y + (o.dy || 0), { ...o, alpha: q.z < 0 ? 0.45 : 1 }); }
+// Per-pixel shaded sphere (lit by `light`), with parallels at the given latitudes (deg). Cheap enough to redraw every frame.
+const SPHERES = {};
+function renderSphere(ctx, cx, cy, r, B, axis, light, parallels, slot, dpr){
+  const R = Math.max(3, Math.round(r * dpr)), N2 = 2 * R + 2;
+  let g = SPHERES[slot]; if (!g || g.N !== N2){ const c = document.createElement('canvas'); c.width = c.height = N2; g = SPHERES[slot] = { c, x: c.getContext('2d'), N: N2 }; }
+  const img = g.x.createImageData(N2, N2), px = img.data, lw = 1.2 / R;
+  for (let j = 0; j < N2; j++){ const v = (R + 1 - (j + 0.5)) / R;
+    for (let i = 0; i < N2; i++){ const u = (i + 0.5 - (R + 1)) / R, rr = u * u + v * v; if (rr > 1) continue;
+      const w = Math.sqrt(1 - rr), n = [0, 1, 2].map(k => u * B.right[k] + v * B.up[k] + w * B.e[k]);
+      const lat = Math.asin(Math.max(-1, Math.min(1, dot(n, axis)))) / RAD, lit = dot(n, light);
+      const t = Math.min(1, Math.max(0, (lit + 0.06) / 0.12)), br = (0.4 + 0.6 * Math.max(0, lit)) * (0.6 + 0.4 * w);
+      let c = [10 + (40 * br - 10) * t, 18 + (112 * br - 18) * t, 36 + (196 * br - 36) * t];
+      for (const pl of parallels) if (Math.abs(lat - pl.lat) < lw / RAD * (pl.w || 1)) c = c.map((x, k) => x + (pl.rgb[k] - x) * (pl.a ?? 0.9));
+      const q = (j * N2 + i) * 4; px[q] = c[0]; px[q + 1] = c[1]; px[q + 2] = c[2]; px[q + 3] = 255 * Math.min(1, (1 - Math.sqrt(rr)) * R + 0.4);
+    } }
+  g.x.putImageData(img, 0, 0); ctx.drawImage(g.c, cx - (R + 1) / dpr, cy - (R + 1) / dpr, N2 / dpr, N2 / dpr);
+}
+// 2D chart frame over one cycle, with grid, zero line, cursor and click-to-pick geometry stored on the canvas.
+function chartFrame(cv, yLo, yHi, fmtY, stepY){
+  const { ctx, W, H } = setupCanvas(cv), pad = { l: 46, r: 10, t: 10, b: 20 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const X = t => pad.l + t * pw, Y = v => pad.t + ph - (v - yLo) / (yHi - yLo) * ph;
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
+  ctx.strokeStyle = 'rgba(140,160,200,0.12)'; ctx.lineWidth = 1;
+  for (let v = Math.ceil(yLo / stepY) * stepY; v <= yHi + 1e-9; v += stepY){ ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(pad.l + pw, Y(v)); ctx.stroke(); txt(ctx, fmtY(v), pad.l - 5, Y(v), { align: 'right', bg: false, color: '#8e9ab2', font: '10px Segoe UI' }); }
+  if (yLo < 0 && yHi > 0){ ctx.strokeStyle = 'rgba(220,230,245,0.4)'; ctx.beginPath(); ctx.moveTo(pad.l, Y(0)); ctx.lineTo(pad.l + pw, Y(0)); ctx.stroke(); }
+  const line = (vals, color, w = 2, dash = []) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); vals.forEach((v, i) => i ? ctx.lineTo(X(i / N), Y(v)) : ctx.moveTo(X(0), Y(v))); ctx.stroke(); ctx.setLineDash([]); };
+  cv._geo = { pad, pw };
+  return { ctx, W, H, X, Y, line, pad, pw, ph };
+}
+const niceStep = (span, target) => { const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; };
+
+// ============================ RENDERERS — REPLACE the scene content ============================
+const cam = new Cam(-35, 20);
+function draw3d(S){
+  const { ctx, W, H, dpr } = setupCanvas($('view3d'));
+  cam.setup(W, H, Math.min(W, H) * 0.36);
+  const pnt = (lon, lat, r = 1) => [r * Math.cos(lat * RAD) * Math.cos(lon * RAD), r * Math.cos(lat * RAD) * Math.sin(lon * RAD), r * Math.sin(lat * RAD)];
+  const lon = T * 360 + S.total * 4, lines = pass => {
+    poly(ctx, cam, curve(a => pnt(a, 0), 0, 360, 120), { color: '#5aa9ff', width: 2 }, pass);
+    poly(ctx, cam, curve(d => pnt(lon, d), 0, S.lat, 30), { color: '#ffd84d', width: 4 }, pass);
+  };
+  lines('back');
+  const c = cam.proj([0, 0, 0]);
+  renderSphere(ctx, c.x, c.y, 0.2 * cam.S * c.k, cam.basis(), [0, 0, 1], unit(pnt(lon, S.lat)), [{ lat: 0, rgb: [235, 242, 252] }, { lat: S.lat, rgb: [255, 216, 77], w: 1.6 }], 'center', dpr);
+  lines('front');
+  const q = cam.proj(pnt(lon, S.lat)); disc(ctx, q.x, q.y, 7, '#ffd84d');
+  label3(ctx, cam, pnt(lon, S.lat), 'moving point', { dx: 10, color: '#ffd84d' });
+  txt(ctx, 'Drag to rotate · scroll to zoom', 8, 12, { bg: false, color: '#8e9ab2' });
+}
+function drawChart(S){
+  const vals = SER.flatMap(s => [s.a, s.b, s.total]), m = Math.max(3, ...vals.map(Math.abs)) + 2;
+  const C = chartFrame($('chart'), -m, m, v => sgn(v, 0), niceStep(2 * m, 6));
+  if ($('ghosts').checked){ C.line(SER.map(s => s.a), '#c9a0ff', 1.6, [5, 4]); C.line(SER.map(s => s.b), '#6fe3cf', 1.6, [5, 4]); }
+  C.line(SER.map(s => s.total), '#ffd84d', 2.4);
+  C.ctx.strokeStyle = 'rgba(255,216,77,0.6)'; C.ctx.beginPath(); C.ctx.moveTo(C.X(T), C.pad.t); C.ctx.lineTo(C.X(T), C.pad.t + C.ph); C.ctx.stroke();
+  disc(C.ctx, C.X(T), C.Y(S.total), 4, '#ffd84d');
+  let ly = C.pad.t + 10;
+  for (const [c, t] of [['#ffd84d', 'total ' + sgn(S.total)], ['#c9a0ff', 'cause A ' + sgn(S.a)], ['#6fe3cf', 'cause B ' + sgn(S.b)]]){ txt(C.ctx, t, C.pad.l + 6, ly, { color: c }); ly += 15; }
+  if (Math.max(...SER.map(s => s.total)) - Math.min(...SER.map(s => s.total)) < 1e-6) txt(C.ctx, 'Both causes off: the total is constant', C.X(0.5), C.Y(0) - 18, { align: 'center', color: '#ffd84d' });
+}
+function dynValues(S){   // every D('key') used in STEPS must have an entry here
+  return { total: sgn(S.total), a: sgn(S.a), b: sgn(S.b), ampA: P.ampA.toFixed(1), ampB: P.ampB.toFixed(1) };
+}
+
+// ============================ MAIN ============================
+function renderAll(){
+  const S = modelAt(T, P);
+  draw3d(S); drawChart(S);
+  const dv = dynValues(S);
+  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
+  $('readout').innerHTML = `t = <b>${T.toFixed(3)}</b> · total <b>${dv.total}</b> = cause A <b>${dv.a}</b> + cause B <b>${dv.b}</b>`;
+  $('t_o').textContent = T.toFixed(3); if (Math.abs(+$('t').value - T) > 1e-3) $('t').value = T;
+}
+const WHAT = { real: [false, false], noA: [true, false], noB: [false, true], none: [true, true] };
+function syncUI(){
+  for (const s of SPEC){ $(s.id).value = P[s.id]; $(s.id + '_o').textContent = s.fmt(P[s.id]); }
+  $('offA').checked = P.offA; $('offB').checked = P.offB;
+  $('ampA').closest('.ctl').classList.toggle('overridden', P.offA); $('ampB').closest('.ctl').classList.toggle('overridden', P.offB);
+  document.querySelectorAll('#whatSeg button').forEach(b => { const [a, c] = WHAT[b.dataset.w]; b.classList.toggle('on', a === P.offA && c === P.offB); });
+}
+function setParams(o){ Object.assign(P, o); syncUI(); recompute(); }
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
+  if (st.params) setParams({ ...st.params });
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
+}
+function init(){
+  for (const s of SPEC){ const d = document.createElement('div'); d.className = 'ctl';
+    d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    $('params').appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); }
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  $('stepText').addEventListener('click', ev => { const b = ev.target.closest('button[data-set]'); if (!b) return;
+    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('='); o[k.trim()] = parseFloat(v); }); setParams(o); });
+  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => { const [a, c] = WHAT[b.dataset.w]; setParams({ offA: a, offB: c }); });
+  $('offA').onchange = () => setParams({ offA: $('offA').checked }); $('offB').onchange = () => setParams({ offB: $('offB').checked });
+  $('ghosts').onchange = () => dirty = true;
+  $('reset').onclick = () => setParams({ ...REAL, offA: false, offB: false });
+  $('t').oninput = () => { T = +$('t').value; dirty = true; };
+  $('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '❚❚ Pause' : '▶ Play'; };
+  const cv = $('view3d'); let drag = null;
+  cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (!drag) return; cam.az -= (e.clientX - drag[0]) * 0.4; cam.el = Math.max(-89, Math.min(89, cam.el + (e.clientY - drag[1]) * 0.4)); drag = [e.clientX, e.clientY]; dirty = true; });
+  cv.addEventListener('pointerup', () => drag = null);
+  cv.addEventListener('wheel', e => { e.preventDefault(); cam.zoom = Math.max(0.5, Math.min(3, cam.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1))); dirty = true; }, { passive: false });
+  const ch = $('chart'), pick = e => { const g = ch._geo; if (!g) return; T = Math.max(0, Math.min(0.999, (e.clientX - ch.getBoundingClientRect().left - g.pad.l) / g.pw)); dirty = true; };
+  ch.addEventListener('pointerdown', e => { ch.setPointerCapture(e.pointerId); pick(e); }); ch.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
+  window.addEventListener('resize', () => dirty = true);
+  recompute(); syncUI(); goStep(0);
+  let last = null;
+  const frame = now => {
+    if (playing){ if (last !== null){ T = (T + (now - last) / 1000 * 0.05) % 1; dirty = true; } last = now; } else last = null;
+    if (dirty){ dirty = false; renderAll(); }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>
