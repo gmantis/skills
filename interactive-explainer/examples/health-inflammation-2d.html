@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Reference example for the interactive-explainer skill: a NON-physics (biology/health) explainer built from a book chapter.
+     Patterns: illustrative compartment model with warm-up, what-if scenarios + presets, 2D body diagram with screen-space labels,
+     J-curve dose chart, localised "your numbers" card, on-page validation table, glossary + quiz (combined teach page). -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friendly Fire — Why Sunlight Is Healthy</title>
+<style>/* inlined from the course assets/course.css */
+/* Shared stylesheet for the "In Defense of Sunlight" teaching workspace.
+   Light, paper-like, prints cleanly. Every lesson and reference page links this file. */
+:root{
+  --paper:#fbf8f1; --panel:#ffffff; --ink:#1f2328; --muted:#6b6f76; --line:#e6dfd0; --soft:#f4efe3;
+  --sun:#c46a12; --sun-soft:#fbe9d2; --good:#2f7d5b; --bad:#b53a2e; --uv:#7b3fb8; --blue:#3a7bd5; --green:#3fae5a; --ir:#8a2a2a;
+  --serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+  --sans: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans)}
+a{color:var(--sun)} a:hover{text-decoration:none}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.25;color:var(--ink)}
+h1{font-size:2rem;margin:.2em 0 .2em} h2{font-size:1.45rem;margin:1.6em 0 .4em} h3{font-size:1.1rem;margin:1.2em 0 .3em}
+.kicker{font:600 .72rem/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--sun)}
+.lede{font-family:var(--serif);font-size:1.12rem;color:#3a3d42;max-width:52em}
+.muted{color:var(--muted)} small,.small{font-size:.82rem}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.panel,.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.panel h3,.card h3{margin:0 0 4px;font-size:1rem}
+.sub{margin:0 0 8px;color:var(--muted);font-size:.84rem}
+.callout{border-left:4px solid var(--sun);background:var(--sun-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.callout.good{border-color:var(--good);background:#e6f2ec} .callout.bad{border-color:var(--bad);background:#f8e5e2}
+.seven{font-family:var(--serif);font-size:1.5rem;letter-spacing:.01em}
+.btn,button.btn{font:500 .82rem var(--sans);background:var(--soft);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:5px 11px;cursor:pointer}
+.btn:hover{border-color:var(--sun)} .btn.primary{background:var(--sun);border-color:var(--sun);color:#fff}
+.seg{display:flex;flex-wrap:wrap;gap:0;margin:4px 0 8px}
+.seg button{flex:1 1 auto;font:500 .78rem var(--sans);background:var(--soft);border:1px solid var(--line);margin-left:-1px;color:var(--ink);padding:5px 8px;cursor:pointer}
+.seg button:first-child{border-radius:7px 0 0 7px;margin-left:0} .seg button:last-child{border-radius:0 7px 7px 0}
+.seg button.on{background:var(--sun);border-color:var(--sun);color:#fff}
+.ctl{margin-bottom:10px} .ctl .lab{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
+.ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--sun)}
+.chk{display:flex;gap:7px;align-items:flex-start;font-size:.82rem;color:#3a3d42;margin:4px 0}
+select{font:inherit;font-size:.84rem;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:#3a3d42;background:var(--soft)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.src{color:var(--muted)}
+.tag{display:inline-block;font-size:.72rem;padding:1px 7px;border-radius:10px;background:var(--soft);border:1px solid var(--line);color:#3a3d42}
+.tag.good{background:#e6f2ec;border-color:#bfdccd;color:var(--good)} .tag.warn{background:#fdf1dc;border-color:#f0d6a8;color:#9a5a00} .tag.bad{background:#f8e5e2;border-color:#ebc3bd;color:var(--bad)}
+canvas{display:block;width:100%;border-radius:8px;background:#fffdf8}
+cite{font-style:normal} sup a{text-decoration:none;font-size:.75em}
+.refs{font-size:.84rem;color:#3a3d42} .refs li{margin:3px 0}
+.ask{border:1px dashed var(--sun);border-radius:10px;padding:10px 14px;background:#fffaf2}
+footer.page{margin:40px 0 30px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line);padding-top:12px}
+/* quiz widget (assets/quiz.js) */
+.quiz .q{margin:14px 0 18px} .quiz .q p{margin:0 0 6px;font-weight:600}
+.quiz .opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.quiz .opts button{text-align:left;font:inherit;font-size:.88rem;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+.quiz .opts button:hover{border-color:var(--sun)}
+.quiz .opts button.right{background:#e6f2ec;border-color:var(--good)} .quiz .opts button.wrong{background:#f8e5e2;border-color:var(--bad)}
+.quiz .why{font-size:.85rem;color:#3a3d42;margin-top:6px;display:none} .quiz .why.show{display:block}
+.quiz .score{font-weight:600;color:var(--sun)}
+@media (max-width:700px){.quiz .opts{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff;font-size:11pt} .noprint,button,.seg,input,select{display:none!important}
+  .panel,.card{break-inside:avoid;border-color:#ccc} a{color:#000} canvas{max-width:100%}
+}
+
+</style>
+<style>
+  header.hero{padding:26px 0 6px}
+  .layout{display:flex;gap:18px;align-items:flex-start;margin-top:14px}
+  aside{width:360px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  main{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;gap:14px}
+  .panel{min-width:0;overflow-x:auto;transition:box-shadow .3s,border-color .3s} .grid2>*{min-width:0}
+  .panel.focus{border-color:var(--sun);box-shadow:0 0 0 3px var(--sun-soft)}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button{font:600 .9rem var(--sans);background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:3px 10px;cursor:pointer}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:23px;height:23px;border-radius:50%;background:var(--soft);border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:var(--sun);border-color:var(--sun);color:#fff}
+  #stepTitle{margin:10px 0 6px;font-size:1.08rem;color:var(--sun)}
+  #stepText{font-size:.9rem} #stepText p{margin:0 0 8px} #stepText .dyn,.dyn{font-weight:700;white-space:nowrap}
+  #stepText blockquote{margin:6px 0 8px;padding-left:10px;border-left:3px solid var(--line);font-family:var(--serif);color:#3a3d42}
+  .actbtn{font:500 .76rem var(--sans);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer;margin:1px 0}
+  .actbtn:hover{border-color:var(--sun)}
+  h4{margin:0 0 6px;font:600 .72rem var(--sans);text-transform:uppercase;letter-spacing:.1em;color:var(--sun)}
+  .ctl.overridden{opacity:.4}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2.top{grid-template-columns:1.15fr 1fr}
+  #readout{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:.88rem}
+  canvas.chart{cursor:crosshair}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.78rem;color:#3a3d42;margin-top:6px}
+  .legend i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+  .legend i.dash{border-top-style:dashed;border-top-width:2px}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+  #cmp td.on,#cmp th.on{background:#fff4e4}
+  #cmp td{font-variant-numeric:tabular-nums} #cmp td.num{white-space:nowrap}
+  #sgTable td{font-variant-numeric:tabular-nums}
+  dl.gloss{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 22px;margin:0} dl.gloss dt{font-weight:700;margin-top:6px} dl.gloss dd{margin:0 0 4px;font-size:.86rem;color:#3a3d42}
+  .ok{color:var(--good);font-weight:700} .no{color:var(--bad);font-weight:700}
+  ol.take li{margin:6px 0}
+  @media (max-width:1050px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2,.grid2.top,dl.gloss{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="kicker">Lesson 2 · <i>In Defense of Sunlight</i> (Jacobsen), Ch 9 “Friendly Fire: Modernity, Chronic Inflammation, and the Sun Deficit”</div>
+  <h1>Friendly fire — why sunlight is healthy</h1>
+  <p class="lede">Chapter 9 is where the book stops listing molecules that sunlight makes (vitamin D, nitric oxide) and offers a bigger idea. Your immune system is a fire brigade. Modern indoor life leaves it idle, so it smoulders. Sunlight, like exercise, is a <b>short, controlled fire that trains the brigade to put fires out</b>. The page below simulates that idea: pick a life, play 60 days and watch the embers.</p>
+  <p class="seven">“Sun exposure improves the same health conditions as exercise because it is a form of exercise. It’s a workout for the skin.” <span class="muted small">— Jacobsen, Ch 9</span></p>
+  <p class="small muted">Builds on <a href="#">Lesson 1 · Sunlight, decoded</a> (the bands of sunlight and the Singapore day). The simulator here is a <b>toy model</b>: it shows the chapter’s <i>shapes</i> (what rises, what falls, what reverses), not clinical numbers.</p>
+</header>
+
+<h2 id="sim">1 · The fire brigade, simulated</h2>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev" aria-label="previous step">‹</button><div class="dots" id="dots"></div><button id="next" aria-label="next step">›</button></div>
+    <h3 id="stepTitle"></h3><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if your life had…</h4>
+    <div class="seg" id="whatSeg">
+      <button data-w="real">Sun + exercise</button><button data-w="sun">Only sun</button><button data-w="ex">Only exercise</button><button data-w="none">Neither</button>
+    </div>
+    <h4 style="margin-top:8px">…or was one of these lives</h4>
+    <div class="seg" id="presetSeg">
+      <button data-p="hunter">Hunter-gatherer</button><button data-p="office">Office worker</button><button data-p="burner">Weekend burner</button><button data-p="sg">Singapore sensible</button>
+    </div>
+  </div>
+  <div class="card">
+    <h4>The daily doses</h4>
+    <div class="ctl" id="sunCtl"><div class="lab"><span>☀ Sun at 09:00 (share of your burn dose)</span><output id="sun_o"></output></div><input type="range" id="sun" min="0" max="2" step="0.05"></div>
+    <div class="seg" id="patSeg"><button data-pat="daily">Every day</button><button data-pat="weekend">Weekends only</button></div>
+    <div class="ctl" id="exCtl"><div class="lab"><span>Exercise at 07:00 (challenge)</span><output id="ex_o"></output></div><input type="range" id="ex" min="0" max="1.6" step="0.05"></div>
+    <div class="ctl"><div class="lab"><span>Modern irritant load (indoor, processed, sedentary)</span><output id="irr_o"></output></div><input type="range" id="irr" min="0" max="1.5" step="0.05"></div>
+    <div class="ctl"><div class="lab"><span>Allergen / insult at 15:00</span><output id="alg_o"></output></div><input type="range" id="alg" min="0" max="1.5" step="0.05"></div>
+    <label class="chk"><input type="checkbox" id="micro"><span>Sun-adapted skin microbes (they eat urocanic acid before it shuts down surveillance — Lyon, 2025)</span></label>
+  </div>
+  <div class="card">
+    <h4>Time</h4>
+    <div class="ctl"><div class="lab"><span>Day</span><output id="day_o"></output></div><input type="range" id="day" min="1" max="60" step="1"></div>
+    <div class="ctl"><div class="lab"><span>Hour</span><output id="hour_o"></output></div><input type="range" id="hour" min="0" max="23.9" step="0.1"></div>
+    <button class="btn primary" id="play">▶ Play 60 days</button> <button class="btn" id="reset">Reset</button>
+  </div>
+  <div class="card">
+    <h4>Your sun dose in Singapore minutes</h4>
+    <p class="sub">Open sky, bare skin, <span id="sgDate"></span>. Minutes starting at each clock time to reach the dose on the ☀ slider.</p>
+    <div class="lab small muted">Skin type (Fitzpatrick)</div>
+    <div class="seg" id="skinSeg"><button data-s="I">I</button><button data-s="II">II</button><button data-s="III">III</button><button data-s="IV">IV</button><button data-s="V">V</button><button data-s="VI">VI</button></div>
+    <div class="seg" id="cloudSeg"><button data-c="clear">Clear</button><button data-c="partly">Partly cloudy</button><button data-c="overcast">Overcast</button></div>
+    <table id="sgTable"></table>
+  </div>
+</aside>
+
+<main>
+  <div class="grid2 top">
+    <div class="panel" id="pBody">
+      <h3>The body tonight</h3><p class="sub">Embers = smouldering inflammation (inflammaging). Blue dots = firefighters (resolution). Dashed green = the skin’s cancer surveillance.</p>
+      <canvas id="body" height="480"></canvas>
+      <div class="legend"><span><span class="sw" style="background:#e0561b"></span>chronic ember</span><span><span class="sw" style="background:#f5a623"></span>acute spark (drill)</span><span><span class="sw" style="background:#3a7bd5"></span>firefighter</span><span><span class="sw" style="background:#2b2b2b"></span>damage that slipped through</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div class="panel" id="pDay">
+        <h3>One day, hour by hour</h3><p class="sub">Click to pick an hour. Short orange spikes (the drills) raise the blue repair crew, which keeps working all day.</p>
+        <canvas id="dayc" class="chart" height="210"></canvas>
+        <div class="legend"><span><i style="border-color:#f5a623"></i>acute inflammation</span><span><i style="border-color:#3a7bd5"></i>resolution crew</span><span><i style="border-color:#555"></i>inflammaging</span><span><i style="border-color:#c0392b"></i>sunburn damage</span></div>
+      </div>
+      <div class="panel" id="pChronic">
+        <h3>60 days of smoulder</h3><p class="sub">Daily average inflammaging. Dashed lines are the other lives with the same sliders. Click to pick a day.</p>
+        <canvas id="chron" class="chart" height="210"></canvas>
+        <div class="legend" id="chronLegend"></div>
+      </div>
+    </div>
+  </div>
+  <div id="readout"></div>
+  <div class="grid2">
+    <div class="panel" id="pDose">
+      <h3>How much sun? The dose–response</h3><p class="sub">Day-60 inflammaging and escaped damage for every daily sun dose (with the other sliders as set). Click to choose a dose.</p>
+      <canvas id="dose" class="chart" height="230"></canvas>
+      <div class="legend"><span><i style="border-color:#555"></i>inflammaging (left)</span><span><i style="border-color:#c0392b"></i>escaped damage (right)</span><span><i class="dash" style="border-color:#c0392b"></i>burn line</span></div>
+    </div>
+    <div class="panel" id="pMS">
+      <h3>The clue: the “sunshine disease”</h3><p class="sub">Multiple sclerosis by latitude (book’s rule of thumb) and by children’s outdoor time.</p>
+      <canvas id="ms" height="230"></canvas>
+      <p class="small muted" style="margin:6px 0 0">Left: ≈0 at the equator, +3.6 per 100,000 per degree, ≈200 in Canada, the UK and Northern Europe (Ch 9). Singapore’s point is the rule extrapolated, not a measurement. Right: under 30 min/day outside = 2× the risk of up to 1 h and ≈5× the risk of over 1 h (so up to 1 h ≈ 2.5×).</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Four lives, same sliders</h3><p class="sub">Model outputs over 60 days. Your current what-if is highlighted.</p>
+    <table id="cmp"></table>
+  </div>
+</main>
+</div>
+
+<h2 id="evidence">2 · The evidence in the chapter</h2>
+<div class="panel">
+<table>
+  <thead><tr><th>Finding</th><th class="num">Number</th><th>Who / where</th></tr></thead>
+  <tbody>
+    <tr><td>MS rises with distance from the equator</td><td class="num">+3.6 / 100k per degree → ≈200 / 100k</td><td class="src">Latitude gradient, Ch 9</td></tr>
+    <tr><td>MS tracked annual sunshine among US veterans</td><td class="num">Seattle 7× Los Angeles</td><td class="src">1960 veterans study</td></tr>
+    <tr><td>Even sunny Australia has a gradient</td><td class="num">6× higher in the south</td><td class="src">Robyn Lucas</td></tr>
+    <tr><td>Most sun damage on the skin</td><td class="num">⅓ the MS rate</td><td class="src">Lucas, several countries</td></tr>
+    <tr><td>Children’s outdoor time</td><td class="num">&lt;30 min: 2× vs ≤1 h, ≈5× vs &gt;1 h</td><td class="src">Ch 9; also: first trimester in winter raises risk</td></tr>
+    <tr><td>Narrowband UV (311 nm) in early MS: 20 patients, 8 weeks, 3×/week</td><td class="num">1 year: 100% placebo → MS; 30% of UV group spared</td><td class="src">Prue Hart (effect lasted months)</td></tr>
+    <tr><td>Babies wearing light monitors</td><td class="num">sun: far less eczema; vitamin D pills: no effect</td><td class="src">Australian team</td></tr>
+    <tr><td>UV-induced tumours moved to a new mouse</td><td class="num">rejected 10 times out of 10</td><td class="src">Margaret Kripke, 1974</td></tr>
+    <tr><td>Skin bacteria eat urocanic acid (UCA) before it suppresses immunity</td><td class="num">tumours flourished without them</td><td class="src">University of Lyon, 2025</td></tr>
+    <tr><td>Psoriasis patients using phototherapy (~1 million)</td><td class="num">36% fewer major cardiovascular events</td><td class="src">Korea, 2021</td></tr>
+    <tr><td>Vitiligo patients with years of phototherapy (12,000+)</td><td class="num">32% fewer heart attacks, 40% fewer strokes</td><td class="src">Korea, 2021</td></tr>
+    <tr><td>Share of sunlight that is UV / visible / infrared</td><td class="num">4% / 43% / 53%</td><td class="src">Ch 9 (bridge to Ch 10)</td></tr>
+  </tbody>
+</table>
+<p class="small muted">Lucas on MS: “Have we reached the threshold to say this is a causal relationship? For sun exposure and MS, I would say yes.” She reports the same pattern in pediatric MS, Crohn’s disease and type 1 diabetes. Footnotes add that people with polymorphic light eruption (a strong immune reaction to sun) get <i>less</i> skin cancer, and that COVID deaths were less frequent at sunnier latitudes.</p>
+</div>
+
+<div class="grid2" style="margin-top:14px">
+  <div class="card"><h3>Two arms, two responses</h3><p>UV mostly calms the <b>adaptive</b> immune system (the targeted arm that learns specific threats and can turn on your own nerves, gut or pancreas). It <b>stimulates</b> the <b>innate</b> arm, the general repair crew that walls off wounds and clears damaged cells. The big guns stand down while local repair goes to work.</p></div>
+  <div class="card"><h3>Why a “double whammy” became a feature</h3><p>Kripke showed that UV both damages DNA and switches off the surveillance that kills “baby cancers”. In prehistoric skin, with melanin, repair systems and sun-adapted microbes, that trade was cheap: tolerance instead of “constant inflammation, beset with rashes and hives”. Today’s sun-naive skin pays more for it, and the price rises steeply with a burn.</p></div>
+</div>
+
+<h2 id="sg">3 · Putting Chapter 9 to work in Singapore</h2>
+<div class="panel">
+  <ol class="take" id="take"></ol>
+  <p class="small muted">The minutes follow the skin type and sky picked in the simulator’s Singapore card. For the full hour-by-hour plan (morning light, shade, evening darkness), use <a href="#">Lesson 1’s routine</a>.</p>
+</div>
+
+<h2 id="gloss">4 · Glossary</h2>
+<div class="panel"><dl class="gloss">
+  <div><dt>Inflammation</dt><dd>The immune system’s battle response: heat, swelling and chemical weapons, with some unavoidable “friendly fire” on healthy tissue.</dd>
+  <dt>Resolution</dt><dd>The switch to anti-inflammatory mode afterwards: “turn off the flamethrowers, clean up the debris, heal the damage.”</dd>
+  <dt>Inflammaging</dt><dd>Chronic, low-grade, smouldering inflammation that grows with age in modern people. It is not seen in hunter-gatherers.</dd>
+  <dt>Hormesis</dt><dd>A small dose of stress that makes the body stronger: exercise, plant compounds, sauna or cold, fasting, and sunlight.</dd>
+  <dt>Fire drill</dt><dd>Jacobsen’s image for exercise. It is pro-inflammatory in the short run and anti-inflammatory in the long run, because the repair crew it recruits also puts out unrelated fires.</dd>
+  <dt>Adaptive immunity</dt><dd>The targeted arm that learns specific pathogens or cancer cells. Autoimmune disease happens when it targets your own cells. UV calms it.</dd>
+  <dt>Innate immunity</dt><dd>The general damage-control arm: walls off wounds, removes compromised cells, makes repairs. Light stimulates it.</dd></div>
+  <div><dt>Immune tolerance</dt><dd>Learning to hold fire at harmless things (peanuts, farm microbes, blackfly bites, daily sun) instead of overreacting.</dd>
+  <dt>Immune surveillance</dt><dd>The skin’s patrol that kills newly mutated cells. UV suppresses it locally for a while.</dd>
+  <dt>Urocanic acid (UCA)</dt><dd>A skin molecule made by sunlight and a main trigger of UV immunosuppression. Sun-loving skin bacteria eat it.</dd>
+  <dt>Narrowband UV (311 nm)</dt><dd>Clinical phototherapy for psoriasis, vitiligo and in MS trials. It avoids the 290–300 nm wavelengths that do most direct DNA damage.</dd>
+  <dt>Clinically isolated syndrome</dt><dd>A first MS-like episode that often progresses to full multiple sclerosis. It was the target of Hart’s trial.</dd>
+  <dt>Polymorphic light eruption (PLE)</dt><dd>An itchy rash after sun in people whose immune systems respond strongly. They get less skin cancer.</dd>
+  <dt>Burn dose (MED)</dt><dd>The UV dose that just turns your skin pink. The simulator’s sun slider is a share of it; darker skin has a bigger burn dose.</dd></div>
+</dl></div>
+
+<h2 id="quiz">5 · Check yourself</h2>
+<div class="panel"><div id="quizBox"></div></div>
+
+<h2 id="valid">6 · Does the toy model reproduce the chapter?</h2>
+<div class="panel">
+  <p class="sub">Each row runs fixed scenarios through the model and checks the direction the book describes. The model was built to have these shapes, so this is a consistency check, not independent evidence.</p>
+  <table id="validTable"></table>
+  <details style="margin-top:10px"><summary class="small">How the model works</summary>
+  <p class="small">Hourly simulation over 60 days, after a 150-day warm-up in a sun-less, drill-less version of the same life. <b>Acute inflammation</b> gets pulses from exercise at 07:00, sun at 09:00 and an allergen at 15:00, and decays with a 6-hour half-scale. It recruits a <b>resolution crew</b> that lingers for about 30 hours and lowers <b>inflammaging</b>, which is fed by the irritant load. Sun below the burn dose adds a <b>systemic calming signal</b> (about 4 days) and <b>tolerance</b> training (months), which shrink allergen flares. Sun above the burn dose adds <b>burn damage</b> that feeds inflammaging instead of training anything. UV also causes DNA damage and a local <b>surveillance dip</b>; skin microbes shrink the dip. Damage that meets a dipped surveillance counts as <b>escaped</b>. Exercise above 1.1 adds lasting damage (“running until your arches collapse”). Units are arbitrary.</p></details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="refs">
+  <li>Jacobsen, <i>In Defense of Sunlight</i>, Ch 9. Notes: <a href="#">In-Defense-of-Sunlight-note.md</a> (Photoimmunology, Inflammaging).</li>
+  <li><a href="https://pubmed.ncbi.nlm.nih.gov/38350754/">Neale et al. 2024</a>, the Australian consensus on balancing sun risks and benefits (Lucas is a co-author).</li>
+  <li>Search terms for the primary studies: “Hart narrowband UVB clinically isolated syndrome”, “Kripke 1974 UV tumor transplantation”, “Korea phototherapy psoriasis cardiovascular 2021”, “vitiligo phototherapy myocardial infarction stroke”.</li>
+  <li><a href="#">Lesson 1</a>: the bands of sunlight, safe windows and the full Singapore routine.</li>
+</ul>
+<div class="ask"><b>Ask your teacher:</b> “Why would the immune system need a stress to switch on its repair crew, instead of repairing all the time?” (Jacobsen’s answer is in the “fire drill” passage. Try yours first.) You could also ask for a lesson on Chapter 10, infrared, the 53% of sunlight this chapter leaves out.</div>
+<p class="noprint" style="margin-top:12px"><button class="btn" onclick="print()">Print this page</button></p>
+<footer class="page">Lesson 2 of the <i>In Defense of Sunlight</i> workspace. The toy model is for building intuition, not medical advice. If you have an autoimmune or skin condition, phototherapy is a medical treatment to discuss with a dermatologist.</footer>
+</div>
+
+<script>/* inlined from assets/sunlight-model.js */
+// Sunlight model for Singapore — pure functions, no DOM. Shared by lessons in this workspace.
+// Sources: sun position = NOAA general solar position equations; UV index = empirical clear-sky fit
+// UVI ≈ 12.5·cos(z)^2.42 (Madronich-style), tuned to NEA Singapore readings (peak ~12 on clear days);
+// burn doses = standard Fitzpatrick MED table; mechanism map = Jacobsen, "In Defense of Sunlight" (insert chart).
+(function (root) {
+  const RAD = Math.PI / 180;
+  const SG = { lat: 1.352, lon: 103.82, tz: 8 };
+
+  // ---------- Sun position (NOAA) ----------
+  function solar(doy, hour, loc = SG) {
+    const g = 2 * Math.PI / 365 * (doy - 1 + (hour - 12) / 24);
+    const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+    const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+    const tst = hour * 60 + eqt + 4 * loc.lon - 60 * loc.tz;
+    const ha = (tst / 4 - 180) * RAD, lat = loc.lat * RAD;
+    const mu = Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(ha);
+    const elev = Math.asin(Math.max(-1, Math.min(1, mu))) / RAD;
+    return { elev, mu: Math.max(0, mu), decl: decl / RAD, eqt, noon: 12 - (eqt + 4 * loc.lon - 60 * loc.tz) / 60 };
+  }
+  // sunrise / sunset / solar noon in clock hours (sun centre at −0.833° for refraction + radius)
+  function sunTimes(doy, loc = SG) {
+    const noon = solar(doy, 12, loc).noon;
+    const f = h => solar(doy, h, loc).elev + 0.833;
+    const root = (a, b) => { for (let i = 0; i < 50; i++) { const m = (a + b) / 2; (f(a) < 0) === (f(m) < 0) ? a = m : b = m; } return (a + b) / 2; };
+    return { rise: root(noon - 9, noon), noon, set: root(noon, noon + 9) };
+  }
+  // Kasten–Young air mass
+  function airMass(elev) { if (elev <= 0) return 40; const z = 90 - elev; return 1 / (Math.cos(z * RAD) + 0.50572 * Math.pow(96.07995 - z, -1.6364)); }
+
+  // ---------- Light bands ----------
+  // share of ground-level noon sunlight (sums to 1): UV ≈ 4 %, visible ≈ 43 %, infrared ≈ 53 % (book, ch 9 / insert)
+  const BANDS = [
+    { k: 'uvb', name: 'UVB', nm: '280–315', share: 0.003, tau: 1.20, col: '#7b3fb8' },
+    { k: 'uva', name: 'UVA', nm: '315–400', share: 0.037, tau: 0.45, col: '#a86be0' },
+    { k: 'blue', name: 'Blue', nm: '400–500', share: 0.15, tau: 0.25, col: '#3a7bd5' },
+    { k: 'green', name: 'Green', nm: '500–600', share: 0.15, tau: 0.15, col: '#3fae5a' },
+    { k: 'red', name: 'Red', nm: '600–780', share: 0.13, tau: 0.08, col: '#d9483b' },
+    { k: 'nir', name: 'Infrared', nm: '780+', share: 0.53, tau: 0.06, col: '#8a2a2a' },
+  ];
+  // relative intensity of each band on a horizontal surface, 1 = overhead sun, clear sky
+  function bandsAt(elev, body = false) {
+    const out = {}; const m = airMass(elev), mu = Math.max(0, Math.sin(elev * RAD));
+    // body=true: a standing person also catches low sun on their sides (simplified: max(μ, 0.35·cos elev))
+    const g = body ? Math.max(mu, 0.35 * Math.cos(elev * RAD)) : mu;
+    for (const b of BANDS) out[b.k] = elev <= 0 ? 0 : g * Math.exp(-b.tau * (m - 1));
+    return out;
+  }
+  const CLOUD = { clear: { uv: 1, lux: 1, ir: 1, label: 'Clear' }, partly: { uv: 0.75, lux: 0.7, ir: 0.7, label: 'Partly cloudy' }, overcast: { uv: 0.35, lux: 0.25, ir: 0.35, label: 'Overcast' } };
+
+  function uvIndex(elev, cloud = 'clear') { const mu = Math.max(0, Math.sin(elev * RAD)); return 12.5 * Math.pow(mu, 2.42) * CLOUD[cloud].uv; }
+  // horizontal illuminance (lux) incl. civil twilight
+  function luxH(elev) { if (elev <= -6) return 0; if (elev <= 0) return 600 * Math.pow(10, 0.4 * elev); return 600 + 120000 * Math.pow(Math.sin(elev * RAD), 1.15); }
+
+  // ---------- Where you are: transmission per band relative to open sky ----------
+  // uvb, uva, blue, green, red, nir. Artificial places ignore the sun and give fixed lux at the eye.
+  const PLACES = {
+    open:   { label: 'Open sky', t: [1, 1, 1, 1, 1, 1], eyeFrac: 0.4, col: '#f2b632' },
+    shade:  { label: 'Tree shade', t: [0.35, 0.4, 0.12, 0.2, 0.12, 0.45], eyeFrac: 0.4, col: '#4f9a5b' },
+    roofed: { label: 'Under a roof, open sides', t: [0.06, 0.08, 0.08, 0.1, 0.08, 0.25], eyeFrac: 0.4, col: '#c7a46b' },
+    window: { label: 'Beside a window', t: [0, 0.01, 0.05, 0.06, 0.05, 0.02], eyeFrac: 0.4, col: '#8fb3d9' },
+    office: { label: 'Office (LED)', t: [0, 0, 0, 0, 0, 0], artificial: 400, mel: 0.8, col: '#b8bfcc' },
+    homeCool: { label: 'Home, cool-white LED', t: [0, 0, 0, 0, 0, 0], artificial: 250, mel: 0.8, col: '#c9c3e6' },
+    homeWarm: { label: 'Home, warm dim light', t: [0, 0, 0, 0, 0, 0], artificial: 30, mel: 0.45, col: '#e8c49a' },
+    bedLit: { label: 'Bed, phone + streetlight', t: [0, 0, 0, 0, 0, 0], artificial: 20, mel: 0.8, col: '#7d7aa8' },
+    dark:   { label: 'Dark bedroom', t: [0, 0, 0, 0, 0, 0], artificial: 0.5, mel: 0.45, col: '#2e3350' },
+  };
+  const CLOTH_T = [0.03, 0.05, 0.15, 0.15, 0.2, 0.6];      // covered skin: infrared passes fabric (book ch 15)
+  const SPF_T = spf => spf ? [1 / (spf / 2), 1 / (spf / 4), 1, 1, 1, 1] : [1, 1, 1, 1, 1, 1];  // "as applied" ≈ half the label (book ch 3 fn)
+  const MED = { I: 200, II: 250, III: 350, IV: 450, V: 600, VI: 1000 };  // J/m² erythemal to just redden (Fitzpatrick)
+
+  // everything that hits you at one moment
+  function momentAt(doy, hour, o) {
+    const s = solar(doy, hour), P = PLACES[o.place], C = CLOUD[o.cloud || 'clear'];
+    const B = bandsAt(s.elev), Bb = bandsAt(s.elev, true), T = P.t, spf = SPF_T(o.spf || 0), ex = o.exposed ?? 0.25;
+    const skin = {}, eye = {};
+    BANDS.forEach((b, i) => {
+      const cf = i < 2 ? C.uv : i === 5 ? C.ir : C.lux;
+      const inc = Bb[b.k] * T[i] * cf;
+      skin[b.k] = inc * (ex * spf[i] + (1 - ex) * CLOTH_T[i] * (i === 5 ? 1 : 0.3));   // area-weighted dose on the body
+      eye[b.k] = B[b.k] * T[i] * cf;
+    });
+    const uviOpen = uvIndex(s.elev, o.cloud);
+    const uviHere = uviOpen * (0.8 * T[0] + 0.2 * T[1]);         // erythema is ~80 % UVB-driven
+    const uviSkin = uviHere * (0.8 * spf[0] + 0.2 * spf[1]);
+    let lux, mel;
+    if (P.artificial !== undefined) { lux = P.artificial; mel = lux * P.mel; }
+    else {
+      const vis = (T[2] + 2 * T[3] + T[4]) / 4;
+      lux = Math.max(P.artificial === undefined && o.place !== 'window' ? 3 : 0, P.eyeFrac * luxH(s.elev) * C.lux * vis); // 3 lux city sky-glow at night
+      mel = lux * (s.elev > 0 ? 1 : 0.8);
+    }
+    const green = P.artificial !== undefined ? lux * 0.45 : lux * (T[3] / Math.max(1e-6, (T[2] + 2 * T[3] + T[4]) / 4)) * 0.5;
+    return { sun: s, bands: B, skin, eye, uviOpen, uviHere, uviSkin, lux, mel, green, place: o.place };
+  }
+
+  // ---------- Mechanisms (book's chart, insert "A Light Primer") ----------
+  // value = weighted band dose; ref = value at open-sky noon with 25 % skin exposed → shown as % of that reference.
+  const MECH = [
+    { k: 'vitd', name: 'Vitamin D', where: 'skin', from: ['uvb'], w: { uvb: 1 }, good: true, out: 'bones · a marker of sun, not the whole story' },
+    { k: 'no', name: 'Nitric oxide', where: 'skin', from: ['uvb', 'uva', 'blue', 'red'], w: { uvb: 0.8, uva: 1, blue: 0.02, red: 0.01 }, good: true, out: 'vessels relax → lower blood pressure' },
+    { k: 'pomc', name: 'POMC → endorphin', where: 'skin', from: ['uvb', 'uva'], w: { uvb: 1, uva: 0.5 }, good: true, out: 'mood, alertness, the urge to go back out' },
+    { k: 'uca', name: 'Urocanic acid', where: 'skin', from: ['uvb', 'uva'], w: { uvb: 1, uva: 0.3 }, good: true, out: 'glutamate for the brain (learning, memory)' },
+    { k: 'immune', name: 'Immune calming', where: 'skin', from: ['uvb', 'uva'], w: { uvb: 1, uva: 0.5 }, good: true, out: 'less inflammation, fewer autoimmune flares' },
+    { k: 'clock', name: 'Body clock & alertness', where: 'eyes', from: ['blue'], w: { blue: 1 }, good: true, out: 'cortisol up by day, melatonin on time at night' },
+    { k: 'calm', name: 'Green calm', where: 'eyes', from: ['green'], w: { green: 1 }, good: true, out: 'natural opioids, less pain and anxiety' },
+    { k: 'mito', name: 'Mitochondria & repair', where: 'deep tissue', from: ['red', 'nir'], w: { red: 0.3, nir: 1 }, good: true, out: 'energy, healing, primes skin for noon UV' },
+    { k: 'dna', name: 'DNA damage (burn)', where: 'skin', from: ['uvb', 'uva'], w: { uvb: 1, uva: 0.15 }, good: false, out: 'sunburn, basal & squamous cancers' },
+    { k: 'ros', name: 'Free radicals', where: 'skin', from: ['uva'], w: { uva: 1 }, good: false, out: 'linked to melanoma (why broad-spectrum matters)' },
+  ];
+  // eye pathways saturate: ~1,000 lux gives half the daytime signal, >10,000 lux is near full (book ch 13)
+  const sat = L => { const x = Math.pow(Math.max(0, L) / 1000, 1.2); return x / (1 + x); };
+  function mechValues(m) {
+    const out = {};
+    for (const me of MECH) {
+      if (me.k === 'clock') { out[me.k] = sat(m.mel); continue; }
+      if (me.k === 'calm') { out[me.k] = sat(m.green); continue; }
+      let v = 0; for (const b in me.w) v += me.w[b] * m.skin[b]; out[me.k] = v;
+    }
+    return out;
+  }
+  let REF = null;
+  function mechRef() {
+    if (REF) return REF;
+    const m = momentAt(80, solar(80, 12).noon, { place: 'open', exposed: 0.25, cloud: 'clear' });
+    return (REF = mechValues(m));
+  }
+  function mechPercent(m) { const v = mechValues(m), r = mechRef(), o = {}; for (const k in v) o[k] = 100 * v[k] / r[k]; return o; }
+
+  // ---------- Routines ----------
+  const hm = s => { const [h, mm] = s.split(':').map(Number); return h + mm / 60; };
+  function blockAt(routine, hour) { for (const b of routine.blocks) if (hour >= hm(b.from) && hour < hm(b.to)) return b; return routine.blocks[routine.blocks.length - 1]; }
+  const melSupp = mel => mel / (mel + 25);   // 50 % melatonin suppression at ~25 lux (book ch 11)
+
+  // how many minutes of direct midday sun keep a skin type well clear of burning (≈20 % of burn time; none for types I–II)
+  function middayMinutes(o) {
+    if (o.skin === 'I' || o.skin === 'II') return 0;
+    const u = uvIndex(solar(o.doy, 12.6).elev, o.cloud) || 0.1;
+    return Math.max(3, Math.min(15, Math.round(0.2 * MED[o.skin] / (1.5 * u))));
+  }
+  const fmt = h => { const H = Math.floor(h + 1e-9), M = Math.round((h - H) * 60); return String(H).padStart(2, '0') + ':' + String(M).padStart(2, '0'); };
+  function blocksOf(routine, o) { return routine.build ? routine.build(o) : routine.blocks; }
+  function evalRoutine(routine, o) {   // o: {doy, cloud, skin}
+    routine = { blocks: blocksOf(routine, o) };
+    const N = 288, dt = 24 / N, lux = [], dose = [], uvi = [], place = [];
+    let cum = 0, over1000 = 0, morning = 0, nirMin = 0, eveSupp = 0, eveN = 0, nightLux = 0, nightN = 0, dayLux = 0, dayN = 0, greenMin = 0, skinSED = 0;
+    for (let i = 0; i < N; i++) {
+      const h = (i + 0.5) * dt, b = blockAt(routine, h);
+      const m = momentAt(o.doy, h, { place: b.place, exposed: b.exposed ?? 0.1, spf: b.spf || 0, cloud: o.cloud });
+      const d = 1.5 * m.uviSkin * dt * 60;          // J/m² on exposed skin (UVI·0.025 W/m² × seconds)
+      cum += d; skinSED += d * (b.exposed ?? 0.1) / 100;
+      lux.push(m.lux); dose.push(100 * cum / MED[o.skin]); uvi.push(m.uviSkin); place.push(b.place);
+      if (m.lux >= 1000) over1000 += dt;
+      if (m.lux >= 1000 && h < 10) morning += dt * 60;
+      if (m.skin.nir > 0.05) nirMin += dt * 60;
+      if (m.eye.green > 0.05 && b.place === 'shade') greenMin += dt * 60;
+      if (b.sleep) { nightLux += m.lux; nightN++; }
+      else if (h >= 21) { eveSupp += melSupp(m.mel); eveN++; }
+      if (h >= 9 && h < 17) { dayLux += m.lux; dayN++; }
+    }
+    const day = dayLux / Math.max(1, dayN), night = nightLux / Math.max(1, nightN);
+    return { lux, dose, uvi, place, burnPct: 100 * cum / MED[o.skin], areaSED: skinSED, over1000, morning, nirMin, greenMin,
+      eveSupp: 100 * eveSupp / Math.max(1, eveN), day, night, amplitude: day / Math.max(0.5, night) };
+  }
+
+  const ROUTINES = {
+    office: { name: 'Typical office day', blocks: [
+      { from: '00:00', to: '07:00', place: 'bedLit', sleep: true, label: 'Sleep (phone, streetlight)' },
+      { from: '07:00', to: '07:50', place: 'homeCool', label: 'Get ready indoors' },
+      { from: '07:50', to: '08:00', place: 'open', exposed: 0.1, label: 'Walk to MRT' },
+      { from: '08:00', to: '08:40', place: 'office', label: 'MRT + mall link' },
+      { from: '08:40', to: '12:30', place: 'office', label: 'Desk, interior' },
+      { from: '12:30', to: '12:38', place: 'open', exposed: 0.1, label: 'Dash to food court' },
+      { from: '12:38', to: '13:30', place: 'office', label: 'Air-con food court' },
+      { from: '13:30', to: '18:40', place: 'office', label: 'Desk, interior' },
+      { from: '18:40', to: '19:30', place: 'office', label: 'MRT home' },
+      { from: '19:30', to: '23:30', place: 'homeCool', label: 'Home, bright LED + screens' },
+      { from: '23:30', to: '24:00', place: 'bedLit', label: 'Phone in bed' } ] },
+    sunlit: { name: 'Sunlit day (recommended)', build: o => {
+      const mid = middayMinutes(o), fair = o.skin === 'I' || o.skin === 'II', t0 = 12.5, t1 = t0 + mid / 60;
+      const eve = fair ? '18:15' : '17:45';
+      return [
+        { from: '00:00', to: '06:45', place: 'dark', sleep: true, label: 'Sleep, blackout dark' },
+        { from: '06:45', to: '07:05', place: 'homeWarm', label: 'Wake; no bright screens yet' },
+        { from: '07:05', to: '08:00', place: 'open', exposed: 0.4, label: 'Morning walk at sunrise, arms & legs bare' },
+        { from: '08:00', to: '08:40', place: 'window', label: 'Breakfast by a window' },
+        { from: '08:40', to: '12:30', place: 'window', label: 'Desk beside a window' },
+        ...(mid ? [{ from: '12:30', to: fmt(t1), place: 'open', exposed: 0.25, label: mid + ' min of direct midday sun, then cover' }] : []),
+        { from: fmt(t1), to: '13:15', place: 'roofed', exposed: 0.25, label: 'Lunch seated well inside an open-sided hawker centre' },
+        { from: '13:15', to: eve, place: 'window', label: 'Desk beside a window' },
+        { from: eve, to: '19:10', place: 'open', exposed: fair ? 0.15 : 0.4, label: fair ? 'Walk/exercise, light long sleeves' : 'Walk/exercise into sunset' },
+        { from: '19:10', to: '21:00', place: 'homeCool', label: 'Dinner, normal lights' },
+        { from: '21:00', to: '22:45', place: 'homeWarm', label: 'Warm dim lamps, screens turned down' },
+        { from: '22:45', to: '24:00', place: 'dark', sleep: true, label: 'Sleep, blackout dark' } ]; } },
+    lunch30: { name: 'Skin sun at lunch (30 min)', blocks: [
+      { from: '00:00', to: '07:00', place: 'bedLit', sleep: true, label: 'Sleep (phone, streetlight)' },
+      { from: '07:00', to: '07:50', place: 'homeCool', label: 'Get ready indoors' },
+      { from: '07:50', to: '08:00', place: 'open', exposed: 0.1, label: 'Walk to MRT' },
+      { from: '08:00', to: '12:30', place: 'office', label: 'MRT + desk, interior' },
+      { from: '12:30', to: '13:00', place: 'open', exposed: 0.45, label: '30 min skin sun at noon, T-shirt + shorts, no hat' },
+      { from: '13:00', to: '18:40', place: 'office', label: 'Desk, interior' },
+      { from: '18:40', to: '19:30', place: 'office', label: 'MRT home' },
+      { from: '19:30', to: '23:30', place: 'homeCool', label: 'Home, bright LED + screens' },
+      { from: '23:30', to: '24:00', place: 'bedLit', label: 'Phone in bed' } ] },
+    wfh: { name: 'Stay-home day', blocks: [
+      { from: '00:00', to: '07:30', place: 'bedLit', sleep: true, label: 'Sleep' },
+      { from: '07:30', to: '23:00', place: 'homeCool', label: 'Indoors all day, blinds half-shut' },
+      { from: '23:00', to: '24:00', place: 'bedLit', sleep: true, label: 'Sleep' } ] },
+    beach: { name: 'Sentosa beach blitz', blocks: [
+      { from: '00:00', to: '08:00', place: 'bedLit', sleep: true, label: 'Sleep' },
+      { from: '08:00', to: '10:00', place: 'homeCool', label: 'Indoors' },
+      { from: '10:00', to: '14:30', place: 'open', exposed: 0.8, spf: 30, label: 'Beach, swimwear + SPF 30' },
+      { from: '14:30', to: '23:30', place: 'homeCool', label: 'Indoors' },
+      { from: '23:30', to: '24:00', place: 'bedLit', sleep: true, label: 'Sleep' } ] },
+  };
+
+  const API = { RAD, SG, solar, sunTimes, airMass, BANDS, bandsAt, CLOUD, uvIndex, luxH, PLACES, CLOTH_T, SPF_T, MED, momentAt, MECH, mechValues, mechPercent, blockAt, blocksOf, middayMinutes, evalRoutine, sat, fmt, ROUTINES, melSupp, hm };
+  if (typeof module !== 'undefined') module.exports = API; else root.SunModel = API;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>/* inlined from assets/quiz.js */
+// Retrieval-practice quiz widget. Usage:
+//   Quiz.mount(document.getElementById('quiz'), [{ q: 'Question?', options: ['a','b','c','d'], answer: 0, why: 'Explanation' }, ...])
+// Immediate feedback per question; one attempt counts toward the score, further clicks just reveal.
+(function (root) {
+  function mount(el, questions) {
+    el.classList.add('quiz');
+    let answered = 0, right = 0;
+    const score = document.createElement('p'); score.className = 'score';
+    const upd = () => score.textContent = answered ? `Score: ${right} / ${answered} answered (of ${questions.length})` : `${questions.length} questions. Answer from memory before scrolling back up.`;
+    questions.forEach((qq, qi) => {
+      const box = document.createElement('div'); box.className = 'q';
+      box.innerHTML = `<p>${qi + 1}. ${qq.q}</p><div class="opts"></div><div class="why"></div>`;
+      const opts = box.querySelector('.opts'), why = box.querySelector('.why'); let done = false;
+      qq.options.forEach((o, oi) => {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = o;
+        b.onclick = () => {
+          if (!done) { done = true; answered++; if (oi === qq.answer) right++; upd(); }
+          opts.querySelectorAll('button').forEach((x, xi) => { x.classList.toggle('right', xi === qq.answer); x.classList.toggle('wrong', xi === oi && oi !== qq.answer); });
+          why.innerHTML = (oi === qq.answer ? '<b>Yes.</b> ' : '<b>Not quite.</b> ') + qq.why; why.classList.add('show');
+        };
+        opts.appendChild(b);
+      });
+      el.appendChild(box);
+    });
+    el.appendChild(score); upd();
+  }
+  root.Quiz = { mount };
+})(window);
+
+</script>
+<script>
+// ---------- model (pure) ----------
+function stepModel(st, p, d, h, dt) {
+  const at = x => h <= x && h + dt > x, sat = u => 1 - Math.exp(-u / 0.35);
+  const u = !p.sunOn ? 0 : p.pattern === 'weekend' ? (d % 7 >= 5 ? p.sun : 0) : p.sun;
+  if (p.exOn && p.ex > 0 && at(7)) { st.Ae += p.ex; if (p.ex > 1.1) st.I += 0.8 * (p.ex - 1.1) ** 2; }
+  if (u > 0 && at(9)) {
+    st.As += 0.5 * Math.min(u, 1);                          // sub-burn skin workout: short, resolvable
+    st.S += 0.6 * sat(u); st.Tol += 0.06 * sat(u) * (1 - st.Tol);
+    const burn = Math.max(0, u - 1); st.B += 2.5 * burn;    // sunburn: damage that does not train
+    st.L += 0.5 * u + 1.5 * burn;
+    const surv = survOf(st.L, p.microbiome);
+    const dmg = Math.max(0, u - 0.25) ** 1.5; st.dmg += dmg; st.esc += dmg * (1 - surv);
+  }
+  if (p.allergen > 0 && at(15)) { const f = p.allergen * (1 - 0.75 * st.Tol) * (1 - 0.4 * Math.min(1, st.S)); st.Aa += f; st.flares += f; st.Tol += 0.01 * p.allergen * (1 - st.Tol); }
+  const A = st.Ae + st.As + st.Aa;
+  st.Ae -= dt * st.Ae / 6; st.As -= dt * st.As / 6; st.Aa -= dt * st.Aa / 6;
+  st.R += dt * (0.35 * A - st.R / 30);
+  st.B -= dt * st.B / 48;
+  st.I += dt * (0.01 * p.irritant * (1 - 0.3 * st.Tol) + 0.012 * st.B - (0.0015 * st.R + 0.0015 * st.S + 0.002) * st.I);
+  st.S -= dt * st.S / 96; st.L -= dt * st.L / 36; st.Tol -= dt * st.Tol / (24 * 120);
+}
+const survOf = (L, micro) => 1 - Math.min(0.9, L * 0.5 * (micro ? 0.35 : 1));
+const DAYS = 60, DT = 0.25, WARM = {};
+function warmState(p) {
+  const key = p.irritant + '|' + p.allergen;
+  if (!WARM[key]) {
+    const st = { Ae: 0, As: 0, Aa: 0, R: 0, B: 0, I: 3, Tol: 0.1, S: 0, L: 0, esc: 0, flares: 0, dmg: 0 };
+    const w = { ...p, sunOn: false, exOn: false };
+    for (let k = 0; k < 150 * 24 / DT; k++) stepModel(st, w, Math.floor(k * DT / 24), (k * DT) % 24, DT);
+    WARM[key] = st;
+  }
+  return { ...WARM[key], esc: 0, flares: 0, dmg: 0 };
+}
+function simulate(p) {
+  const st = warmState(p), out = [snap(st, p, 0)];
+  for (let k = 0; k < DAYS * 24 / DT; k++) {
+    const t = k * DT; stepModel(st, p, Math.floor(t / 24), t % 24, DT);
+    if (k % 4 === 3) out.push(snap(st, p, t + DT));
+  }
+  return out;                                   // out[i] = state at hour i (0..1440)
+}
+function snap(st, p, t) { return { t, Ae: st.Ae, As: st.As, Aa: st.Aa, A: st.Ae + st.As + st.Aa, R: st.R, B: st.B, I: st.I, Tol: st.Tol, S: st.S, surv: survOf(st.L, p.microbiome), esc: st.esc, flares: st.flares }; }
+function summary(r) {
+  const last = r.slice(-168);
+  return { I0: r[0].I, I: last.reduce((s, x) => s + x.I, 0) / last.length, Tol: r[r.length - 1].Tol, flares: r[r.length - 1].flares,
+    minSurv: Math.min(...r.map(x => x.surv)), esc: r[r.length - 1].esc, peak: Math.max(...r.map(x => x.A + x.B)) };
+}
+const MODES = { real: { sunOn: true, exOn: true, label: 'Sun + exercise', col: '#1f2328' }, sun: { sunOn: true, exOn: false, label: 'Only sun', col: '#c46a12' }, ex: { sunOn: false, exOn: true, label: 'Only exercise', col: '#3a7bd5' }, none: { sunOn: false, exOn: false, label: 'Neither', col: '#b53a2e' } };
+const DEFAULTS = { sun: 0.3, pattern: 'daily', ex: 0.6, irritant: 1, allergen: 0.5, microbiome: true };
+const PRESETS = {
+  hunter: { sun: 0.4, pattern: 'daily', ex: 0.8, irritant: 0.4, allergen: 1, microbiome: true },
+  office: { sun: 0, pattern: 'daily', ex: 0.2, irritant: 1.2, allergen: 0.5, microbiome: false },
+  burner: { sun: 1.8, pattern: 'weekend', ex: 0.2, irritant: 1, allergen: 0.5, microbiome: false },
+  sg:     { sun: 0.3, pattern: 'daily', ex: 0.7, irritant: 0.8, allergen: 0.5, microbiome: true },
+};
+
+// ---------- Singapore minutes (uses Lesson 1's sun model) ----------
+const SM = window.SunModel;
+const today = new Date(), DOY = Math.round((today - new Date(today.getFullYear(), 0, 0)) / 864e5);
+function minutesTo(frac, startH, skin, cloud) {
+  if (frac <= 0) return 0;
+  const target = frac * SM.MED[skin]; let dose = 0;
+  for (let m = 0; m < 240; m++) { const h = startH + m / 60; dose += SM.uvIndex(SM.solar(DOY, h).elev, cloud) * 1.5; if (dose >= target) return m + 1; }  // UVI 1 = 0.025 W/m² = 1.5 J/m² per min
+  return Infinity;
+}
+const fmtMin = m => m === 0 ? '—' : m === Infinity ? 'not by dusk' : m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}` : `${m} min`;
+const SG_TIMES = [7.5, 8.5, 9.5, 11, 13, 15, 16.5, 17.5];
+const hm = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+
+// ---------- state ----------
+const $ = id => document.getElementById(id);
+const S = { mode: 'real', preset: null, day: 60, hour: 9.5, skin: 'IV', cloud: 'clear', playing: false, step: 0 };
+const P = { ...DEFAULTS };
+let RES = {}, SUM = {}, DOSE = [], ALT = null;
+const fx = (x, n = 2) => Number.isFinite(x) ? x.toFixed(n) : '—';
+const pct = (a, b) => b > 1e-9 ? Math.round(100 * (1 - a / b)) : 0;
+
+function recompute() {
+  for (const m in MODES) { RES[m] = simulate({ ...P, ...MODES[m] }); SUM[m] = summary(RES[m]); }
+  const cur = MODES[S.mode];
+  ALT = summary(simulate({ ...P, ...cur, microbiome: !P.microbiome }));
+  DOSE = [];
+  for (let u = 0; u <= 2.0001; u += 0.1) { const s = summary(simulate({ ...P, sun: u, sunOn: true, exOn: cur.exOn })); DOSE.push({ u, I: s.I, esc: s.esc }); }
+  renderAll();
+}
+const cur = () => RES[S.mode];
+function sampleAt(r, time) { const i = Math.max(0, Math.min(r.length - 1, time)), a = Math.floor(i), b = Math.min(r.length - 1, a + 1), f = i - a, o = {}; for (const k in r[a]) o[k] = r[a][k] + (r[b][k] - r[a][k]) * f; return o; }
+const nowT = () => (S.day - 1) * 24 + S.hour;
+
+// ---------- canvas helpers ----------
+function fit(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth || 400;
+  if (!c.dataset.h) c.dataset.h = c.getAttribute('height');   // logical CSS height; c.height gets overwritten with h*dpr below
+  const h = +c.dataset.h;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.style.height = h + 'px'; }
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h); return { ctx, w, h };
+}
+function frame(ctx, w, h, pad, x0, x1, y0, y1) {
+  const X = x => pad.l + (x - x0) / (x1 - x0) * (w - pad.l - pad.r), Y = y => h - pad.b - (y - y0) / (y1 - y0) * (h - pad.t - pad.b);
+  ctx.strokeStyle = '#e6dfd0'; ctx.lineWidth = 1; ctx.strokeRect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b);
+  ctx.font = '10.5px Segoe UI, system-ui, sans-serif'; ctx.fillStyle = '#6b6f76';
+  return { X, Y, inv: px => x0 + (px - pad.l) / (w - pad.l - pad.r) * (x1 - x0) };
+}
+function line(ctx, pts, col, lw = 2, dash = []) { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]); }
+function label(ctx, txt, x, y, w, align = 'left', col = '#6b6f76') { ctx.fillStyle = col; ctx.textAlign = align; const tw = ctx.measureText(txt).width; let xx = x; if (align === 'left') xx = Math.min(x, w - tw - 3); if (align === 'right') xx = Math.max(x, tw + 3); if (align === 'center') xx = Math.max(tw / 2 + 2, Math.min(w - tw / 2 - 2, x)); ctx.fillText(txt, xx, y); ctx.textAlign = 'left'; }
+const niceMax = v => { const c = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40, 50]; return c.find(x => x >= v) || Math.ceil(v); };
+
+// ---------- body diagram ----------
+const SITES = [
+  { k: 'brain', x: 230, y: 50, w: 1.0, name: 'Brain', dis: 'MS, Alzheimer’s', side: 'R', ly: 34 },
+  { k: 'air', x: 230, y: 118, w: 0.8, name: 'Airways', dis: 'asthma, allergy', side: 'L', ly: 96 },
+  { k: 'heart', x: 214, y: 150, w: 1.0, name: 'Heart', dis: 'heart attack, stroke', side: 'L', ly: 150 },
+  { k: 'panc', x: 250, y: 190, w: 0.7, name: 'Pancreas', dis: 'type 1 diabetes', side: 'R', ly: 170 },
+  { k: 'gut', x: 226, y: 222, w: 0.9, name: 'Gut', dis: 'Crohn’s disease', side: 'L', ly: 214 },
+  { k: 'knee', x: 188, y: 350, w: 0.7, name: 'Joints', dis: 'arthritis', side: 'R', ly: 330, x2: 272 },
+];
+function bodyPath(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(230, 88); ctx.lineTo(262, 96); ctx.quadraticCurveTo(292, 102, 296, 130);   // right shoulder
+  ctx.lineTo(332, 250); ctx.quadraticCurveTo(336, 262, 324, 262); ctx.lineTo(288, 150);  // right arm
+  ctx.lineTo(284, 260); ctx.lineTo(276, 430); ctx.quadraticCurveTo(262, 440, 248, 430); ctx.lineTo(232, 290);  // right leg
+  ctx.lineTo(228, 290); ctx.lineTo(212, 430); ctx.quadraticCurveTo(198, 440, 184, 430); ctx.lineTo(176, 260);  // left leg
+  ctx.lineTo(172, 150); ctx.lineTo(136, 262); ctx.quadraticCurveTo(124, 262, 128, 250); ctx.lineTo(164, 130);    // left arm
+  ctx.quadraticCurveTo(168, 102, 198, 96); ctx.closePath();
+  ctx.moveTo(262, 50); ctx.arc(230, 50, 32, 0, Math.PI * 2);
+}
+const SKIN_PTS = [[140, 238], [150, 205], [318, 232], [308, 200], [186, 400], [270, 395], [180, 290], [282, 280], [160, 175], [300, 170], [205, 420], [258, 420], [214, 30], [248, 28], [132, 250], [326, 248]];
+function drawBody() {
+  const c = $('body'), cw0 = c.clientWidth || 400;
+  c.dataset.h = (Math.round(Math.max(300, Math.min(480, 425 * Math.min((cw0 - 196) / 215, 1.05) + 90))));
+  const { ctx, w, h } = fit(c), r = cur(), s = sampleAt(r, nowT());
+  const topH = 40, botH = 42, labW = 98, sc = Math.min((h - topH - botH) / 425, (w - 2 * labW) / 215, 1.05);
+  const ox = w / 2 - 230 * sc, oy = topH - 16 * sc, SX = x => ox + x * sc, SY = y => oy + y * sc;
+  ctx.save(); ctx.translate(ox, oy); ctx.scale(sc, sc);
+  const Imax = 4.5, iN = Math.min(1, s.I / Imax);
+  bodyPath(ctx); ctx.fillStyle = '#f5e6d3'; ctx.fill('evenodd'); ctx.strokeStyle = '#c9b69c'; ctx.lineWidth = 1.5; ctx.stroke();
+  if (s.As > 0.01) { bodyPath(ctx); ctx.strokeStyle = `rgba(245,166,35,${Math.min(0.9, s.As * 1.6)})`; ctx.lineWidth = 3 + 10 * Math.min(1, s.As * 2); ctx.stroke(); }
+  if (s.B > 0.02) { bodyPath(ctx); ctx.strokeStyle = `rgba(192,57,43,${Math.min(0.85, s.B / 3)})`; ctx.lineWidth = 4 + 8 * Math.min(1, s.B / 3); ctx.stroke(); }
+  ctx.save(); ctx.translate(230, 240); ctx.scale(1.08, 1.04); ctx.translate(-230, -240); bodyPath(ctx);
+  ctx.strokeStyle = `rgba(47,125,91,${0.25 + 0.6 * s.surv})`; ctx.lineWidth = 2; ctx.setLineDash([Math.max(1, 14 * s.surv), 2 + 14 * (1 - s.surv)]); ctx.stroke(); ctx.restore();
+  const ember = (x, y, rad, a, col) => { const g = ctx.createRadialGradient(x, y, 0, x, y, rad); g.addColorStop(0, col.replace('A', a)); g.addColorStop(1, col.replace('A', 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill(); };
+  const flick = t => 0.85 + 0.15 * Math.sin(t);
+  for (const st of SITES) {
+    const pts = st.k === 'knee' ? [[st.x, st.y], [st.x2, st.y]] : [[st.x, st.y]];
+    for (const [x, y] of pts) ember(x, y, 5 + 26 * Math.sqrt(iN) * st.w * flick(nowT() * 1.3 + x), (0.15 + 0.75 * iN).toFixed(2), 'rgba(224,86,27,A)');
+  }
+  if (s.Ae > 0.01) for (const x of [196, 264]) ember(x, 315, 8 + 28 * Math.min(1, s.Ae), Math.min(0.9, 0.3 + s.Ae).toFixed(2), 'rgba(245,166,35,A)');
+  if (s.Aa > 0.01) ember(230, 118, 8 + 30 * Math.min(1, s.Aa * 1.5), Math.min(0.9, 0.3 + s.Aa).toFixed(2), 'rgba(240,200,40,A)');
+  const n = Math.min(44, Math.round(s.R * 9)), tt = nowT() * 0.25;
+  ctx.fillStyle = '#3a7bd5';
+  for (let i = 0; i < n; i++) { const st = SITES[i % SITES.length], a = tt + i * 2.39, rr = 12 + (i * 7) % 20; const bx = st.k === 'knee' && i % 2 ? st.x2 : st.x; ctx.beginPath(); ctx.arc(bx + rr * Math.cos(a), st.y + rr * 0.8 * Math.sin(a), 3.4, 0, Math.PI * 2); ctx.fill(); }
+  const ne = Math.min(SKIN_PTS.length, Math.round(5 * Math.log10(1 + s.esc * 10)));
+  ctx.fillStyle = '#2b2b2b'; for (let i = 0; i < ne; i++) { ctx.beginPath(); ctx.arc(SKIN_PTS[i][0], SKIN_PTS[i][1], 3.2, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+  // labels in screen space so they stay readable at any size
+  const labs = SITES.map(st => ({ name: st.name, dis: st.dis, L: st.side === 'L', ly: st.ly, tx: st.k === 'knee' ? st.x2 : st.x, ty: st.y }));
+  labs.push({ name: 'Skin', dis: 'eczema, psoriasis, skin cancer', L: true, ly: 290, tx: 176, ty: 300 });
+  ctx.font = '10.5px Segoe UI, system-ui, sans-serif';
+  for (const q of labs) {
+    const words = q.dis.split(' '), lines = ['']; for (const wd of words) { const t = (lines[lines.length - 1] + ' ' + wd).trim(); if (ctx.measureText(t).width > labW - 4 && lines[lines.length - 1]) lines.push(wd); else lines[lines.length - 1] = t; }
+    q.lines = lines; q.yy = SY(q.ly);
+  }
+  for (const side of [true, false]) {   // keep label blocks on each side from overlapping
+    const col = labs.filter(q => q.L === side).sort((a, b) => a.yy - b.yy); let bottom = -1e9;
+    for (const q of col) { q.yy = Math.max(q.yy, bottom + 14); bottom = q.yy + 4 + q.lines.length * 12; }
+  }
+  for (const q of labs) {
+    const yy = q.yy, lines = q.lines, edge = q.L ? SX(128) - 6 : SX(332) + 6, tx = q.L ? Math.min(edge, labW + 6) : Math.max(edge, w - labW - 6);
+    ctx.strokeStyle = '#d8ccb6'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx + (q.L ? 3 : -3), yy); ctx.lineTo(SX(q.tx), SY(q.ty)); ctx.stroke();
+    ctx.textAlign = q.L ? 'right' : 'left';
+    ctx.fillStyle = '#1f2328'; ctx.font = '600 11.5px Segoe UI, system-ui, sans-serif'; ctx.fillText(q.name, tx, yy - 2);
+    ctx.fillStyle = '#6b6f76'; ctx.font = '10.5px Segoe UI, system-ui, sans-serif';
+    lines.forEach((ln, i) => ctx.fillText(ln, tx, yy + 11 + i * 12));
+  }
+  ctx.textAlign = 'left';
+  ctx.font = '600 12px Segoe UI, system-ui, sans-serif'; ctx.fillStyle = '#c46a12'; ctx.fillText(`Day ${S.day} · ${hm(S.hour)}`, 8, 15);
+  ctx.font = '11px Segoe UI, system-ui, sans-serif'; ctx.fillStyle = '#3a3d42';
+  ctx.fillText(`Inflammaging ${fx(s.I)}  (start ${fx(r[0].I)})`, 8, 30);
+  const gy = h - 12, gw = Math.min(180, (w - 30) / 2);
+  const gauge = (x, lab, v, col) => { ctx.fillStyle = '#6b6f76'; ctx.fillText(lab, x, gy - 5); ctx.fillStyle = '#f0e9da'; ctx.fillRect(x, gy, gw, 8); ctx.fillStyle = col; ctx.fillRect(x, gy, gw * Math.max(0, Math.min(1, v)), 8); };
+  gauge(8, `Tolerance ${Math.round(s.Tol * 100)}%`, s.Tol, '#2f7d5b');
+  gauge(w - gw - 8, `Skin surveillance ${Math.round(s.surv * 100)}%`, s.surv, s.surv < 0.6 ? '#b53a2e' : '#2f7d5b');
+}
+
+// ---------- day chart ----------
+function drawDay() {
+  const c = $('dayc'), { ctx, w, h } = fit(c), r = cur(), t0 = (S.day - 1) * 24;
+  const pts = []; for (let x = 0; x <= 24; x++) pts.push([x, r[Math.min(r.length - 1, t0 + x)]]);
+  const ymax = niceMax(1.1 * Math.max(0.5, ...pts.map(([, o]) => Math.max(o.A, o.R, o.I, o.B))));
+  const pad = { l: 34, r: 10, t: 16, b: 22 }, F = frame(ctx, w, h, pad, 0, 24, 0, ymax);
+  for (let x = 0; x <= 24; x += 3) { const px = F.X(x); ctx.fillStyle = '#6b6f76'; ctx.textAlign = 'center'; ctx.fillText(String(x).padStart(2, '0'), px, h - 7); ctx.strokeStyle = '#f2ecdf'; ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, h - pad.b); ctx.stroke(); }
+  ctx.textAlign = 'right'; for (let i = 0; i <= 4; i++) { const y = ymax * i / 4; ctx.fillText(fx(y, ymax < 2 ? 2 : 1), pad.l - 4, F.Y(y) + 3); } ctx.textAlign = 'left';
+  // acute fill
+  ctx.beginPath(); ctx.moveTo(F.X(0), F.Y(0)); pts.forEach(([x, o]) => ctx.lineTo(F.X(x), F.Y(o.A))); ctx.lineTo(F.X(24), F.Y(0)); ctx.closePath(); ctx.fillStyle = 'rgba(245,166,35,.25)'; ctx.fill();
+  line(ctx, pts.map(([x, o]) => [F.X(x), F.Y(o.A)]), '#f5a623', 2);
+  line(ctx, pts.map(([x, o]) => [F.X(x), F.Y(o.R)]), '#3a7bd5', 2);
+  line(ctx, pts.map(([x, o]) => [F.X(x), F.Y(o.I)]), '#555', 2.5);
+  if (pts.some(([, o]) => o.B > 0.01)) line(ctx, pts.map(([x, o]) => [F.X(x), F.Y(o.B)]), '#c0392b', 2);
+  // events
+  const md = MODES[S.mode], d = S.day - 1, u = !md.sunOn ? 0 : P.pattern === 'weekend' ? (d % 7 >= 5 ? P.sun : 0) : P.sun;
+  const ev = []; if (md.exOn && P.ex > 0) ev.push([7, 'exercise']); if (u > 0) ev.push([9, u > 1 ? '☀ burn' : '☀ sun']); if (P.allergen > 0) ev.push([15, 'allergen']);
+  ctx.font = '11px Segoe UI, system-ui, sans-serif'; for (const [x, t] of ev) label(ctx, t, F.X(x), pad.t - 4, w, 'center', '#3a3d42');
+  if (!ev.length) label(ctx, 'no drills today', F.X(12), pad.t - 4, w, 'center');
+  const cx = F.X(S.hour); ctx.strokeStyle = '#c46a12'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, pad.t); ctx.lineTo(cx, h - pad.b); ctx.stroke();
+  c._inv = F.inv;
+}
+
+// ---------- chronic chart ----------
+const daily = r => { const o = []; for (let d = 0; d < DAYS; d++) { let s = 0; for (let k = 1; k <= 24; k++) s += r[d * 24 + k].I; o.push(s / 24); } return o; };
+function drawChronic() {
+  const c = $('chron'), { ctx, w, h } = fit(c);
+  const series = {}; for (const m in MODES) series[m] = daily(RES[m]);
+  const ghosts = S.mode === 'real' ? ['sun', 'ex', 'none'] : ['real'];
+  const all = [S.mode, ...ghosts].flatMap(m => series[m]), ymaxRaw = Math.max(...all, RES[S.mode][0].I);
+  const pad = { l: 34, r: 34, t: 12, b: 22 };
+  if (ymaxRaw < 0.01) { frame(ctx, w, h, pad, 0, 1, 0, 1); label(ctx, 'Flat: with zero irritant load there is no smouldering fire to put out.', w / 2, h / 2, w, 'center', '#3a3d42'); c._inv = null; $('chronLegend').innerHTML = ''; return; }
+  const ymax = niceMax(ymaxRaw * 1.08), F = frame(ctx, w, h, pad, 0, DAYS, 0, ymax);
+  ctx.textAlign = 'right'; for (let i = 0; i <= 4; i++) ctx.fillText(fx(ymax * i / 4, 1), pad.l - 4, F.Y(ymax * i / 4) + 3);
+  ctx.textAlign = 'center'; for (let d = 0; d <= DAYS; d += 10) ctx.fillText(d ? 'day ' + d : 'start', F.X(d), h - 7);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#2f7d5b'; ctx.fillText('tol', w - pad.r + 5, pad.t + 8); ctx.fillText('100%', w - pad.r + 3, pad.t + 20); ctx.fillText('0', w - pad.r + 5, h - pad.b);
+  const tol = []; for (let d = 0; d < DAYS; d++) tol.push(RES[S.mode][(d + 1) * 24].Tol);
+  line(ctx, tol.map((v, d) => [F.X(d + 1), pad.t + (1 - v) * (h - pad.t - pad.b)]), 'rgba(47,125,91,.55)', 1.5);
+  for (const m of ghosts) { line(ctx, series[m].map((v, d) => [F.X(d + 0.5), F.Y(v)]), MODES[m].col, 1.5, [5, 4]); ctx.globalAlpha = 1; }
+  line(ctx, [[F.X(0), F.Y(RES[S.mode][0].I)], ...series[S.mode].map((v, d) => [F.X(d + 0.5), F.Y(v)])], MODES[S.mode].col, 3);
+  const ends = [S.mode, ...ghosts].map(m => ({ m, y: F.Y(series[m][DAYS - 1]) - 4 })).sort((p, q) => p.y - q.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
+  for (const e of ends) label(ctx, MODES[e.m].label, F.X(DAYS) - 4, Math.max(pad.t + 10, e.y), w - pad.r, 'right', MODES[e.m].col);
+  const cx = F.X(S.day - 0.5); ctx.strokeStyle = '#c46a12'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, pad.t); ctx.lineTo(cx, h - pad.b); ctx.stroke();
+  c._inv = F.inv;
+  $('chronLegend').innerHTML = `<span><i style="border-color:${MODES[S.mode].col}"></i>${MODES[S.mode].label} (current)</span>` + ghosts.map(m => `<span><i class="dash" style="border-color:${MODES[m].col}"></i>${MODES[m].label}</span>`).join('') + `<span><i style="border-color:rgba(47,125,91,.6)"></i>tolerance (right)</span>`;
+}
+
+// ---------- dose chart ----------
+function drawDose() {
+  const c = $('dose'), { ctx, w, h } = fit(c), pad = { l: 34, r: 38, t: 14, b: 30 };
+  const imax = niceMax(1.08 * Math.max(0.1, ...DOSE.map(d => d.I))), emax = niceMax(1.08 * Math.max(0.1, ...DOSE.map(d => d.esc)));
+  const F = frame(ctx, w, h, pad, 0, 2, 0, imax), YE = e => h - pad.b - e / emax * (h - pad.t - pad.b);
+  ctx.fillStyle = 'rgba(47,125,91,.08)'; ctx.fillRect(F.X(0.2), pad.t, F.X(0.5) - F.X(0.2), h - pad.t - pad.b);
+  ctx.fillStyle = 'rgba(181,58,46,.06)'; ctx.fillRect(F.X(1), pad.t, F.X(2) - F.X(1), h - pad.t - pad.b);
+  ctx.fillStyle = '#6b6f76'; ctx.textAlign = 'center'; for (let u = 0; u <= 2; u += 0.5) ctx.fillText(Math.round(u * 100) + '%', F.X(u), h - 16);
+  ctx.fillText('daily sun dose, % of your burn dose', (pad.l + w - pad.r) / 2, h - 3);
+  ctx.textAlign = 'right'; for (let i = 0; i <= 4; i++) ctx.fillText(fx(imax * i / 4, 1), pad.l - 4, F.Y(imax * i / 4) + 3);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#c0392b'; for (let i = 0; i <= 4; i++) ctx.fillText(fx(emax * i / 4, emax < 4 ? 1 : 0), w - pad.r + 4, YE(emax * i / 4) + 3);
+  line(ctx, [[F.X(1), pad.t], [F.X(1), h - pad.b]], '#c0392b', 1.2, [4, 3]);
+  ctx.font = '10.5px Segoe UI, system-ui, sans-serif';
+  label(ctx, 'sweet zone', F.X(0.35), pad.t + 11, w, 'center', '#2f7d5b'); label(ctx, 'burning', F.X(1.5), pad.t + 11, w, 'center', '#b53a2e');
+  line(ctx, DOSE.map(d => [F.X(d.u), YE(d.esc)]), '#c0392b', 2);
+  line(ctx, DOSE.map(d => [F.X(d.u), F.Y(d.I)]), '#555', 2.5);
+  const k = Math.round(P.sun / 0.1), d = DOSE[Math.min(DOSE.length - 1, k)], mx = F.X(P.sun);
+  ctx.fillStyle = '#c46a12'; ctx.beginPath(); ctx.arc(mx, F.Y(d.I), 5, 0, Math.PI * 2); ctx.fill();
+  line(ctx, [[mx, pad.t], [mx, h - pad.b]], 'rgba(196,106,18,.6)', 1.2);
+  if (P.pattern === 'weekend') label(ctx, 'weekends-only pattern', F.X(0.02), h - pad.b - 6, w, 'left', '#9a5a00');
+  if (!MODES[S.mode].sunOn) label(ctx, 'sun is off in this what-if', F.X(1.98), h - pad.b - 6, w, 'right', '#9a5a00');
+  c._inv = F.inv;
+}
+
+// ---------- MS clue (static) ----------
+function drawMS() {
+  const c = $('ms'), { ctx, w, h } = fit(c), gap = 18, wl = (w - gap) * 0.6;
+  let pad = { l: 34, r: 8, t: 12, b: 30 };
+  const X = x => pad.l + x / 60 * (wl - pad.l - pad.r), Y = y => h - pad.b - y / 220 * (h - pad.t - pad.b);
+  ctx.strokeStyle = '#e6dfd0'; ctx.strokeRect(pad.l, pad.t, wl - pad.l - pad.r, h - pad.t - pad.b);
+  ctx.font = '10.5px Segoe UI, system-ui, sans-serif'; ctx.fillStyle = '#6b6f76'; ctx.textAlign = 'center';
+  for (let x = 0; x <= 60; x += 15) ctx.fillText(x + '°', X(x), h - 16); ctx.fillText('latitude', X(30), h - 3);
+  ctx.textAlign = 'right'; for (let y = 0; y <= 200; y += 50) ctx.fillText(y, pad.l - 4, Y(y) + 3); ctx.textAlign = 'left';
+  const pts = []; for (let x = 0; x <= 60; x++) pts.push([X(x), Y(Math.min(200, 3.6 * x))]); line(ctx, pts, '#7b3fb8', 2.5);
+  label(ctx, 'Canada, UK,', wl - pad.r - 2, Y(170), wl, 'right', '#7b3fb8');
+  label(ctx, 'N Europe ≈200', wl - pad.r - 2, Y(170) + 13, wl, 'right', '#7b3fb8');
+  const sg = 3.6 * 1.35; ctx.fillStyle = '#c46a12'; ctx.beginPath(); ctx.arc(X(1.35), Y(sg), 5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(196,106,18,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(1.35) + 4, Y(sg) - 2); ctx.lineTo(X(19), Y(30)); ctx.stroke();
+  label(ctx, `Singapore 1.35°`, X(20), Y(30) - 2, wl - pad.r, 'left', '#c46a12');
+  label(ctx, `→ ≈${sg.toFixed(0)} (rule)`, X(20), Y(30) + 11, wl - pad.r, 'left', '#c46a12');
+  label(ctx, 'MS per 100,000', pad.l + 4, pad.t + 12, wl, 'left');
+  // kids bars
+  const x0 = wl + gap, bw = (w - x0 - 8) / 3, vals = [['> 1 h', 1], ['≤ 1 h', 2.5], ['< 30 min', 5]], YB = v => h - pad.b - v / 5.6 * (h - pad.t - pad.b);
+  vals.forEach(([lab, v], i) => { const bx = x0 + i * bw + bw * 0.18, bwid = bw * 0.64; ctx.fillStyle = ['#2f7d5b', '#e0a13a', '#b53a2e'][i]; ctx.fillRect(bx, YB(v), bwid, h - pad.b - YB(v));
+    ctx.fillStyle = '#1f2328'; ctx.textAlign = 'center'; ctx.font = '600 11px Segoe UI, system-ui, sans-serif'; ctx.fillText('×' + v, bx + bwid / 2, YB(v) - 4);
+    ctx.font = '10.5px Segoe UI, system-ui, sans-serif'; ctx.fillStyle = '#6b6f76'; ctx.fillText(lab, bx + bwid / 2, h - 16); });
+  ctx.fillText('kids’ time outside', x0 + (w - x0) / 2, h - 3); ctx.textAlign = 'left';
+}
+
+// ---------- tables & text ----------
+function renderCmp() {
+  const rows = [
+    ['Inflammaging, day 54–60 average', m => fx(SUM[m].I) + ` <span class="muted small">(${SUM[m].I < SUM[m].I0 ? '−' : '+'}${Math.abs(pct(SUM[m].I, SUM[m].I0))}%)</span>`],
+    ['Tolerance at day 60', m => Math.round(SUM[m].Tol * 100) + '%'],
+    ['Allergic / autoimmune flare load (60 days)', m => fx(SUM[m].flares, 1)],
+    ['Lowest skin surveillance', m => Math.round(SUM[m].minSurv * 100) + '%'],
+    ['Escaped damage (“baby cancers”)', m => fx(SUM[m].esc)],
+    ['Peak acute inflammation', m => fx(SUM[m].peak)],
+  ];
+  $('cmp').innerHTML = `<thead><tr><th></th>${Object.keys(MODES).map(m => `<th class="num ${m === S.mode ? 'on' : ''}">${MODES[m].label}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(([l, f]) => `<tr><td>${l}</td>${Object.keys(MODES).map(m => `<td class="num ${m === S.mode ? 'on' : ''}">${f(m)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+}
+function renderSG() {
+  $('sgDate').textContent = today.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+  const rows = SG_TIMES.map(t => { const m = minutesTo(P.sun, t, S.skin, S.cloud), uvi = SM.uvIndex(SM.solar(DOY, t).elev, S.cloud); return `<tr><td>${hm(t)}</td><td class="num">UV ${uvi.toFixed(1)}</td><td class="num"><b>${fmtMin(m)}</b></td></tr>`; }).join('');
+  $('sgTable').innerHTML = `<thead><tr><th>Start</th><th class="num">UV index</th><th class="num">${Math.round(P.sun * 100)}% of burn dose</th></tr></thead><tbody>${rows}</tbody>`;
+}
+function renderTake() {
+  const m830 = minutesTo(0.3, 8.5, S.skin, S.cloud), m13 = minutesTo(0.3, 13, S.skin, S.cloud), m1 = minutesTo(1, 13, S.skin, S.cloud), m175 = minutesTo(0.3, 16.5, S.skin, S.cloud);
+  $('take').innerHTML = [
+    `<b>Small daily doses, not weekend binges.</b> In the model a daily 30% of your burn dose lowers inflammaging, while a weekend burn raises it and multiplies escaped damage. For skin type ${S.skin} on a ${S.cloud === 'clear' ? 'clear' : S.cloud === 'partly' ? 'partly cloudy' : 'overcast'} day, 30% is about <b>${fmtMin(m830)}</b> of open sky from 08:30, <b>${fmtMin(m175)}</b> from 16:30, but only <b>${fmtMin(m13)}</b> at 13:00.`,
+    `<b>Never cross the burn line.</b> At 13:00 your full burn dose arrives in about <b>${fmtMin(m1)}</b>. Past it the chapter’s bargain reverses: burn damage feeds the fire instead of training the brigade, and Kripke’s surveillance hole opens.`,
+    `<b>Stack the two drills.</b> An outdoor walk or run before about 09:00 is exercise, skin sun and the morning eye light from Lesson 1 in one go. Aim for a real challenge: Jacobsen says couch-to-fridge doesn’t count, and neither does “running until your arches collapse”.`,
+    `<b>Let normal soreness run its course.</b> The book’s footnote: post-exercise inflammation “should not be arrested with ice or NSAIDs … It needs to run its course.” (Injuries and medical advice are a different matter.)`,
+    `<b>Children outdoors more than an hour a day.</b> That is the chapter’s lowest-MS group. Singapore’s eye doctors (SNEC) already recommend 2 h a day against myopia, so the same habit covers both.`,
+    `<b>Air-conditioned Singapore is the “no drills” life.</b> Offices and malls give neither sun nor movement. Walking the park connector instead of the underpass is the local fix. Leafy shade cuts UV but keeps the infrared (Ch 10).`,
+    `<b>Autoimmune or inflammatory skin disease?</b> Narrowband UV phototherapy (311 nm) is an established medical treatment, and the Korean data suggest heart and stroke benefits too. Discuss it with a dermatologist rather than self-dosing sun.`,
+  ].map(x => `<li>${x}</li>`).join('');
+}
+function renderValid() {
+  const run = o => summary(simulate({ ...DEFAULTS, sunOn: true, exOn: true, ...o }));
+  const none = run({ sunOn: false, exOn: false }), ex = run({ sunOn: false }), sun = run({ exOn: false }), real = run({});
+  const burner = run(PRESETS.burner), burnerM = run({ ...PRESETS.burner, microbiome: true }), sens = run(PRESETS.sg);
+  const hunter = run(PRESETS.hunter), office = run(PRESETS.office), over = run({ sunOn: false, ex: 1.6 }), exOk = run({ sunOn: false, ex: 0.6 }), burnDaily = run({ exOn: false, sun: 1.3 });
+  const rows = [
+    ['Exercise alone lowers chronic inflammation (“fire drill”)', `${fx(ex.I)} vs ${fx(none.I)} with neither`, ex.I < none.I],
+    ['Sub-burn sun alone lowers it too (“a workout for the skin”)', `${fx(sun.I)} vs ${fx(none.I)}`, sun.I < none.I],
+    ['Sun and exercise together work best', `${fx(real.I)} (lowest of the four)`, real.I < Math.min(sun.I, ex.I)],
+    ['Sun trains tolerance, so fewer allergic/autoimmune flares (eczema, MS direction)', `flare load ${fx(sun.flares, 1)} vs ${fx(none.flares, 1)}`, sun.flares < none.flares],
+    ['Hunter-gatherers show no inflammaging', `${fx(hunter.I)} vs office worker ${fx(office.I)}`, hunter.I < office.I / 3],
+    ['Burning opens a surveillance hole (Kripke’s double whammy)', `lowest surveillance ${Math.round(burner.minSurv * 100)}% vs ${Math.round(sens.minSurv * 100)}%`, burner.minSurv < 0.5 && sens.minSurv > 0.85],
+    ['Burning reverses the benefit', `daily 130% dose: ${fx(burnDaily.I)} vs neither ${fx(none.I)}`, burnDaily.I > none.I],
+    ['Sun-loving skin microbes limit the damage that slips through (Lyon 2025)', `escaped ${fx(burnerM.esc, 1)} vs ${fx(burner.esc, 1)} without`, burnerM.esc < 0.6 * burner.esc],
+    ['Too much exercise stops helping (“until your arches collapse”)', `challenge 1.6: ${fx(over.I)} vs 0.6: ${fx(exOk.I)}`, over.I > exOk.I],
+  ];
+  $('validTable').innerHTML = `<thead><tr><th>The book says…</th><th>Model gives</th><th></th></tr></thead><tbody>${rows.map(([a, b, ok]) => `<tr><td>${a}</td><td>${b}</td><td class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</td></tr>`).join('')}</tbody>`;
+}
+function renderReadout() {
+  const s = sampleAt(cur(), nowT()), sm = SUM[S.mode], bits = [];
+  if (s.Ae > 0.05) bits.push('the morning <b>exercise drill</b> is still sparking');
+  if (s.As > 0.03) bits.push('the <b>sun dose</b> has lit a small skin fire and sent the adaptive arm a stand-down signal');
+  if (s.B > 0.05) bits.push('<b>sunburn damage</b> is feeding the fire rather than training it');
+  if (s.Aa > 0.05) bits.push(`an <b>allergen flare</b> is running at ${fx(s.Aa)}${s.Tol > 0.6 ? ', damped by a well-trained, tolerant immune system' : ', barely damped: this immune system has had little tolerance training'}`);
+  const now = bits.length ? 'Right now ' + bits.join('; ') + '.' : 'No drill is active right now; the repair crew works on the smoulder.';
+  $('readout').innerHTML = `<b>${MODES[S.mode].label}${S.preset ? ' · ' + $('presetSeg').querySelector(`[data-p=${S.preset}]`).textContent : ''}, day ${S.day} ${hm(S.hour)}.</b> ${now} Firefighters on duty: <b>${fx(s.R)}</b>. Inflammaging <b>${fx(s.I)}</b>, heading to <b>${fx(sm.I)}</b> by day 60 (${sm.I < sm.I0 ? pct(sm.I, sm.I0) + '% below' : Math.abs(pct(sm.I, sm.I0)) + '% above'} where this life started). ${s.surv < 0.6 ? `<span class="tag bad">surveillance ${Math.round(s.surv * 100)}%</span> mutated cells can slip through.` : ''}`;
+}
+
+// ---------- steps ----------
+const DYN = {
+  sgRule: () => (3.6 * 1.35).toFixed(0),
+  Inone: () => fx(SUM.none.I), Iex: () => fx(SUM.ex.I), Isun: () => fx(SUM.sun.I), Ireal: () => fx(SUM.real.I), I0: () => fx(SUM.none.I0),
+  pctEx: () => pct(SUM.ex.I, SUM.none.I) + '%', pctSun: () => pct(SUM.sun.I, SUM.none.I) + '%', pctReal: () => pct(SUM.real.I, SUM.none.I) + '%',
+  flNone: () => fx(SUM.none.flares, 1), flSun: () => fx(SUM.sun.flares, 1), flPct: () => pct(SUM.sun.flares, SUM.none.flares) + '%',
+  tolSun: () => Math.round(SUM.sun.Tol * 100) + '%', tolNone: () => Math.round(SUM.none.Tol * 100) + '%',
+  curI: () => fx(SUM[S.mode].I), curEsc: () => fx(SUM[S.mode].esc, 1), altEsc: () => fx(ALT.esc, 1), curSurv: () => Math.round(SUM[S.mode].minSurv * 100) + '%',
+  microWord: () => P.microbiome ? 'with' : 'without', altWord: () => P.microbiome ? 'without' : 'with',
+  dose: () => Math.round(P.sun * 100) + '%', skin: () => S.skin,
+  sgAM: () => fmtMin(minutesTo(P.sun, 8.5, S.skin, S.cloud)), sgNoon: () => fmtMin(minutesTo(P.sun, 13, S.skin, S.cloud)),
+  exNow: () => fx(P.ex),
+};
+const b = (act, txt) => `<button class="actbtn" data-act="${act}">${txt}</button>`;
+const d = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const STEPS = [
+  { t: '1 · The “sunshine disease”', focus: 'pMS', apply: () => setScenario('none', null, DEFAULTS),
+    h: `<p>Multiple sclerosis is an autoimmune disease: the immune system attacks the insulation around nerves. It is nearly absent at the equator and rises about <b>3.6 cases per 100,000 per degree of latitude</b>. Seattle had 7× the MS of Los Angeles; sunny Australia still has 6× more in its south. By the book’s rule, Singapore would sit near ${d('sgRule')} per 100,000.</p><p>Children outside less than 30 minutes a day have about 5× the risk of those outside more than an hour. How could <i>light</i> stop an immune attack on the brain? Jacobsen calls MS “the Rosetta stone for deciphering how light translates into health.”</p><p class="small muted">The simulator starts on a modern indoor life: no sun, no exercise. Inflammaging here: ${d('Inone')}.</p>` },
+  { t: '2 · Inflammation is the fire brigade', focus: 'pDay', apply: () => setScenario('ex', null, DEFAULTS),
+    h: `<p>Inflammation is not the enemy; it is the army. “Some friendly fire is unavoidable … Without inflammation, the kingdom would be lost every day.” After the battle it is supposed to switch off and repair.</p><p>Exercise at 07:00 lights a small, controlled fire (orange spike). The body answers with a repair crew (blue) that lingers all day and also puts out “smoldering fires that have nothing to do with the exercise”. That is Jacobsen’s <b>fire drill</b>. Result: inflammaging ${d('Iex')} vs ${d('Inone')} with no drills, <b>${d('pctEx')} lower</b>.</p><p>But the challenge must be right. ${b('ex0.1', 'Couch to fridge (0.1)')} ${b('ex1.6', 'Arches collapse (1.6)')} ${b('ex0.6', 'Back to 0.6')} Now: ${d('exNow')}.</p>` },
+  { t: '3 · Modern life: no drills, just smoulder', focus: 'pChronic', apply: () => setScenario('none', null, DEFAULTS),
+    h: `<p>Indoors, sedentary and processed, the brigade never trains, so the embers never go out: inflammaging stays at ${d('Inone')}. The journal <i>Cells</i> ran a special issue titled “Inflammation: The Cause of All Diseases”: heart disease, Alzheimer’s, arthritis, diabetes, even depression have inflammatory roots.</p><p>An untrained immune system also overreacts. The 15:00 allergen causes a flare load of ${d('flNone')} over 60 days, with tolerance stuck at ${d('tolNone')}.</p><p>Hunter-gatherers of every age show <b>no</b> inflammaging: their immune systems are “fully occupied dealing with the world”. ${b('p:hunter', 'Show a hunter-gatherer')} ${b('p:office', 'Show an office worker')}</p>` },
+  { t: '4 · The sun is a workout for the skin', focus: 'pBody', apply: () => setScenario('sun', null, DEFAULTS),
+    h: `<p>“For millions of years, solar radiation was one of those daily irritations, scuffing the skin and keeping the immune system engaged.” Prue Hart: “It’s the most important environmental insult we have. We evolved to cope with it.”</p><p>UV <b>calms the adaptive arm</b> (the one that attacks nerves, gut or pancreas in autoimmune disease) and <b>stimulates the innate repair crew</b>. The immune system learns to hold its fire, like the peanut-early kids, the farm kids and locals who ignore blackfly bites. Tolerance climbs to ${d('tolSun')} and the flare load falls <b>${d('flPct')}</b> (${d('flSun')} vs ${d('flNone')}). Inflammaging: ${d('Isun')}.</p><p class="small">Babies wearing light monitors had far less eczema, and vitamin D pills did nothing. In Hart’s trial, all placebo patients developed MS within a year, but 30% of the UV group were spared.</p>` },
+  { t: '5 · Both drills: the hunter-gatherer body', focus: 'pChronic', apply: () => setScenario('real', null, DEFAULTS),
+    h: `<blockquote>“Sun exposure improves the same health conditions as exercise because it is a form of exercise.”</blockquote><p>With both drills the smoulder falls lowest: ${d('Ireal')}, <b>${d('pctReal')} below</b> the no-drill life (sun alone ${d('pctSun')}, exercise alone ${d('pctEx')}). The dashed lines are those single-drill lives.</p><p>That is why phototherapy for psoriasis or vitiligo, aimed only at the skin, came with <b>36% fewer major cardiovascular events</b> and <b>32% fewer heart attacks, 40% fewer strokes</b> in Korean patients. Calming the fire in one place calms it everywhere.</p><p>${b('p:hunter', 'Hunter-gatherer')} ${b('p:sg', 'Singapore sensible')} ${b('w:real', 'Back to defaults')}</p>` },
+  { t: '6 · Too much: the burn breaks the deal', focus: 'pDose', apply: () => setScenario('real', 'burner', PRESETS.burner),
+    h: `<p>Kripke, 1974: UV-induced tumours grew in the irradiated mouse but were rejected by a fresh mouse <b>10 times out of 10</b>. UV is a “double whammy”: it damages DNA <i>and</i> switches off the surveillance that kills baby cancers.</p><p>A weekend burner gets big doses with no training in between. Surveillance dips to ${d('curSurv')}, escaped damage reaches ${d('curEsc')}, and the burn feeds inflammaging (${d('curI')}) instead of calming it. Look at the dose–response: benefit rises up to the burn line, then everything turns.</p><p>Skin microbes that eat urocanic acid help (Lyon, 2025). This run is ${d('microWord')} them; ${d('altWord')} them, escaped damage would be ${d('altEsc')}. ${b('micro', 'Toggle skin microbes')} ${b('p:sg', 'Switch to small daily doses')}</p>` },
+  { t: '7 · Your dose, Singapore', focus: 'pDose', apply: () => setScenario('real', 'sg', PRESETS.sg),
+    h: `<p>The sweet zone is roughly <b>20–50% of your burn dose, every day</b>: most of the calming, little escaped damage. The dose now is ${d('dose')}.</p><p>For skin type ${d('skin')} in Singapore that is about <b>${d('sgAM')}</b> of open sky from 08:30, but only <b>${d('sgNoon')}</b> at 13:00, when the UV index is ≈12. Change the skin type in the Singapore card; the table shows every hour.</p><p>So: move outdoors in the morning or late afternoon, never burn, and cover up or seek shade at midday. The “Putting Chapter 9 to work” section below has the full list, and <a href="#">Lesson 1</a> has the full routine.</p>` },
+];
+function goStep(i) {
+  S.step = Math.max(0, Math.min(STEPS.length - 1, i));
+  const st = STEPS[S.step];
+  $('stepTitle').textContent = st.t; $('stepText').innerHTML = st.h;
+  $('dots').querySelectorAll('span').forEach((e, j) => e.classList.toggle('on', j === S.step));
+  $('prev').disabled = S.step === 0; $('next').disabled = S.step === STEPS.length - 1;
+  document.querySelectorAll('.panel.focus').forEach(e => e.classList.remove('focus'));
+  if (st.focus) $(st.focus).classList.add('focus');
+  st.apply();
+}
+function updateDyn() { document.querySelectorAll('[data-dyn]').forEach(e => { const f = DYN[e.dataset.dyn]; e.textContent = f ? f() : '?'; }); }
+
+// ---------- UI sync ----------
+function setScenario(mode, preset, params) { S.mode = mode; S.preset = preset; Object.assign(P, params); syncUI(); recompute(); }
+function syncUI() {
+  $('sun').value = P.sun; $('ex').value = P.ex; $('irr').value = P.irritant; $('alg').value = P.allergen; $('micro').checked = P.microbiome;
+  $('day').value = S.day; $('hour').value = S.hour;
+  $('sun_o').textContent = Math.round(P.sun * 100) + '%' + (P.sun > 1 ? ' — burn' : ''); $('ex_o').textContent = fx(P.ex); $('irr_o').textContent = fx(P.irritant); $('alg_o').textContent = fx(P.allergen);
+  $('day_o').textContent = S.day; $('hour_o').textContent = hm(S.hour);
+  const md = MODES[S.mode];
+  $('sunCtl').classList.toggle('overridden', !md.sunOn); $('exCtl').classList.toggle('overridden', !md.exOn); $('patSeg').classList.toggle('overridden', !md.sunOn);
+  document.querySelectorAll('#whatSeg button').forEach(e => e.classList.toggle('on', e.dataset.w === S.mode));
+  document.querySelectorAll('#presetSeg button').forEach(e => e.classList.toggle('on', e.dataset.p === S.preset));
+  document.querySelectorAll('#patSeg button').forEach(e => e.classList.toggle('on', e.dataset.pat === P.pattern));
+  document.querySelectorAll('#skinSeg button').forEach(e => e.classList.toggle('on', e.dataset.s === S.skin));
+  document.querySelectorAll('#cloudSeg button').forEach(e => e.classList.toggle('on', e.dataset.c === S.cloud));
+}
+function renderTime() { drawBody(); drawDay(); drawChronic(); renderReadout(); }
+function renderAll() { syncUI(); renderTime(); drawDose(); renderCmp(); renderSG(); renderTake(); updateDyn(); }
+
+let pending = false; const soon = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; recompute(); }); } };
+const onSlider = (id, fn) => $(id).addEventListener('input', e => { fn(+e.target.value); S.preset = null; soon(); });
+onSlider('sun', v => { P.sun = v; }); onSlider('ex', v => { P.ex = v; }); onSlider('irr', v => { P.irritant = v; }); onSlider('alg', v => { P.allergen = v; });
+$('micro').addEventListener('change', e => { P.microbiome = e.target.checked; S.preset = null; soon(); });
+$('day').addEventListener('input', e => { S.day = +e.target.value; syncUI(); renderTime(); });
+$('hour').addEventListener('input', e => { S.hour = +e.target.value; syncUI(); renderTime(); });
+$('whatSeg').addEventListener('click', e => { const w = e.target.dataset.w; if (w) { S.mode = w; soon(); } });
+$('presetSeg').addEventListener('click', e => { const p = e.target.dataset.p; if (p) setScenario('real', p, PRESETS[p]); });
+$('patSeg').addEventListener('click', e => { const p = e.target.dataset.pat; if (p) { P.pattern = p; S.preset = null; soon(); } });
+$('skinSeg').addEventListener('click', e => { const s = e.target.dataset.s; if (s) { S.skin = s; syncUI(); renderSG(); renderTake(); updateDyn(); } });
+$('cloudSeg').addEventListener('click', e => { const c = e.target.dataset.c; if (c) { S.cloud = c; syncUI(); renderSG(); renderTake(); updateDyn(); } });
+$('stepText').addEventListener('click', e => {
+  const a = e.target.dataset && e.target.dataset.act; if (!a) return;
+  if (a.startsWith('p:')) setScenario('real', a.slice(2), PRESETS[a.slice(2)]);
+  else if (a.startsWith('w:')) setScenario(a.slice(2), null, DEFAULTS);
+  else if (a.startsWith('ex')) { P.ex = +a.slice(2); soon(); }
+  else if (a === 'micro') { P.microbiome = !P.microbiome; soon(); }
+});
+$('reset').addEventListener('click', () => { S.day = 60; S.hour = 9.5; goStep(S.step); });
+$('prev').onclick = () => goStep(S.step - 1); $('next').onclick = () => goStep(S.step + 1);
+STEPS.forEach((_, i) => { const e = document.createElement('span'); e.textContent = i + 1; e.onclick = () => goStep(i); $('dots').appendChild(e); });
+document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.key === 'ArrowRight') goStep(S.step + 1); if (e.key === 'ArrowLeft') goStep(S.step - 1); });
+const pick = (id, fn) => $(id).addEventListener('click', e => { const c = $(id); if (!c._inv) return; const r = c.getBoundingClientRect(); fn(c._inv(e.clientX - r.left)); });
+pick('dayc', x => { S.hour = Math.max(0, Math.min(23.9, x)); syncUI(); renderTime(); });
+pick('chron', x => { S.day = Math.max(1, Math.min(60, Math.floor(x) + 1)); syncUI(); renderTime(); });
+pick('dose', x => { P.sun = Math.max(0, Math.min(2, Math.round(x * 20) / 20)); S.preset = null; if (!MODES[S.mode].sunOn) S.mode = MODES[S.mode].exOn ? 'real' : 'sun'; soon(); });
+
+// play: 60 days at ~1 day per second
+let last = 0;
+function tick(ts) {
+  if (!S.playing) return;
+  const dtS = last ? Math.min(0.1, (ts - last) / 1000) : 0; last = ts;
+  let t = nowT() + dtS * 24;
+  if (t >= DAYS * 24 - 0.1) { t = DAYS * 24 - 0.1; S.playing = false; $('play').textContent = '▶ Play 60 days'; }
+  S.day = Math.min(60, Math.floor(t / 24) + 1); S.hour = t - (S.day - 1) * 24;
+  syncUI(); renderTime(); if (S.playing) requestAnimationFrame(tick);
+}
+$('play').addEventListener('click', () => {
+  S.playing = !S.playing; $('play').textContent = S.playing ? '❚❚ Pause' : '▶ Play 60 days';
+  if (S.playing) { if (nowT() >= DAYS * 24 - 1) { S.day = 1; S.hour = 0; } last = 0; requestAnimationFrame(tick); }
+});
+window.addEventListener('resize', () => { renderTime(); drawDose(); drawMS(); });
+
+// quiz
+Quiz.mount($('quizBox'), [
+  { q: 'Why does Jacobsen call exercise a “fire drill”?', options: ['Short inflammation now trains a crew that douses old fires', 'It lowers body temperature so fewer immune cells are made', 'It burns stored fat, the only real source of inflammation', 'It rests the immune system by replacing a night’s sleep'], answer: 0, why: 'Exercise is “anti-inflammatory in the long run because it’s pro-inflammatory in the short run”; the repair it prompts also puts out unrelated smouldering fires.' },
+  { q: 'How steep is the MS latitude gradient the chapter quotes?', options: ['About 36 extra cases per 100,000 per degree of latitude', 'About 0.36 extra cases per 100,000 per degree of latitude', 'About 3.6 extra cases per 100,000 per degree of latitude', 'About 360 extra cases per 100,000 per degree of latitude'], answer: 2, why: 'Near zero at the equator, +3.6 per degree, reaching ≈200 per 100,000 in Canada, the UK and Northern Europe.' },
+  { q: 'What did Kripke’s 1974 tumour transplants reveal?', options: ['UV-made tumours spread readily into every new host mouse', 'UV also switches off the skin’s own cancer surveillance', 'Tumours grew only in mice that got vitamin D', 'Skin bacteria, not UV light, had caused the tumours'], answer: 1, why: 'A fresh mouse rejected the tumours 10 times out of 10; they grew only where UV had also suppressed immune surveillance: a “double whammy”.' },
+  { q: 'Which immune arm does UV calm, and which does it stimulate?', options: ['Calms both arms equally for several weeks after exposure', 'Stimulates both arms, which is the reason sunburn stings', 'Calms the innate repair arm, stimulates the adaptive arm', 'Calms the targeted adaptive arm, stimulates the innate arm'], answer: 3, why: 'The adaptive arm (which autoimmune disease turns against you) stands down; the innate damage-control crew goes to work.' },
+  { q: 'What happened in Prue Hart’s narrowband-UV trial after one year?', options: ['All placebo patients got MS; 30% on UV were spared', 'Half of both groups went on to develop full-blown MS', 'The UV group got MS sooner, but with milder symptoms', 'No difference appeared until UV was paired with vitamin D'], answer: 0, why: '20 patients with clinically isolated syndrome; 8 weeks of UV, 3×/week; the effect lasted months after treatment ended.' },
+  { q: 'Babies wore light monitors. What did vitamin D supplements do for eczema?', options: ['Worked as well as the sunlight did', 'Worked, but only in the fair-skinned infants', 'Made no difference to the eczema rates', 'Made eczema worse during the sunny months'], answer: 2, why: 'Sun exposure dramatically reduced eczema; “Vitamin D supplements, as usual, made no difference.” The benefit is the light, not the vitamin.' },
+  { q: 'In the simulator, why does a weekend burner end up worse than someone with no sun at all?', options: ['Weekend UV cannot reach the skin through city smog', 'Burn damage feeds the fire and opens surveillance holes', 'The model treats any sun at all as harmful', 'Tolerance training only works on the five working weekdays'], answer: 1, why: 'Sub-burn doses train tolerance and calm; above the burn line the extra dose adds damage that feeds inflammaging, and surveillance dips let mutated cells slip through.' },
+  { q: 'What does the chapter’s footnote say about icing sore muscles after normal exercise?', options: ['Ice is fine within the first ten minutes', 'Pair ice with NSAIDs so recovery is quicker', 'Ice only when training somewhere hot and humid', 'Don’t ice it; let inflammation run its course'], answer: 3, why: 'Post-exercise inflammation “should not be arrested with ice or NSAIDs, FYI. It needs to run its course.” It is the signal that builds the repair.' },
+]);
+
+// init
+drawMS(); renderValid(); goStep(0);
+</script>
+</body>
+</html>
