@@ -137,7 +137,7 @@ textarea.answer-text-input { width: 100%; font: 1.05rem/1.5 var(--serif); paddin
 }
 
 /* square-grid figures (grid.js) */
-.grid-figure svg { width: 100%; max-width: 30rem; height: auto; display: block; margin: 0 auto; }
+.grid-figure svg { width: 100%; max-width: 30rem; height: auto; display: block; margin: 0 auto; overflow: visible; }
 .item .grid-figure { margin: .6rem 0 .9rem; }
 
 /* bar model for comparison word problems */

@@ -1,0 +1,192 @@
+{
+  "id": "NNNN-slug",
+  "number": 2,
+  "series": "SERIES NAME",
+  "title": "Stop at the hour",
+  "hook": "ONE-SENTENCE METAPHOR HOOK. Minutes only go up to 60, so when a jump goes past an o'clock, stop at the o'clock first.",
+  "learner": "LEARNER-ID",
+  "subject": "maths",
+  "topics": [
+    "time-adding-minutes-across-hour"
+  ],
+  "source_scan": "SCAN-ID",
+  "source_items": [
+    "p2-8a"
+  ],
+  "minutes": 12,
+  "retry_hint": "Not yet. Draw it on your timeline and try again.",
+  "body": [
+    {
+      "step": "Warm-up from last time"
+    },
+    {
+      "item": "e0"
+    },
+    {
+      "step": "A puzzle from your worksheet"
+    },
+    {
+      "figure": {
+        "src": "../scans/SCAN-ID/crops/CROP.jpg",
+        "alt": "What the learner wrote",
+        "caption": "What you wrote, and a question to keep in mind: where should the timeline stop? The section below answers it."
+      }
+    },
+    {
+      "step": "The trick"
+    },
+    {
+      "timeline": {
+        "start": "06 25",
+        "end": "07 05",
+        "ticks": [
+          "07 00"
+        ],
+        "jumps": [
+          {
+            "from": "06 25",
+            "to": "07 00",
+            "label": "35 min"
+          },
+          {
+            "from": "07 00",
+            "to": "07 05",
+            "label": "5 min"
+          }
+        ],
+        "play": true
+      }
+    },
+    {
+      "rules": [
+        "Jump to the next o'clock: how many minutes make 60?",
+        "Work out what's left.",
+        "Jump the rest."
+      ]
+    },
+    {
+      "step": "Step by step"
+    },
+    {
+      "item": "jb1"
+    },
+    {
+      "step": "Spot the mistake"
+    },
+    {
+      "item": "s1"
+    },
+    {
+      "step": "On your own"
+    },
+    {
+      "items": [
+        "q1",
+        "q2",
+        "q3"
+      ]
+    }
+  ],
+  "source": {
+    "label": "Watch next",
+    "url": "https://www.thenational.academy/pupils/lessons/calculating-duration-of-time-in-hours-and-minutes-60v36d/video",
+    "title": "PRIMARY SOURCE TITLE",
+    "note": "One line on why it's worth it."
+  },
+  "ask": {
+    "helpers": "HELPERS",
+    "try": "A FOLLOW-UP QUESTION THEY COULD ASK"
+  },
+  "nav": [
+    {
+      "href": "PREV.html",
+      "text": "← Lesson 1"
+    },
+    {
+      "href": "NEXT.html",
+      "text": "Lesson 3 →"
+    }
+  ],
+  "items": [
+    {
+      "id": "e0",
+      "type": "explain",
+      "prompt": "From last lesson, in one sentence: what happens to <b>12 am</b> on the 24-hour clock, and why?",
+      "key_ideas": [
+        "12 am becomes 00",
+        "because it is the midnight hour"
+      ]
+    },
+    {
+      "id": "jb1",
+      "type": "jump-builder",
+      "start": "08 45",
+      "add": 30,
+      "prompt": "Recess starts at <span class='t'>08 45</span> and lasts <b>30 min</b>. When does it end?"
+    },
+    {
+      "id": "s1",
+      "type": "spot",
+      "prompt": "Ben worked out <span class='t'>10 35</span> + 40 min. Tap the step that goes wrong.",
+      "steps": [
+        "Start at <span class='t'>10 35</span>.",
+        "The jump goes past 11 o'clock, so the hour becomes 11.",
+        "Minutes: 40 − 35 = 5, so he gets <span class='t'>11 05</span>."
+      ],
+      "wrong": 2,
+      "fix": {
+        "kind": "time",
+        "answer": "11 15",
+        "prompt": "The right end time is",
+        "traps": {
+          "1105": "That's Ben's answer. From 35 to the hour is 25 min, so 15 min are left."
+        },
+        "verify": {
+          "time": "10 35 + 40"
+        }
+      },
+      "explain": "25 min to <span class='t'>11 00</span>, then 15 more."
+    },
+    {
+      "id": "q1",
+      "type": "typed",
+      "kind": "time",
+      "prompt": "Mei starts reading at <span class='t'>19 35</span> and reads for 40 minutes. When does she stop?",
+      "answer": "20 15",
+      "traps": {
+        "1975": "There is no minute 75! Stop at <span class='t'>20 00</span> first.",
+        "2005": "From 35 to the hour is <b>25</b> min, so 15 min are left."
+      },
+      "explain": "25 min to <span class='t'>20 00</span>, then 15 more.",
+      "verify": {
+        "time": "19 35 + 40"
+      }
+    },
+    {
+      "id": "q2",
+      "type": "typed",
+      "kind": "time",
+      "prompt": "The library opens at <span class='t'>10 20</span>. Ben arrives 25 minutes later. When?",
+      "answer": "10 45",
+      "explain": "Trick question: 20 + 25 doesn't reach 60, so there's no o'clock to stop at.",
+      "verify": {
+        "time": "10 20 + 25"
+      }
+    },
+    {
+      "id": "q3",
+      "type": "mcq",
+      "prompt": "<span class='t'>11 40</span> + 35 min. Where is your <b>first stop</b>?",
+      "options": [
+        "at 12 15",
+        "at 11 75",
+        "at 12 00"
+      ],
+      "answer": 2,
+      "traps": {
+        "at 11 75": "There is no minute 75."
+      },
+      "explain": "First stop <span class='t'>12 00</span>, then 15 more."
+    }
+  ]
+}

@@ -66,9 +66,19 @@ Find high-trust sources for each topic (curriculum body such as the national syl
 Khan Academy, recognised teacher references) and add them to `RESOURCES.md` with one line each on what they're for.
 Don't teach from memory alone. Keep `NOTES.md` working notes current.
 
-## 5. Write lessons → `lessons/NNNN-<slug>.html`
-One lesson per gap (merge tiny related gaps), numbered after the highest existing one. Start from
-`templates/lesson-template.html`; it runs as-is and shows every item type. Each lesson, about 10–12 minutes:
+## 5. Write lessons → `lessons/src/NNNN-<slug>.json`, then build
+One lesson per gap (merge tiny related gaps), numbered after the highest existing one. Write a **spec**, not HTML:
+start from `templates/lesson-spec.json` (it builds as-is) and see SCHEMA.md for every block and item type. Then
+```
+python -I tools/build_lesson.py lessons/src/NNNN-<slug>.json      # -> lessons/NNNN-<slug>.html
+```
+The spec is the source of truth. Never edit the generated HTML; fix the spec and rebuild. The builder refuses to
+write a lesson with a misplaced or missing item, a malformed trap, a bad grid, or a failed `verify`.
+Give **every** typed answer and spot fix a `verify` block (arithmetic, time, duration, 12h→24h, grid step,
+parallel/perpendicular): the tools then prove the answer is right, and for lines that it is the only right one.
+List deliberately false statements (the child's own working, a classmate's wrong claim) in `expected_wrong`.
+Give each grid an `id` so items can verify against it. To bring an old hand-written lesson into this system:
+`python -I tools/html_to_spec.py lessons/NNNN-<slug>.html`. Each lesson, about 10–12 minutes:
 1. **Hook**: one metaphor sentence.
 2. **Explain-it warm-up on the previous lesson's idea** (item `explain`). Retrieval after a night's sleep.
    It is saved and judged later, not scored. The first lesson of a series has none.
@@ -84,7 +94,7 @@ One lesson per gap (merge tiny related gaps), numbered after the highest existin
 8. Primary source link, the "Stuck? Ask HELPERS, or ask your AI tutor" box, the parent **Save results** button,
    and prev/next navigation.
 
-Rules: all content lives in the `#lesson-data` JSON, and the HTML only places items with `<div data-item="id">`.
+Rules: all content lives in the spec; `body` places blocks and items in page order, and each item exactly once.
 Multiple-choice options have equal length, the correct position varies, and at most ~30% of items are multiple choice.
 Never use un-checked "say it out loud / show me" prompts: children skip them.
 Every feedback message must fit the item it appears on: set the lesson's `retry_hint` to the tool *this* lesson teaches
@@ -92,7 +102,7 @@ Every feedback message must fit the item it appears on: set the lesson's `retry_
 wrong answer a `trap`. Use `kind: "number"` for numeric answers (so "54 cm" is accepted) and list every accepted
 spelling for `text` answers (e.g. `["RS","SR"]`). Every retrieval is either marked
 (typed/spot/mcq) or saved (explain). Write to the child warmly and plainly, with no baby talk and never shaming.
-Use the textbook's notation. Build from `assets/`. A widget the next lesson could reuse goes into `assets/` as a
+Use the textbook's notation. A widget the next lesson could reuse goes into `assets/` as a
 component registered in `window.LessonWidgets` (see `timeline.js`; `grid.js` draws square-grid figures for geometry), and is copied back into this skill's
 `templates/assets/`. Add or refresh a printable `reference/<topic>-cheat-sheet.html` linking the lessons.
 
@@ -101,11 +111,12 @@ component registered in `window.LessonWidgets` (see `timeline.js`; `grid.js` dra
 python -I tools/check_lessons.py lessons/NNNN-*.html --shots <tmpdir>
 ```
 It answers every item: traps must be flagged, answers accepted, spots and widgets completed, explanations saved,
-active time recorded, and no JS errors. Every correct answer must also pass when typed key by key and when written
+active time recorded, and no JS errors. It re-runs every `verify`, and fails a grid figure whose labels sit on
+a line, overlap, cover another point or are cut off. Every correct answer must also pass when typed key by key and when written
 the ways a child writes it ("97 students", spaces, a final full stop, full-width digits), and the question numbers must
 run 1, 2, 3... down the page. It also lints multiple-choice balance. Don't hand over on a subagent's "no issues"
-unless its report shows the inputs it typed and the feedback it got. **Read the screenshots** before handing
-over. Then open the first new lesson (`start "" <file>` / `open` / `xdg-open`).
+unless its report shows the inputs it typed and the feedback it got. Then **read the screenshots** for what the
+tools can't judge (is the picture clear, does each rule say what it means) before handing over. Then open the first new lesson (`start "" <file>` / `open` / `xdg-open`).
 
 ## 7. Close the loop
 The parent saves `*-results-*.json` from each lesson into `results/`. For each file:

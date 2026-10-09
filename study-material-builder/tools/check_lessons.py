@@ -9,14 +9,63 @@ For every item in the lesson's #lesson-data JSON (located on the page by data-it
   spot    tap a correct step (must be flagged), tap the wrong step, enter the fix (must be accepted)
   explain type a sentence and save (must be stored, unscored)
   jump-builder / hops  drive the widget to completion; hops also checks the fence-post answer is rejected
-Also checks: question numbers run 1, 2, 3... down the page, equal-length MCQ options, varied correct positions, at most ~30% MCQ, and that
+Also checks: grid figures (labels not on a line, not overlapping, not cut off), every "verify" block on an item
+(the stated answer is really right; for parallel/perpendicular, the only right one: see lesson_verify.py),
+question numbers run 1, 2, 3... down the page, equal-length MCQ options, varied correct positions, at most ~30% MCQ, and that
 recorded items carry active_ms. Needs `pip install playwright` and an installed Chrome or Edge
 (or `playwright install chromium`). Exit 1 on any failure.
 """
 import json, pathlib, re, sys
 from playwright.sync_api import sync_playwright
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import lesson_verify as V   # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8")
+
+# In the page: every grid figure's labels must not touch a line, another label or another point's dot,
+# and must stay inside the picture. Returns problems as strings.
+GRID_LAYOUT_JS = """() => {
+  const out = [];
+  const clip = (x1, y1, x2, y2, r) => {            // does segment (x1,y1)-(x2,y2) cross rect r? (Liang-Barsky)
+    let t0 = 0, t1 = 1; const dx = x2 - x1, dy = y2 - y1;
+    for (const [p, q] of [[-dx, x1 - r.x], [dx, r.x + r.width - x1], [-dy, y1 - r.y], [dy, r.y + r.height - y1]]) {
+      if (p === 0) { if (q < 0) return false; continue; }
+      const t = q / p;
+      if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+    }
+    return true;
+  };
+  document.querySelectorAll('figure.grid-figure').forEach((fig, fi) => {
+    const svg = fig.querySelector('svg'), vb = svg.viewBox.baseVal, name = fig.dataset.gridId || ('grid #' + (fi + 1));
+    // The visible letters, not the font's line box: capitals rise ~0.72 em above the baseline; box labels
+    // ("1 up") also have descenders.
+    const labels = [...svg.querySelectorAll('text.pt-label, text.box-label')].map(t => {
+      const b = t.getBBox(), fs = +t.getAttribute('font-size'), base = +t.getAttribute('y');
+      const below = t.classList.contains('box-label') ? 0.22 * fs : 0.02 * fs;
+      return { t: t.textContent, own: t.dataset.name, r: { x: b.x + 1, y: base - 0.72 * fs, width: b.width - 2, height: 0.72 * fs + below } };
+    });
+    const segs = [...svg.querySelectorAll('line.seg')].map(l => ({ n: l.dataset.name, c: ['x1', 'y1', 'x2', 'y2'].map(a => +l.getAttribute(a)) }));
+    const dots = [...svg.querySelectorAll('circle')].map(c => ({ n: c.dataset.name, x: +c.getAttribute('cx'), y: +c.getAttribute('cy') }));
+    labels.forEach((L, i) => {
+      segs.forEach(s => { if (clip(...s.c, L.r)) out.push(`${name}: label "${L.t}" sits on line ${s.n}`); });
+      labels.slice(i + 1).forEach(M => {
+        const a = L.r, b = M.r;
+        if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height)
+          out.push(`${name}: labels "${L.t}" and "${M.t}" overlap`);
+      });
+      dots.forEach(d => {
+        if (d.n && d.n === L.own) return;   // a label always sits next to its own point
+        const nx = Math.max(L.r.x, Math.min(d.x, L.r.x + L.r.width)), ny = Math.max(L.r.y, Math.min(d.y, L.r.y + L.r.height));
+        if (Math.hypot(nx - d.x, ny - d.y) < 4) out.push(`${name}: label "${L.t}" covers a point`);
+      });
+      const T = 3;   // labels may poke a little past the picture (svg overflow is visible), not further
+      if (L.r.x < vb.x - T || L.r.y < vb.y - T || L.r.x + L.r.width > vb.x + vb.width + T || L.r.y + L.r.height > vb.y + vb.height + T)
+        out.push(`${name}: label "${L.t}" is cut off at the edge`);
+    });
+  });
+  return out;
+}"""
 
 
 def builder_steps(item):
@@ -89,6 +138,16 @@ def run(paths, shots):
                 failures.append(f"{name} :: question numbers out of order down the page: {nums}")
             raw = page.locator("#lesson-data")
             data = json.loads(raw.text_content()) if raw.count() else {"items": []}
+            for prob in page.evaluate(GRID_LAYOUT_JS):
+                failures.append(f"{name} :: {prob}")
+            grids = {}
+            for k, spec in enumerate(page.evaluate("() => [...document.querySelectorAll('figure.grid-figure')].map(f => f.dataset.gridSpec)")):
+                g = json.loads(spec)
+                grids[g.get("id", f"#{k}")] = g
+            verrs, unverified = V.verify_items(data["items"], grids)
+            failures += [f"{name} :: {e}" for e in verrs]
+            if unverified:
+                print(f"  WARN {name}: no 'verify' on {unverified}: their answers are not checked")
             ok = 0
             for item in data["items"]:
                 t = item["type"]

@@ -24,7 +24,42 @@ Content and results are plain JSON and are kept apart from presentation, so less
 }
 ```
 
-## Lesson `#lesson-data` block
+## Lesson spec: `lessons/src/NNNN-<slug>.json` (the source of truth; `build_lesson.py` makes the HTML)
+```jsonc
+{
+  "id": "0004-count-the-steps", "number": 4, "series": "Line detective", "title": "Count the steps",
+  "hook": "one metaphor sentence (html)",
+  // ...the #lesson-data fields below (learner, subject, topics, source_scan, source_items, minutes, retry_hint)...
+  "expected_wrong"?: ["8/10 − 1/10 = 6/10"],   // false statements that are meant (the child's working, a wrong claim)
+  "body": [                                     // page order; every item placed exactly once
+    { "step": "A puzzle from your paper" },     // numbered heading (0 first if the lesson has a warm-up explain item)
+    { "item": "e0" }, { "items": ["q1", "q2"] },
+    { "p": "html", "class"?: "small muted" },  { "card": "html", "tone"?: "good" },
+    { "rules": ["html", "html"] },
+    { "figure": { "src": "../scans/<id>/crops/<crop>.jpg", "alt", "caption"? } },
+    { "grid": { "id": "practice", "w", "h", "points", "segments", "highlight"?, "boxes"?, "caption"? } },
+    { "timeline": { "start", "end", "ticks", "jumps", "play"? } },
+    { "bars": { "label", "rows": [{ "label": "Boys", "parts": [{ "text", "size": 192 }, { "text", "size": 140, "extra": true }] },
+                                  { "label": "Girls", "parts": [{ "text": "?", "size": 192 }, { "size": 140, "blank": true }] }],
+                "note"? } },                     // comparison bar model; sizes are proportional
+    { "html": "<svg …>…</svg>" }                 // anything else, verbatim
+  ],
+  "source": { "label": "Watch next", "title", "url", "note"? },
+  "ask": { "helpers": "Daddy or Mummy", "try"?: "a follow-up question" },
+  "parent_note"?: "html after the Save results button",
+  "nav": [{ "href": "0003-count-the-jumps.html", "text": "← Lesson 3" }, { "href": "…", "text": "Lesson 5 →" }],
+  "style"?: "lesson-only CSS", "scripts"?: ["extra-widget.js"],   // timeline.js / grid.js are added automatically
+  "items": [ /* as below, each typed item / spot fix with a "verify" */ ]
+}
+```
+`verify` (checked by `build_lesson.py` and `check_lessons.py`, see `tools/lesson_verify.py`):
+`{"expr": "332 + (332 - 140)"}` (exact; fractions ok; for a duration answer it counts minutes) ·
+`{"time": "18 45 + 30"}` · `{"duration": "15 30 -> 17 30"}` · `{"to24": "12:50 am"}` ·
+`{"grid": "practice", "step": "PQ"}` (across for every 1 up/down) ·
+`{"grid": "practice", "parallel_to": "PQ"}` / `{"grid": "practice", "perpendicular_to": "PQ"}` (the accepted answers
+must be exactly the lines with that relation, and no trap may be one).
+
+## Lesson `#lesson-data` block (inside the generated HTML)
 ```jsonc
 {
   "id": "0002-stop-at-the-hour", "title", "learner", "subject",
@@ -50,7 +85,7 @@ Trap keys are normalised: `time` → digits only (`"1210"`); `duration` → comp
 Marking: `number` by value (units ignored), `fraction` by equal value unless `simplest`, `text` ignores case, spaces and a final full stop.
 Wrong-answer feedback order: matching trap → item `retry` → lesson `retry_hint` → generic "Not yet. Look at your working again…".
 Never let a generic message name a tool the lesson doesn't teach.
-Non-item visuals are declared in the HTML, e.g. `<div data-timeline='{"start":"06 25","end":"07 05","ticks":["07 00"],"jumps":[...],"play":true}'>`
+In the generated HTML, non-item visuals appear as, e.g. `<div data-timeline='{"start":"06 25","end":"07 05","ticks":["07 00"],"jumps":[...],"play":true}'>`
 or a square grid (`assets/grid.js`; y counts down): `<div data-grid='{"w":12,"h":6,"points":{"P":[1,4,"w"]},"segments":["PQ"],"highlight":[],"boxes":[{"at":[1,2],"w":4,"h":2,"label":"…"}],"caption":"…"}'>`.
 
 ## Results (`Save results` button → `<lesson id>-results-<date>.json`)
