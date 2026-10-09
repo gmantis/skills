@@ -86,10 +86,14 @@ One lesson per gap (merge tiny related gaps), numbered after the highest existin
 
 Rules: all content lives in the `#lesson-data` JSON, and the HTML only places items with `<div data-item="id">`.
 Multiple-choice options have equal length, the correct position varies, and at most ~30% of items are multiple choice.
-Never use un-checked "say it out loud / show me" prompts: children skip them. Every retrieval is either marked
+Never use un-checked "say it out loud / show me" prompts: children skip them.
+Every feedback message must fit the item it appears on: set the lesson's `retry_hint` to the tool *this* lesson teaches
+(timeline, bar model, step box…), give mixed-in items from earlier lessons their own `retry`, and give each predictable
+wrong answer a `trap`. Use `kind: "number"` for numeric answers (so "54 cm" is accepted) and list every accepted
+spelling for `text` answers (e.g. `["RS","SR"]`). Every retrieval is either marked
 (typed/spot/mcq) or saved (explain). Write to the child warmly and plainly, with no baby talk and never shaming.
 Use the textbook's notation. Build from `assets/`. A widget the next lesson could reuse goes into `assets/` as a
-component registered in `window.LessonWidgets` (see `timeline.js`), and is copied back into this skill's
+component registered in `window.LessonWidgets` (see `timeline.js`; `grid.js` draws square-grid figures for geometry), and is copied back into this skill's
 `templates/assets/`. Add or refresh a printable `reference/<topic>-cheat-sheet.html` linking the lessons.
 
 ## 6. Verify (required)
@@ -97,7 +101,10 @@ component registered in `window.LessonWidgets` (see `timeline.js`), and is copie
 python -I tools/check_lessons.py lessons/NNNN-*.html --shots <tmpdir>
 ```
 It answers every item: traps must be flagged, answers accepted, spots and widgets completed, explanations saved,
-active time recorded, and no JS errors. It also lints multiple-choice balance. **Read the screenshots** before handing
+active time recorded, and no JS errors. Every correct answer must also pass when typed key by key and when written
+the ways a child writes it ("97 students", spaces, a final full stop, full-width digits), and the question numbers must
+run 1, 2, 3... down the page. It also lints multiple-choice balance. Don't hand over on a subagent's "no issues"
+unless its report shows the inputs it typed and the feedback it got. **Read the screenshots** before handing
 over. Then open the first new lesson (`start "" <file>` / `open` / `xdg-open`).
 
 ## 7. Close the loop

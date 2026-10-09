@@ -5,7 +5,10 @@
  * and places items with <div data-item="<item id>"></div>.
  *
  * Item types
- *   typed  { id, type:"typed", kind:"time"|"duration"|"number"|"text", prompt, answer, traps?, explain? }
+ *   typed  { id, type:"typed", kind:"time"|"duration"|"number"|"fraction"|"text", prompt, answer, traps?, explain?, retry?, simplest? }
+ *          number: marked by value, so "54 cm" = 54. fraction: equal value accepted ("simplest":true requires lowest terms).
+ *          text: case and spaces ignored; answer may be a list of accepted strings.
+ *          retry: first-wrong-answer nudge for this item (falls back to the lesson's "retry_hint", then a generic line).
  *   mcq    { id, type:"mcq", prompt, options:[...], answer:<index>, explain? }
  *   spot   { id, type:"spot", prompt, steps:[...], wrong:<index>, fix:{ kind, answer, prompt?, traps? }, explain? }
  *          "Spot the mistake": tap the wrong step in a worked answer, then type the fix. Marked by rules.
@@ -49,7 +52,7 @@
 
   // Returns { ok, msg, hint } where hint=true means "not wrong, just fix the format".
   function judge(item, raw) {
-    const v = String(raw).trim();
+    const v = String(raw).normalize("NFKC").trim();   // full-width digits from a Chinese keyboard: "９７" -> "97"
     if (!v) return { ok: false, hint: true, msg: "Type an answer first." };
     if (item.kind === "time") {
       const d = digits(v), want = digits(item.answer);
@@ -67,10 +70,50 @@
       if (item.traps && item.traps[key]) return { ok: false, msg: item.traps[key] };
       return { ok: false };
     }
-    const accept = [].concat(item.answer).map(a => String(a).trim().toLowerCase());
-    if (accept.includes(v.toLowerCase())) return { ok: true };
-    if (item.traps && item.traps[v.toLowerCase()]) return { ok: false, msg: item.traps[v.toLowerCase()] };
+    if (item.kind === "number") {
+      const got = toNumber(v);
+      if (got === null) return { ok: false, hint: true, msg: "Type your answer as a number." };
+      if ([].concat(item.answer).some(a => toNumber(a) === got)) return { ok: true };
+      if (item.traps && item.traps[String(got)]) return { ok: false, msg: item.traps[String(got)] };
+      return { ok: false };
+    }
+    if (item.kind === "fraction") {
+      const got = toFraction(v), want = toFraction(item.answer);
+      if (!got) return { ok: false, hint: true, msg: "Write it as a fraction, like <span class='t'>3/4</span>." };
+      const key = got.n + "/" + got.d;
+      if (item.traps && item.traps[key]) return { ok: false, msg: item.traps[key] };
+      if (got.n * want.d === want.n * got.d) {
+        if (item.simplest && key !== want.n + "/" + want.d) return { ok: false, hint: true, msg: "Right amount! Now simplify it: can the top and bottom both be divided by the same number?" };
+        return { ok: true };
+      }
+      return { ok: false };
+    }
+    // Case, spaces and a final full stop are ignored: "R S", "rs" and "RS." all match "RS". Trap keys: lowercase, no spaces.
+    // A leading "line" is dropped too, so "line RS" matches "RS".
+    const norm = s => String(s).toLowerCase().replace(/\s+/g, "").replace(/[.!]+$/, "").replace(/^line(?=[a-z]{2}$)/, "");
+    const accept = [].concat(item.answer).map(norm);
+    if (accept.includes(norm(v))) return { ok: true };
+    if (item.traps && item.traps[norm(v)]) return { ok: false, msg: item.traps[norm(v)] };
     return { ok: false };
+  }
+  const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+    "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+  function toNumber(s) {
+    s = String(s).trim().toLowerCase();
+    if (WORDS.includes(s.split(/\s+/)[0])) return WORDS.indexOf(s.split(/\s+/)[0]);     // "two", "two squares"
+    s = s.replace(/(\d),(\d{3})/g, "$1$2").replace(/(\d)\s+(?=\d)/g, "$1");               // "1,000", "5 2 4"
+    const m = s.match(/-?\d+(\.\d+)?/);
+    return m ? Number(m[0]) : null;
+  }
+  function toFraction(s) {
+    const m = String(s).replace(/\s+/g, "").replace(/[.!]+$/, "").match(/^(\d+)\/(\d+)$/);
+    return m && +m[2] ? { n: +m[1], d: +m[2] } : null;
+  }
+  // Generic retry messages. A lesson can set "retry_hint" in #lesson-data and an item can set "retry"
+  // to point at the lesson's own tool (timeline, bar model, step box...). Never name a tool the lesson doesn't use.
+  function retryMsg(item, wrongs) {
+    if (wrongs === 1) return item.retry || data.retry_hint || "Not yet. Look at your working again and try once more.";
+    return "Still not it. Read the rules above again, or press <b>Show me</b>.";
   }
 
   // ---------- active time ----------
@@ -126,13 +169,17 @@
     box.innerHTML = html;
   }
 
+  function placeholderFor(kind) {
+    return { time: "_ _  _ _", duration: "e.g. 1 h 5 min", number: "Type a number", fraction: "e.g. 3/4" }[kind] || "Type your answer";
+  }
+
   function renderTyped(host, item, n) {
     const wrap = el("div", "item");
     wrap.appendChild(el("div", "q", `<span class="n">${n}</span>${item.prompt}`));
     const row = el("div", "row");
     const input = el("input", "answer");
     input.setAttribute("autocomplete", "off");
-    input.placeholder = item.placeholder || (item.kind === "time" ? "_ _  _ _" : item.kind === "duration" ? "e.g. 1 h 5 min" : "");
+    input.placeholder = item.placeholder || placeholderFor(item.kind);
     const check = el("button", "primary", "Check");
     const reveal = el("button", "", "Show me");
     reveal.style.display = "none";
@@ -156,16 +203,17 @@
       } else {
         wrongs++;
         input.classList.add("wrong");
-        feedback(fb, "wrong", res.msg || (wrongs === 1 ? "Not yet. Draw it on your timeline and try again." : "Still not it. Look at the rule above, or press <b>Show me</b>."));
+        feedback(fb, "wrong", res.msg || retryMsg(item, wrongs));
         if (wrongs >= 2) reveal.style.display = "";
       }
     }
     check.addEventListener("click", go);
     input.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
     reveal.addEventListener("click", () => {
-      input.value = item.answer; input.disabled = true; check.disabled = true; reveal.style.display = "none";
+      const shown = [].concat(item.answer)[0];
+      input.value = shown; input.disabled = true; check.disabled = true; reveal.style.display = "none";
       record(item.id, "(shown)", true, false);
-      feedback(fb, "hint", `The answer is <span class="t">${item.answer}</span>. ${item.explain || ""}`);
+      feedback(fb, "hint", `The answer is <span class="t">${shown}</span>. ${item.explain || ""}`);
     });
   }
 
@@ -227,7 +275,7 @@
     const fix = Object.assign({ id: item.id }, item.fix);
     const fixInput = el("input", "answer");
     fixInput.setAttribute("autocomplete", "off");
-    if (fix.kind === "time") fixInput.placeholder = "_ _  _ _";
+    fixInput.placeholder = fix.placeholder || placeholderFor(fix.kind);
     const fixBtn = el("button", "primary", "Check");
     fixRow.append(el("span", "", fix.prompt || "The right answer is"), fixInput, fixBtn);
     function go() {
@@ -277,9 +325,11 @@
   function mount() {
     let n = 0;
     const widgets = window.LessonWidgets || {};   // registered by widget scripts loaded before this file
-    (data.items || []).forEach(item => {
-      const host = document.querySelector(`[data-item="${item.id}"]`);
-      if (!host) return;
+    const byId = Object.fromEntries((data.items || []).map(i => [i.id, i]));
+    // Walk the page in DOM order, so question numbers always run 1, 2, 3... down the page.
+    document.querySelectorAll("[data-item]").forEach(host => {
+      const item = byId[host.dataset.item];
+      if (!item) return;
       if (widgets[item.type]) { widgets[item.type](host, item); return; }  // widget registers its own score
       if (item.type === "explain") { renderExplain(host, item); return; }   // not scored: judged later
       n++;

@@ -77,9 +77,11 @@ button:disabled { opacity: .45; cursor: default; }
 
 input.answer {
   font: 600 1.15rem/1 var(--mono); letter-spacing: .06em;
-  width: 9rem; padding: .55rem .7rem; border: 1.5px solid var(--ink); border-radius: 8px; background: #fff;
+  /* wide enough for "1 h 15 min" or "AG and BF", and an easy target for a finger or Apple Pencil (Scribble) */
+  flex: 1 1 14rem; width: 14rem; max-width: 22rem; min-height: 3rem;
+  padding: .65rem .85rem; border: 1.5px solid var(--ink); border-radius: 8px; background: #fff;
 }
-input.answer.small { width: 5rem; }
+input.answer.small { flex: 0 0 6rem; width: 6rem; }
 input.answer.right { border-color: var(--good); background: var(--good-soft); }
 input.answer.wrong { border-color: var(--bad); background: var(--bad-soft); }
 
@@ -87,8 +89,8 @@ input.answer.wrong { border-color: var(--bad); background: var(--bad-soft); }
 .item .q { margin-bottom: .7rem; }
 .item .q .n { font: 700 .8rem/1 var(--sans); color: var(--muted); margin-right: .4rem; }
 .item .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-.item .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .5rem; }
-.item .opts button { font-family: var(--mono); font-size: 1.05rem; letter-spacing: .04em; padding: .75rem; }
+.item .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: .5rem; }
+.item .opts button { font-family: var(--mono); font-size: 1rem; letter-spacing: 0; line-height: 1.3; padding: .75rem; }
 .item .opts button.right { border-color: var(--good); background: var(--good-soft); }
 .item .opts button.wrong { border-color: var(--bad); background: var(--bad-soft); }
 .feedback { font: .95rem/1.45 var(--sans); margin-top: .7rem; padding: .6rem .8rem; border-radius: 8px; display: none; }
@@ -133,3 +135,16 @@ textarea.answer-text-input { width: 100%; font: 1.05rem/1.5 var(--serif); paddin
   h2 { break-after: avoid; }
   .item, figure, .card { break-inside: avoid; }
 }
+
+/* square-grid figures (grid.js) */
+.grid-figure svg { width: 100%; max-width: 30rem; height: auto; display: block; margin: 0 auto; }
+.item .grid-figure { margin: .6rem 0 .9rem; }
+
+/* bar model for comparison word problems */
+.bars { font: 600 .9rem/1.2 var(--sans); margin: 1rem 0 1.4rem; }
+.bars .bar-row { display: grid; grid-template-columns: 4.5rem 1fr; align-items: center; gap: .6rem; margin: .45rem 0; }
+.bars .bar { height: 2.2rem; border: 2px solid var(--ink); border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #fff; }
+.bars .bar.extra { border-style: dashed; border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.bars .bar-split { display: flex; gap: 0; }
+.bars .bar-split .bar + .bar { border-left: none; border-radius: 0 4px 4px 0; }
+.bars .bar-split .bar:first-child:not(:last-child) { border-radius: 4px 0 0 4px; }

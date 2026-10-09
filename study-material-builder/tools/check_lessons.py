@@ -3,12 +3,13 @@
 Usage: python -I check_lessons.py <lesson.html> [<lesson.html> ...] [--shots <dir>]
 
 For every item in the lesson's #lesson-data JSON (located on the page by data-item-id):
-  typed   enter the first trap (must be flagged wrong), then the answer (must be accepted)
+  typed   enter the first trap (must be flagged wrong); check the answer is accepted when written other ways
+          (spaces, full-width digits, "97 students", "RS."); then type the answer key by key (must be accepted)
   mcq     click the right option (must be accepted)
   spot    tap a correct step (must be flagged), tap the wrong step, enter the fix (must be accepted)
   explain type a sentence and save (must be stored, unscored)
   jump-builder / hops  drive the widget to completion; hops also checks the fence-post answer is rejected
-Also checks: equal-length MCQ options, varied correct positions, at most ~30% MCQ, and that
+Also checks: question numbers run 1, 2, 3... down the page, equal-length MCQ options, varied correct positions, at most ~30% MCQ, and that
 recorded items carry active_ms. Needs `pip install playwright` and an installed Chrome or Edge
 (or `playwright install chromium`). Exit 1 on any failure.
 """
@@ -30,6 +31,19 @@ def trap_input(kind, key):
     if kind == "duration":  # "1h55min" -> "1 h 55 min"
         return re.sub(r"(\d+)min", r" \1 min", re.sub(r"(\d+)h", r"\1 h", key)).strip()
     return key
+
+
+FULLWIDTH = str.maketrans("0123456789/:", "０１２３４５６７８９／：")
+
+
+def variants(kind, a):
+    """Ways a child may write a correct answer; all must be accepted."""
+    out = [a, f" {a} ", a.translate(FULLWIDTH)]
+    if kind == "number":
+        out += [f"{a} students", f"{a}."]
+    if kind in ("text", "fraction"):
+        out += [a + ".", a.lower()]
+    return out
 
 
 def lint(data):
@@ -70,6 +84,9 @@ def run(paths, shots):
             page.wait_for_timeout(400)
             if shots:
                 page.screenshot(path=str(pathlib.Path(shots) / (pathlib.Path(path).stem + "-top.png")))
+            nums = page.evaluate("() => [...document.querySelectorAll('.item .q .n')].map(n => n.textContent.trim())")
+            if nums != [str(i) for i in range(1, len(nums) + 1)]:
+                failures.append(f"{name} :: question numbers out of order down the page: {nums}")
             raw = page.locator("#lesson-data")
             data = json.loads(raw.text_content()) if raw.count() else {"items": []}
             ok = 0
@@ -85,8 +102,12 @@ def run(paths, shots):
                         if item.get("traps"):
                             inp.fill(trap_input(item.get("kind"), next(iter(item["traps"])))); btn.click()
                             assert "wrong" in fb(), "trap not flagged"
-                        inp.fill(item["answer"]); btn.click()
-                        assert "right" in fb(), "correct answer rejected"
+                        answers = [item["answer"]] if isinstance(item["answer"], str) else item["answer"]
+                        bad = [v for a in answers for v in variants(item.get("kind"), a)
+                               if not page.evaluate("([it, v]) => window.LessonKit.judge(it, v).ok", [item, v])]
+                        assert not bad, f"correct answer written another way was rejected: {bad}"
+                        inp.fill(""); inp.click(); page.keyboard.type(answers[0]); page.keyboard.press("Enter")   # typed like a child
+                        assert "right" in fb(), f"correct answer {answers[0]!r} rejected when typed"
                     elif t == "mcq":
                         box.locator(".opts button").nth(item["answer"]).click()
                         assert "right" in fb(), "correct option rejected"
