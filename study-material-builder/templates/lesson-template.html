@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson N · TITLE</title>
+<!-- Copy to lessons/NNNN-<slug>.html. Paths assume lessons/ and assets/ are siblings in the workspace. -->
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<div class="scorebar" data-score></div>
+<main>
+  <p class="kicker">Lesson N · SERIES NAME</p>
+  <h1>Stop at the hour</h1>
+  <p class="hook">ONE-SENTENCE METAPHOR HOOK. Minutes only go up to 60, so when a jump goes past an o'clock, stop at the o'clock first.</p>
+
+  <!-- 0. Explain-it on the PREVIOUS lesson's idea (omit in a series' first lesson). Judged later, not scored. -->
+  <h2><span class="step-no">0</span>Warm-up from last time</h2>
+  <div data-item="e0"></div>
+
+  <!-- 1. The learner's own work as a puzzle. Lead with a matching success from the same paper if there is one. -->
+  <h2><span class="step-no">1</span>A puzzle from your worksheet</h2>
+  <!--
+  <figure>
+    <img src="../scans/SCAN-ID/crops/CROP.jpg" alt="What the learner wrote">
+    <figcaption>What you wrote, and a question to keep in mind. The section below answers it.</figcaption>
+  </figure>
+  -->
+  <p>A question to keep in mind while you read on: where should the timeline stop?</p>
+
+  <!-- 2. Knowledge: the minimum, as 2-3 rules plus one visual. -->
+  <h2><span class="step-no">2</span>The trick</h2>
+  <div data-timeline='{"start":"06 25","end":"07 05","ticks":["07 00"],"jumps":[{"from":"06 25","to":"07 00","label":"35 min"},{"from":"07 00","to":"07 05","label":"5 min"}],"play":true}'></div>
+  <ol class="rules">
+    <li>Jump to the next o'clock: how many minutes make 60?</li>
+    <li>Work out what's left.</li>
+    <li>Jump the rest.</li>
+  </ol>
+
+  <!-- 3. Guided practice (widgets), then 4. spot the mistake, then 5. independent mixed practice. -->
+  <h2><span class="step-no">3</span>Step by step</h2>
+  <div data-item="jb1"></div>
+
+  <h2><span class="step-no">4</span>Spot the mistake</h2>
+  <div data-item="s1"></div>
+
+  <h2><span class="step-no">5</span>On your own</h2>
+  <div data-item="q1"></div>
+  <div data-item="q2"></div>
+  <div data-item="q3"></div>
+
+  <div class="source"><b>Watch next:</b> <a href="https://www.thenational.academy/pupils/lessons/calculating-duration-of-time-in-hours-and-minutes-60v36d/video">PRIMARY SOURCE TITLE</a>. One line on why it's worth it.</div>
+  <div class="ask"><b>Stuck or curious?</b> Ask HELPERS, or ask your AI tutor. Try: <em>"A FOLLOW-UP QUESTION THEY COULD ASK"</em></div>
+
+  <p class="small muted">For parents: <button data-export>Save results (JSON)</button></p>
+  <nav class="lesson-nav"><a href="PREV.html">← Previous</a><a href="NEXT.html">Next →</a></nav>
+</main>
+
+<script type="application/json" id="lesson-data">
+{
+  "id": "NNNN-slug",
+  "title": "Stop at the hour",
+  "learner": "LEARNER-ID",
+  "subject": "maths",
+  "topics": ["time-adding-minutes-across-hour"],
+  "source_scan": "SCAN-ID",
+  "source_items": ["p2-8a"],
+  "minutes": 12,
+  "items": [
+    { "id": "e0", "type": "explain",
+      "prompt": "From last lesson, in one sentence: what happens to <b>12 am</b> on the 24-hour clock, and why?",
+      "key_ideas": ["12 am becomes 00", "because it is the midnight hour"] },
+    { "id": "jb1", "type": "jump-builder", "start": "08 45", "add": 30,
+      "prompt": "Recess starts at <span class='t'>08 45</span> and lasts <b>30 min</b>. When does it end?" },
+    { "id": "s1", "type": "spot",
+      "prompt": "Ben worked out <span class='t'>10 35</span> + 40 min. Tap the step that goes wrong.",
+      "steps": ["Start at <span class='t'>10 35</span>.", "The jump goes past 11 o'clock, so the hour becomes 11.", "Minutes: 40 − 35 = 5, so he gets <span class='t'>11 05</span>."],
+      "wrong": 2,
+      "fix": { "kind": "time", "answer": "11 15", "prompt": "The right end time is",
+               "traps": { "1105": "That's Ben's answer. From 35 to the hour is 25 min, so 15 min are left." } },
+      "explain": "25 min to <span class='t'>11 00</span>, then 15 more." },
+    { "id": "q1", "type": "typed", "kind": "time",
+      "prompt": "Mei starts reading at <span class='t'>19 35</span> and reads for 40 minutes. When does she stop?", "answer": "20 15",
+      "traps": { "1975": "There is no minute 75! Stop at <span class='t'>20 00</span> first.",
+                 "2005": "From 35 to the hour is <b>25</b> min, so 15 min are left." },
+      "explain": "25 min to <span class='t'>20 00</span>, then 15 more." },
+    { "id": "q2", "type": "typed", "kind": "time",
+      "prompt": "The library opens at <span class='t'>10 20</span>. Ben arrives 25 minutes later. When?", "answer": "10 45",
+      "explain": "Trick question: 20 + 25 doesn't reach 60, so there's no o'clock to stop at." },
+    { "id": "q3", "type": "mcq", "prompt": "<span class='t'>11 40</span> + 35 min. Where is your <b>first stop</b>?",
+      "options": ["at 12 15", "at 11 75", "at 12 00"], "answer": 2,
+      "traps": { "at 11 75": "There is no minute 75." },
+      "explain": "First stop <span class='t'>12 00</span>, then 15 more." }
+  ]
+}
+</script>
+<!-- Widget scripts first (they register in window.LessonWidgets), quiz.js last. -->
+<script src="../assets/timeline.js"></script>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

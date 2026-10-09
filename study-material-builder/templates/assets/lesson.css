@@ -1,0 +1,135 @@
+/* Shared lesson stylesheet. Every lesson and reference sheet links this. */
+:root {
+  --ink: #1f1d1a;
+  --muted: #6d675e;
+  --paper: #fffdf8;
+  --rule: #e8e1d3;
+  --soft: #f6f1e7;
+  --accent: #c2410c;      /* warm orange: the one thing to look at */
+  --accent-soft: #fdebdd;
+  --good: #1f7a3f;
+  --good-soft: #e3f3e8;
+  --bad: #b42318;
+  --bad-soft: #fbe7e5;
+  --blue: #2457a6;        /* matches her blue pen */
+  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0;
+  color: var(--ink);
+  font: 20px/1.6 var(--serif);
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 40rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+/* ---------- type ---------- */
+.kicker { font: 600 0.78rem/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 .6rem; }
+h1 { font: 700 2.1rem/1.15 var(--sans); margin: 0 0 1rem; letter-spacing: -.01em; }
+h2 { font: 700 1.25rem/1.3 var(--sans); margin: 2.6rem 0 .8rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
+h2 .step-no { color: var(--accent); margin-right: .4rem; }
+p { margin: 0 0 1rem; }
+.hook { font-size: 1.2rem; font-style: italic; color: #3b372f; margin-bottom: 1.6rem; }
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+strong { font-weight: 700; }
+a { color: var(--blue); }
+.t { font-family: var(--mono); font-weight: 600; letter-spacing: .04em; white-space: nowrap; }  /* a time like 07 05 */
+.hl { background: var(--accent-soft); padding: 0 .2em; border-radius: 3px; }
+
+/* ---------- blocks ---------- */
+figure { margin: 1.2rem 0 1.6rem; }
+figure img { width: 100%; border: 1px solid var(--rule); border-radius: 6px; display: block; }
+figcaption { font: .82rem/1.4 var(--sans); color: var(--muted); margin-top: .45rem; }
+
+.card { background: var(--soft); border-radius: 10px; padding: 1.1rem 1.25rem; margin: 1.2rem 0; }
+.card > :last-child { margin-bottom: 0; }
+.card.accent { background: var(--accent-soft); }
+.card.good { background: var(--good-soft); }
+
+.rules { counter-reset: r; list-style: none; padding: 0; margin: 1rem 0; }
+.rules li { counter-increment: r; position: relative; padding: .7rem .9rem .7rem 3rem; border-bottom: 1px solid var(--rule); }
+.rules li::before {
+  content: counter(r); position: absolute; left: .6rem; top: .7rem;
+  width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--ink); color: var(--paper);
+  font: 700 .9rem/1.7rem var(--sans); text-align: center;
+}
+
+table.pairs { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+table.pairs th, table.pairs td { padding: .4rem .6rem; border-bottom: 1px solid var(--rule); text-align: left; }
+table.pairs th { font: 600 .75rem/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+table.pairs tr.key td { background: var(--accent-soft); }
+
+/* ---------- interactive ---------- */
+button, .btn {
+  font: 600 .95rem/1 var(--sans); cursor: pointer;
+  border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: .65rem 1rem; transition: background .15s, transform .05s;
+}
+button:hover { background: var(--soft); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--ink); color: var(--paper); }
+button:disabled { opacity: .45; cursor: default; }
+
+input.answer {
+  font: 600 1.15rem/1 var(--mono); letter-spacing: .06em;
+  width: 9rem; padding: .55rem .7rem; border: 1.5px solid var(--ink); border-radius: 8px; background: #fff;
+}
+input.answer.small { width: 5rem; }
+input.answer.right { border-color: var(--good); background: var(--good-soft); }
+input.answer.wrong { border-color: var(--bad); background: var(--bad-soft); }
+
+.item { border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.1rem; margin: 1rem 0; background: #fff; }
+.item .q { margin-bottom: .7rem; }
+.item .q .n { font: 700 .8rem/1 var(--sans); color: var(--muted); margin-right: .4rem; }
+.item .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.item .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .5rem; }
+.item .opts button { font-family: var(--mono); font-size: 1.05rem; letter-spacing: .04em; padding: .75rem; }
+.item .opts button.right { border-color: var(--good); background: var(--good-soft); }
+.item .opts button.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.feedback { font: .95rem/1.45 var(--sans); margin-top: .7rem; padding: .6rem .8rem; border-radius: 8px; display: none; }
+.feedback.show { display: block; }
+.feedback.right { background: var(--good-soft); color: #14532d; }
+.feedback.wrong { background: var(--bad-soft); color: #7a1a12; }
+.feedback.hint { background: var(--accent-soft); color: #7c2d12; }
+
+.scorebar { position: sticky; top: 0; z-index: 5; background: rgba(255,253,248,.94); backdrop-filter: blur(4px);
+  border-bottom: 1px solid var(--rule); font: 600 .85rem/1 var(--sans); color: var(--muted);
+  padding: .55rem 1.25rem; display: flex; justify-content: space-between; }
+.scorebar .stars { color: var(--accent); letter-spacing: .1em; }
+
+/* spot the mistake: a worked answer with one wrong step */
+.steps { list-style: none; counter-reset: st; padding: 0; margin: .4rem 0 .8rem; }
+.steps li { counter-increment: st; margin: .35rem 0; }
+.steps button.step { width: 100%; text-align: left; font: 1rem/1.45 var(--serif); padding: .6rem .8rem .6rem 2.6rem; position: relative; border-color: var(--rule); }
+.steps button.step::before { content: counter(st); position: absolute; left: .8rem; top: .6rem; font: 700 .85rem/1.6 var(--sans); color: var(--muted); }
+.steps button.step:disabled { opacity: 1; cursor: default; }
+.steps button.wrong-step { border-color: var(--bad); background: var(--bad-soft); }
+.steps button.ok-step { border-color: var(--good); background: var(--good-soft); }
+
+/* explain it: one sentence, judged later */
+.item.explain { border-left: 4px solid var(--accent); }
+textarea.answer-text-input { width: 100%; font: 1.05rem/1.5 var(--serif); padding: .6rem .7rem; border: 1.5px solid var(--ink); border-radius: 8px; margin-bottom: .6rem; resize: vertical; background: #fff; }
+
+.timeline { margin: 1rem 0 1.4rem; }
+.timeline svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+/* ---------- footer blocks ---------- */
+.source, .ask { font: .92rem/1.5 var(--sans); padding: .9rem 1.1rem; border-radius: 10px; margin: 1rem 0; }
+.source { border: 1px solid var(--rule); }
+.ask { background: var(--good-soft); }
+.lesson-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2.5rem; font: 600 .9rem/1.3 var(--sans); }
+.lesson-nav a { text-decoration: none; }
+
+/* ---------- print ---------- */
+@media print {
+  html, body { background: #fff; font-size: 12pt; }
+  main { max-width: none; padding: 0; }
+  .scorebar, button, .lesson-nav, .ask { display: none !important; }
+  h2 { break-after: avoid; }
+  .item, figure, .card { break-inside: avoid; }
+}
