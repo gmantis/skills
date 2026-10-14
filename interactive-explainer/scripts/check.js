@@ -6,6 +6,8 @@
 // [data-w] what-if button, takes screenshots, and fails loudly on page errors.
 // It also re-runs the page at devicePixelRatio 1.5 (canvases must not grow on redraw) and at phone width 390 px
 // (no horizontal page scroll).
+// Diagram shapes: it clicks every [data-pick] element (probing after each), warns on overlapping labels (svg text, .lbl)
+// and fails on labels cut off at their svg edge, at desktop and phone width.
 // Teaching lint (warnings, not failures): quiz options must have equal word counts, the right answer must not be
 // the stand-out longest, answer positions must vary; pages under lessons/ need a primary source, an
 // "ask your teacher" reminder, a glossary, a quiz and some external citations.
@@ -84,10 +86,19 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
   }
   await page.screenshot({ path: path.join(outDir, 'initial.png'), fullPage: true });
   const nSteps = await page.evaluate(() => (typeof STEPS !== 'undefined' && typeof goStep === 'function') ? STEPS.length : 0);
+  let nSetButtons = 0;
   for (let s = 0; s < nSteps; s++){
     await page.evaluate(k => goStep(k), s); await page.waitForTimeout(250);
     await doProbe(`step ${s + 1}`);
     await page.screenshot({ path: path.join(outDir, `step${s + 1}.png`) });
+    // inline "try this" buttons in the step text: click each (they change params or move the selection), then restore the step
+    const nb = await page.evaluate(() => document.querySelectorAll('#stepText button[data-set]').length);
+    for (let b = 0; b < nb; b++){
+      const label = await page.evaluate(i => { const el = document.querySelectorAll('#stepText button[data-set]')[i]; if (!el) return null; el.click(); return el.dataset.set; }, b);
+      if (label == null) continue;
+      nSetButtons++; await page.waitForTimeout(120); await doProbe(`step ${s + 1} button ${label}`);
+      await page.evaluate(k => goStep(k), s); await page.waitForTimeout(120);
+    }
   }
   const whats = await page.$$eval('[data-w]', bs => bs.map(b => b.dataset.w));
   for (const w of whats){
@@ -95,6 +106,41 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
     await doProbe(`what-if ${w}`);
     await page.screenshot({ path: path.join(outDir, `whatif-${w}.png`), fullPage: true });
   }
+  // diagram shapes: click every [data-pick] target (boxes, arrows, tree nodes, table rows) and probe after each
+  await page.evaluate(() => typeof goStep === 'function' && goStep(0)); await page.waitForTimeout(250);
+  const picks = await page.$$eval('[data-pick]', es => es.map(e => e.dataset.pick));
+  // a pick can disappear when an earlier click zooms or re-renders the view: reset the tour and retry, warn if still gone
+  const clickPick = k => page.evaluate(k => { const el = [...document.querySelectorAll('[data-pick]')].find(e => e.dataset.pick === k);
+    if (!el) return false; el.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; }, k);
+  const missing = [];
+  for (const pk of picks){
+    if (!await clickPick(pk)){
+      await page.evaluate(() => typeof goStep === 'function' && goStep(0)); await page.waitForTimeout(150);
+      if (!await clickPick(pk)){ missing.push(pk); continue; }
+    }
+    await page.waitForTimeout(120);
+    await doProbe(`pick ${pk}`);
+  }
+  if (missing.length) warnings.push(`${missing.length} [data-pick] target(s) vanished before they could be clicked (even after goStep(0)): ${missing.slice(0, 8).join(', ')}`);
+  if (picks.length) await page.screenshot({ path: path.join(outDir, 'after-picks.png'), fullPage: true });
+  // diagram lint: SVG/HTML labels (svg text, .lbl) must not overlap each other or stick out of their svg
+  const lintLabels = async (pg, tag) => {
+    const r = await pg.evaluate(() => {
+      const els = [...document.querySelectorAll('svg text, .lbl')].filter(e => e.textContent.trim() && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('.dim'));
+      const box = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, s: e.textContent.trim().slice(0, 24) }; };
+      const bs = els.map(box), overlaps = [], clipped = [];
+      for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++){ const a = bs[i], c = bs[j];
+        const ox = Math.min(a.r, c.r) - Math.max(a.l, c.l), oy = Math.min(a.b, c.b) - Math.max(a.t, c.t);
+        if (ox > 2 && oy > 2) overlaps.push(`"${a.s}" × "${c.s}"`); }
+      els.forEach((e, i) => { const sv = e.ownerSVGElement; if (!sv) return; const s = sv.getBoundingClientRect(), b = bs[i];
+        if (b.l < s.left - 1 || b.r > s.right + 1 || b.t < s.top - 1 || b.b > s.bottom + 1) clipped.push(`"${b.s}"`); });
+      return { overlaps, clipped, n: els.length };
+    });
+    if (r.overlaps.length) warnings.push(`${tag}: ${r.overlaps.length} overlapping label pair(s): ${r.overlaps.slice(0, 8).join(', ')}`);
+    if (r.clipped.length) errors.push(`${tag}: label(s) cut off at the svg edge: ${r.clipped.slice(0, 8).join(', ')}`);
+  };
+  await lintLabels(page, 'desktop labels');
+
   // interaction smoke test: play, drag a draggable canvas, wheel-zoom
   const play = await page.$('#play'); if (play){ await play.click(); await page.waitForTimeout(700); await play.click(); }
   const cv = await page.$('canvas.drag');
@@ -112,6 +158,7 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
   const heights = () => hi.$$eval('canvas', cs => cs.map(c => (c.id || c.className || 'canvas') + ':' + c.clientHeight));
   const h0 = await heights();
   for (const c of await hi.$$('canvas:not(.drag)')){
+    await c.scrollIntoViewIfNeeded().catch(() => {});   // mouse clicks below the fold would otherwise miss
     const b = await c.boundingBox(); if (!b || !b.width) continue;
     for (let i = 1; i <= 4; i++){ await hi.mouse.click(b.x + b.width * i / 5, b.y + b.height / 2); await hi.waitForTimeout(40); }
   }
@@ -128,10 +175,11 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
   const over = await ph.evaluate(() => ({ dx: document.documentElement.scrollWidth - innerWidth,
     who: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('table, pre, .tablewrap, .scroll')).slice(0, 6).map(e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className ? '.' + e.className.split(' ')[0] : '')) }));
   if (over.dx > 0) errors.push(`phone 390px: page scrolls sideways by ${over.dx}px; widest: ${over.who.join(', ')}`);
+  await lintLabels(ph, 'phone labels');
   await ph.screenshot({ path: path.join(outDir, 'phone.png'), fullPage: true });
   await ph.close();
   await browser.close();
-  console.log(`steps: ${nSteps}, what-if scenarios: ${whats.length}, quiz questions: ${lint.qs.length}${isLesson ? ' (lesson)' : ''}, screenshots in ${path.resolve(outDir)}`);
+  console.log(`steps: ${nSteps}, step buttons: ${nSetButtons}, what-if scenarios: ${whats.length}, picks: ${picks.length}, quiz questions: ${lint.qs.length}${isLesson ? ' (lesson)' : ''}, screenshots in ${path.resolve(outDir)}`);
   if (warnings.length) console.log('WARNINGS (teaching lint, not failures):\n' + warnings.join('\n'));
   if (errors.length){ console.error('ERRORS:\n' + errors.join('\n')); process.exit(1); }
   console.log('errors: none');

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  STEPPER SKELETON for the interactive-explainer skill (shapes: sequence, state machine / stepper, algorithm, protocol,
+  request flow — see shapes/SHAPES.md). Everything marked REPLACE is placeholder.
+  Demo model: Client → Gateway → Worker payment request. The reply can be lost or slow; the client retries after a
+  timeout; an idempotency key decides whether the retry charges the card twice.
+  The model is a pure simulator: simulate(params) → TRACE, one entry per message or internal action, each with its
+  payload and a snapshot of every actor's state. Two positions exist: STEP (the guided tour) and K (the trace entry).
+  Keep the structure: MODEL (pure) -> INVARIANTS -> STATE -> STEPS -> lanes SVG (build per trace/size, update per K)
+  -> side panels -> main loop. Same engine contract as skeleton.html: STEPS + goStep, [data-w] what-ifs,
+  [data-dyn] live numbers, data-set buttons, [data-pick] on every trace entry (check.js clicks them all).
+-->
+<style>
+  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --msg:#6fe3cf; --note:#c9a0ff; --bad:#ff7aa8; --cur:#ffd84d; --accent:#5aa9ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600;overflow-wrap:anywhere}
+  code{overflow-wrap:anywhere}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button,.btn,#stepText button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+  .stepnav button:disabled,.btn:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--cur)}
+  #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  .ctl{margin-bottom:9px} .ctl .lab{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+  .ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .seg{display:flex;flex-wrap:wrap;margin-bottom:8px} .seg button{flex:1;border-radius:0;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px;font-size:.75rem;cursor:pointer}
+  .seg button:first-child{border-radius:6px 0 0 6px} .seg button:last-child{border-radius:0 6px 6px 0} .seg button.on{background:#2b4a7a;border-color:var(--accent)}
+  .chk{display:flex;gap:7px;font-size:.78rem;color:var(--muted);margin-bottom:6px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
+  .tracenav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px} .tracenav input{flex:1;min-width:120px;accent-color:var(--cur)} .tracenav output{font-size:.8rem;color:var(--muted);white-space:nowrap}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  /* lanes */
+  #lanes{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none}
+  #lanes text{fill:var(--ink);font:11px 'Segoe UI',system-ui,sans-serif;pointer-events:none}
+  #lanes text.head{font-weight:600;font-size:12px;text-anchor:middle;dominant-baseline:central}
+  #lanes text.tl{fill:var(--muted);font-size:10px} #lanes text.tl.div{fill:var(--bad)}
+  #lanes text.ml{text-anchor:middle} #lanes text.nl{text-anchor:middle;dominant-baseline:central}
+  #lanes text.x{fill:var(--bad);font:bold 14px 'Segoe UI',system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}
+  #lanes .entry{cursor:pointer} #lanes .entry.future{opacity:.18}
+  #lanes .entry path.arrow{fill:none;stroke:var(--msg);stroke-width:1.6}
+  #lanes .entry.lost path.arrow{stroke:var(--bad);stroke-dasharray:5 4}
+  #lanes .entry rect.note{fill:#1d1838;stroke:var(--note);stroke-width:1.2}
+  #lanes .entry.broken path.arrow{stroke:var(--bad);stroke-width:2.4}
+  #lanes .entry.broken rect.note{stroke:var(--bad);stroke-width:2;fill:#3a1726}
+  #lanes .entry.cur path.arrow{stroke:var(--cur);stroke-width:3} #lanes .entry.cur rect.note{stroke:var(--cur);stroke-width:2.5}
+  #lanes .entry.cur text{font-weight:700}
+  #lanes .hit{fill:transparent;stroke:none}
+  .kv{width:100%;border-collapse:collapse;font-size:.8rem} .kv td{padding:2px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  .kv td:first-child{color:var(--muted);white-space:nowrap;width:1%} .kv td.chg{color:var(--cur);font-weight:600}
+  .inv{font-size:.82rem;margin:0 0 4px} .inv .ok{color:var(--msg)} .inv .bad{color:var(--bad)} .inv .tbd{color:var(--muted)}
+  .scroll{overflow:auto;max-height:60vh} .cmp{width:100%;border-collapse:collapse;font-size:.78rem} .cmp th{color:var(--muted);text-align:left;font-weight:500}
+  .cmp td,.cmp th{padding:2px 6px;border-bottom:1px solid var(--line);white-space:nowrap} .cmp tr{cursor:pointer}
+  .cmp tr.cur td{background:#2a2a14} .cmp td.d{color:var(--bad)} .cmp td.n{color:var(--muted);width:1%}
+  .grid2>*{min-width:0}
+  .lanewrap{max-height:72vh;overflow:auto;border-radius:6px}
+  pre.src{max-height:72vh;overflow:auto;margin:0;font:12px/1.5 ui-monospace,Consolas,'DejaVu Sans Mono',monospace;background:var(--panel2);border-radius:6px;padding:6px 0;color:#c8d1e3}
+  pre.src .ln{display:block;padding:0 10px 0 0;white-space:pre} pre.src .ln.hl{background:#3a3414;color:#fff}
+  pre.src .n{color:#56627a;display:inline-block;width:3.4em;text-align:right;margin-right:10px;user-select:none} pre.src .ln.hl .n{color:var(--cur)}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TITLE (REPLACE)</h1>
+  <p>One-paragraph framing of the question from the source (REPLACE). Say what the reader can do: follow the tour, step through every message, break a rule and see where the run goes wrong.</p>
+</header>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <h2 id="stepTitle"></h2><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if?</h4>
+    <div class="seg" id="whatSeg"><button data-w="real" class="on">Normal</button><button data-w="lost">Reply lost</button><button data-w="lostNoKey">Lost, no key</button><button data-w="slowNoKey">Slow, no key</button></div>
+    <label class="chk"><input type="checkbox" id="idem"><span>Client sends an idempotency key</span></label>
+    <label class="chk"><input type="checkbox" id="dropReply"><span>The worker's first reply is lost</span></label>
+    <div id="params"></div>
+    <button class="btn" id="reset">Reset to normal</button>
+  </div>
+</aside>
+<main>
+  <div id="topRow">
+  <section class="panel"><h3>Who sends what, in order (REPLACE)</h3>
+    <p class="sub">One lane per actor; time runs down. Arrows are messages, purple boxes are things an actor does. Click any of them, or step with ← → keys.</p>
+    <div class="tracenav"><button class="btn" id="kprev">◀</button><button class="btn" id="play">▶ Play</button><button class="btn" id="knext">▶|</button>
+      <input type="range" id="k" min="0" max="1" step="1" value="0"><output id="k_o"></output></div>
+    <div class="lanewrap" id="lanewrap"><svg id="lanes" role="img" aria-label="Sequence of messages between actors"></svg></div></section>
+  <section class="panel" id="srcPanel"><h3 id="srcTitle">Source</h3><p class="sub">The lines that run at this step are highlighted.</p><pre class="src" id="src"></pre></section>
+  </div>
+  <div class="grid2">
+    <section class="panel"><h3>At this step</h3><p class="sub">The message or action, its contents (changed fields in gold), every actor's state, and the rules.</p><div id="atStep"></div></section>
+    <section class="panel"><h3 id="cmpTitle">Correct run vs this run</h3><p class="sub">The reference run (left) and the current what-if (right). Pink = where they differ.</p><div class="scroll" id="cmpwrap"><table class="cmp" id="cmp"></table></div></section>
+  </div>
+  <div id="readout"></div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL (pure simulator, no DOM) — REPLACE ============================
+const ACTORS = [   // REPLACE: one lane each, left to right in the order the request travels
+  { id: 'C', label: 'Client' },
+  { id: 'G', label: 'Gateway' },
+  { id: 'W', label: 'Worker' },
+];
+const REAL = { lat: 40, workMs: 60, timeout: 400, retries: 1, amount: 10, idem: true, dropReply: false };
+// Each entry: { kind:'msg', t, from, to, short, text, payload, lost, tArr, state } or { kind:'note', t, actor, short, text, state }.
+// short = the label on the diagram (keep it under ~18 characters); text = the sentence shown in "At this step".
+// Optional on any entry: line: [from, to] — source lines to highlight when SOURCE is set.
+// SOURCE (optional): the code being explained, shown with the current entry's lines highlighted. null hides the panel.
+const SOURCE = { name: 'client_and_worker.txt (REPLACE)', text:
+`// client
+attempt(n):
+  send POST /pay {amount, key, attempt: n}
+  wait timeout
+  if no reply and n <= retries: attempt(n + 1)
+// worker
+on request(req):
+  if req.key and seen(req.key):
+    reply saved(req.key)          // no new charge
+  else:
+    claim(req.key); charge(); reply 200
+// client
+on reply: if done: ignore else done = true` };
+const SRC_LINES = { 'POST /pay': [2, 3], 'POST /pay (retry)': [5, 5], 'timeout → retry': [4, 5], 'give up': [4, 5], 'key seen: replay': [8, 9],
+  'charge #1': [10, 11], 'charge #2': [10, 11], 'paid ✓': [13, 13], 'late reply ignored': [13, 13] };   // demo only: real models set e.line directly
+function simulate(p){
+  const st = { C: { attempt: 0, done: false, result: null }, G: { forwarded: 0 }, W: { jobs: 0, charges: 0, keys: {} } };
+  const trace = [], q = []; let seq = 0, workerReplies = 0;
+  const snap = () => JSON.parse(JSON.stringify(st));
+  const at = (t, fn) => q.push({ t, seq: seq++, fn });
+  const note = (t, actor, short, text) => trace.push({ kind: 'note', t, actor, short, text, state: snap() });
+  const send = (t, from, to, short, payload, text) => {
+    const lost = p.dropReply && from === 'W' && workerReplies++ === 0;
+    trace.push({ kind: 'msg', t, from, to, short, text, payload, lost, tArr: lost ? null : t + p.lat, state: snap() });
+    if (!lost) at(t + p.lat, tt => recv(tt, to, from, payload));
+  };
+  function attempt(t){
+    const n = ++st.C.attempt;
+    send(t, 'C', 'G', n === 1 ? 'POST /pay' : 'POST /pay (retry)', { op: 'pay', amount: p.amount, ...(p.idem ? { key: 'k-123' } : {}), attempt: n },
+      n === 1 ? 'The client asks the gateway to charge the card.' : 'The client sends the same request again.');
+    at(t + p.timeout, tt => { if (st.C.done || st.C.attempt !== n) return;
+      if (n < 1 + p.retries){ note(tt, 'C', 'timeout → retry', `No reply after ${p.timeout} ms. The client cannot tell "lost" from "slow", so it retries.`); attempt(tt); }
+      else note(tt, 'C', 'give up', 'No reply after the last retry: the client reports an error, though the card may have been charged.'); });
+  }
+  function recv(t, actor, from, msg){
+    if (actor === 'G' && from === 'C'){ st.G.forwarded++; send(t, 'G', 'W', 'forward', { ...msg, reply_to: 'C' }, 'The gateway forwards the request and remembers whom to answer.'); }
+    else if (actor === 'W'){
+      const prev = p.idem && msg.key ? st.W.keys[msg.key] : null;
+      if (prev) at(Math.max(t, prev.doneAt), tt => { note(tt, 'W', 'key seen: replay', 'This key was seen before: no new charge. The saved result is sent again.');
+        send(tt, 'W', 'G', '200 (saved)', { status: 200, charge_id: prev.id, replayed: true }, 'The worker repeats its earlier answer.'); });
+      else { const id = 'ch_' + (++st.W.jobs); if (p.idem && msg.key) st.W.keys[msg.key] = { doneAt: t + p.workMs, id };
+        at(t + p.workMs, tt => { st.W.charges++; note(tt, 'W', `charge #${st.W.charges}`, `The worker charges the card (${id}).`);
+          send(tt, 'W', 'G', '200 OK', { status: 200, charge_id: id }, 'The worker reports success.'); }); }
+    }
+    else if (actor === 'G' && from === 'W') send(t, 'G', 'C', msg.replayed ? '200 (saved)' : '200 OK', msg, 'The gateway passes the answer back to the client.');
+    else if (actor === 'C'){
+      if (st.C.done) note(t, 'C', 'late reply ignored', 'A second answer arrives; the client already has one and drops it.');
+      else { st.C.done = true; st.C.result = msg.charge_id; note(t, 'C', 'paid ✓', 'The client has its answer.'); }
+    }
+  }
+  at(0, attempt);
+  for (let guard = 0; q.length && guard < 500; guard++){ q.sort((a, b) => a.t - b.t || a.seq - b.seq); const e = q.shift(); e.fn(e.t); }
+  trace.forEach(e => { if (!e.line && SRC_LINES[e.short]) e.line = SRC_LINES[e.short]; });
+  return trace;
+}
+// The run to compare against. Normal rules for the same input here; for code, often "the fixed version under the same conditions".
+const REF_LABEL = 'Correct run';
+const fmtT = t => t + ' ms', fmtTick = t => t + ' ms';   // time in "At this step" / in the lanes' left gutter
+function referenceRun(p){ return simulate(REAL); }
+// ============================ INVARIANTS (pure) — REPLACE ============================
+// check(state, isEnd) → true (holds), false (broken) or null (cannot tell yet).
+const INVARIANTS = [
+  { id: 'once', label: 'The card is charged at most once', check: s => s.W.charges <= 1 },
+  { id: 'answer', label: 'The client ends with an answer', check: (s, end) => s.C.done ? true : end ? false : null },
+];
+const keyOf = e => e.kind === 'msg' ? `${e.from}→${e.to} ${e.short}` : `${e.actor}: ${e.short}`;
+const labelOf = e => e.kind === 'msg' ? `${ACTORS.find(a => a.id === e.from).label} → ${ACTORS.find(a => a.id === e.to).label}: ${e.short}${e.lost ? ' (lost)' : ''}` : `${ACTORS.find(a => a.id === e.actor).label}: ${e.short}`;
+function analyse(tr){
+  const end = tr.length - 1, firstBreak = {};
+  for (const inv of INVARIANTS){ firstBreak[inv.id] = -1; for (let i = 0; i <= end; i++) if (inv.check(tr[i].state, i === end) === false){ firstBreak[inv.id] = i; break; } }
+  return { firstBreak };
+}
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const SPEC = [   // REPLACE: the rules and timings worth exploring
+  { id: 'timeout', label: 'Client timeout', min: 100, max: 1000, step: 20, fmt: v => v + ' ms' },
+  { id: 'workMs', label: 'Worker processing time', min: 20, max: 1000, step: 20, fmt: v => v + ' ms' },
+  { id: 'retries', label: 'Retries', min: 0, max: 3, step: 1, fmt: v => String(v) },
+  { id: 'lat', label: 'Network delay per hop', min: 10, max: 200, step: 10, fmt: v => v + ' ms' },
+];
+const BOOLS = ['idem', 'dropReply'];                                     // REPLACE: rule checkboxes
+const WHAT = { real: {}, lost: { dropReply: true }, lostNoKey: { dropReply: true, idem: false }, slowNoKey: { workMs: 600, idem: false } };
+const WHAT_KEYS = [...new Set(Object.values(WHAT).flatMap(Object.keys))];
+const P = { ...REAL };
+let TRACE = [], CORRECT = [], AN = null, DIV = -1, K = 0, STEP = 0, playing = false, dirty = true, lastPlay = null;
+function recompute(){
+  TRACE = simulate(P); CORRECT = referenceRun(P); AN = analyse(TRACE);
+  DIV = TRACE.findIndex((e, i) => !CORRECT[i] || keyOf(e) !== keyOf(CORRECT[i]));
+  if (DIV < 0 && CORRECT.length > TRACE.length) DIV = TRACE.length;
+  K = Math.min(K, TRACE.length - 1); G = null; dirty = true;
+}
+const findK = pred => { const i = TRACE.findIndex(pred); return i < 0 ? TRACE.length - 1 : i; };
+
+// ============================ STEPS (guided tour) — REPLACE ============================
+// Each step: title, full params on entry, k = trace position on entry (number, 'end', or a function of TRACE), html.
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const STEPS = [
+  { title: '1 · The normal run', params: { ...REAL }, k: 0,
+    html: () => `<p>Press <b>▶ Play</b> or use ← →. The request crosses ${D('hops')} hops and the card is charged ${D('charges')} time(s).</p>` },
+  { title: '2 · The reply gets lost', params: { ...REAL, dropReply: true }, k: () => findK(e => e.short === 'timeout → retry'),
+    html: () => `<p>The worker charged the card, but its answer never arrived. After ${D('timeout')} the client only knows that it heard nothing.</p>` },
+  { title: '3 · A retry with a key is safe', params: { ...REAL, dropReply: true }, k: 'end',
+    html: () => `<p>The retry carries the same key, so the worker replays its saved answer. Charged ${D('charges')} time(s).</p>` },
+  { title: '4 · Without the key', params: { ...REAL, dropReply: true, idem: false }, k: () => Math.max(0, AN.firstBreak.once),
+    html: () => `<p>Same lost reply, no key: the worker can't tell the retry from a new payment. Charged ${D('charges')} times; the rule breaks at step ${D('breakAt')}.
+      <button data-set="idem=1">Add the key</button></p>` },
+  { title: '5 · Slow looks the same as lost', params: { ...REAL, workMs: 600, idem: false }, k: 'end',
+    html: () => `<p>Nothing is lost, but the worker takes ${D('workMs')}, longer than the ${D('timeout')} timeout. The run leaves the correct path at step ${D('div')}.
+      <button data-set="timeout=800">Timeout 800 ms</button> <button data-set="idem=1">Add the key</button></p>` },
+];
+
+// ============================ LANES SVG: build per trace/size, update classes per K ============================
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.appendChild(el); return el; };
+let G = null;
+function buildLanes(){
+  const svg = $('lanes'), W = Math.max(280, svg.clientWidth || svg.parentNode.clientWidth), gut = 46, top = 44, gap = 30;
+  const laneX = i => gut + (W - gut - 8) * (i + 0.5) / ACTORS.length, LX = Object.fromEntries(ACTORS.map((a, i) => [a.id, laneX(i)]));
+  const t0 = TRACE[0].t, tMax = Math.max(1, ...TRACE.map(e => (e.tArr ?? e.t) - t0)), scale = Math.max(0.15, Math.min(1, 420 / tMax));
+  const ys = []; TRACE.forEach((e, i) => { ys.push(Math.max(i ? ys[i - 1] + gap : top + 14, top + 14 + (e.t - t0) * scale)); });
+  // y of an arrival time, measured from the sending row i onwards; instant messages (tArr null or <= t) are drawn flat
+  const inst = e => e.tArr == null || e.tArr <= e.t;
+  const yAt = (i, t) => { for (let j = i + 1; j < TRACE.length; j++){ if (TRACE[j].t >= t){ if (TRACE[j].t === t) return ys[j];
+    const a = TRACE[j - 1].t, b = TRACE[j].t; return ys[j - 1] + (ys[j] - ys[j - 1]) * (t - a) / (b - a); } }
+    return ys[ys.length - 1] + (t - TRACE[TRACE.length - 1].t) * scale; };
+  const H = Math.max(...ys, ...TRACE.map((e, i) => e.kind === 'msg' && !e.lost && !inst(e) ? yAt(i, e.tArr) : 0)) + 24;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.replaceChildren();
+  const defs = S('defs', {}, svg);
+  for (const [id, c] of [['a-msg', '#6fe3cf'], ['a-cur', '#ffd84d']]){ const m = S('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, markerUnits: 'userSpaceOnUse', orient: 'auto' }, defs); S('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }, m); }
+  const hw = Math.min(110, (W - gut) / ACTORS.length - 10);
+  ACTORS.forEach(a => { S('line', { x1: LX[a.id], y1: top, x2: LX[a.id], y2: H - 6, stroke: '#2c3a5a', 'stroke-dasharray': '4 4' }, svg);
+    S('rect', { x: LX[a.id] - hw / 2, y: 8, width: hw, height: 26, rx: 6, fill: '#16213a', stroke: '#33476e' }, svg);
+    S('text', { x: LX[a.id], y: 21, class: 'head lbl' }, svg).textContent = a.label; });
+  const entries = []; let lastT = null;
+  TRACE.forEach((e, i) => {
+    const y = ys[i], g = S('g', { class: 'entry', 'data-pick': 'k:' + i }, svg);
+    if (e.t !== lastT){ S('text', { x: 4, y: y + 4, class: 'tl lbl' + (DIV >= 0 && i >= DIV ? ' div' : '') }, svg).textContent = fmtTick(e.t); lastT = e.t; }
+    if (e.kind === 'msg'){
+      const x1 = LX[e.from], x2full = LX[e.to], dir = Math.sign(x2full - x1);
+      const x2 = e.lost ? (x1 + x2full) / 2 : x2full - dir * 2, y2 = e.lost ? y + 14 : inst(e) ? y + 4 : Math.max(y + 10, yAt(i, e.tArr));
+      const arrow = S('path', { d: `M${x1},${y} L${x2},${y2}`, class: 'arrow', 'marker-end': e.lost ? '' : 'url(#a-msg)' }, g);
+      if (e.lost) S('text', { x: x2, y: y2, class: 'x' }, g).textContent = '×';
+      S('path', { d: `M${x1},${y - 8} L${x2},${y2 - 8} L${x2},${y2 + 8} L${x1},${y + 8} Z`, class: 'hit' }, g);
+      const lx = (x1 + (e.lost ? x2 : x2full)) / 2, ly = y + (y2 - y) / 2 - 7;
+      S('text', { x: lx, y: ly, class: 'ml lbl' }, g).textContent = e.short;
+      entries.push({ g, arrow, lost: e.lost });
+    } else {
+      const t = S('text', { x: LX[e.actor], y, class: 'nl lbl' }, g); t.textContent = e.short;
+      const w = (t.getComputedTextLength ? t.getComputedTextLength() : e.short.length * 6.5) + 14;
+      const cx = Math.max(gut + w / 2, Math.min(W - 4 - w / 2, LX[e.actor])); t.setAttribute('x', cx);
+      g.insertBefore(S('rect', { class: 'note', x: cx - w / 2, y: y - 10, width: w, height: 20, rx: 5 }), t);
+      entries.push({ g });
+    }
+  });
+  G = { W, entries };
+}
+function updateLanes(){
+  const broken = new Set(Object.values(AN.firstBreak).filter(i => i >= 0));
+  G.entries.forEach((h, i) => { h.g.classList.toggle('future', i > K); h.g.classList.toggle('cur', i === K); h.g.classList.toggle('lost', !!h.lost);
+    h.g.classList.toggle('broken', broken.has(i));
+    if (h.arrow && !h.lost) h.arrow.setAttribute('marker-end', i === K ? 'url(#a-cur)' : 'url(#a-msg)'); });
+}
+// Keep the element in view inside its own scroll box (never scrolls the page).
+function keepInView(box, el){ if (!box || !el) return; const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+  if (r.top < b.top + 24 || r.bottom > b.bottom - 24) box.scrollTop += (r.top - b.top) - b.height / 2 + r.height / 2; }
+function buildSource(){
+  if (!SOURCE){ $('srcPanel').hidden = true; return; }
+  $('topRow').classList.add('grid2'); $('srcTitle').textContent = 'Source: ' + SOURCE.name;
+  $('src').innerHTML = SOURCE.text.split('\n').map((l, i) => `<span class="ln" data-ln="${i + 1}"><span class="n">${i + 1}</span>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`).join('');
+}
+function updateSource(){
+  if (!SOURCE) return; const ln = TRACE[K].line; let first = null;
+  document.querySelectorAll('#src .ln').forEach(el => { const n = +el.dataset.ln, on = !!ln && n >= ln[0] && n <= ln[1]; el.classList.toggle('hl', on); if (on && !first) first = el; });
+  keepInView($('src'), first);
+}
+
+// ============================ SIDE PANELS (rebuilt when K or the trace changes, not per frame) ============================
+const show = v => typeof v === 'object' && v !== null ? Object.keys(v).join(', ') || '—' : String(v);
+function renderAtStep(){
+  const e = TRACE[K], prev = TRACE[K - 1], prevMsg = TRACE.slice(0, K).reverse().find(x => x.kind === 'msg');
+  let h = `<p><b>${K + 1} / ${TRACE.length}</b> · ${fmtT(e.t)} · ${labelOf(e)}</p><p>${e.text}</p>`;
+  if (e.kind === 'msg'){ h += '<h4>Message contents</h4><table class="kv">' + Object.entries(e.payload).map(([k, v]) =>
+    `<tr><td>${k}</td><td class="${prevMsg && JSON.stringify(prevMsg.payload[k]) === JSON.stringify(v) ? '' : 'chg'}">${show(v)}</td></tr>`).join('') + '</table>'; }
+  h += '<h4 style="margin-top:10px">State of each actor</h4><table class="kv">' + ACTORS.map(a => `<tr><td>${a.label}</td><td>` +
+    Object.entries(e.state[a.id]).map(([k, v]) => { const pv = prev ? prev.state[a.id][k] : undefined, chg = prev && JSON.stringify(pv) !== JSON.stringify(v);
+      return `<span class="${chg ? 'dyn' : ''}" style="${chg ? 'color:var(--cur)' : ''}">${k}=${show(v)}</span>`; }).join(' · ') + '</td></tr>').join('') + '</table>';
+  h += '<h4 style="margin-top:10px">Rules</h4>' + INVARIANTS.map(inv => { const r = inv.check(e.state, K === TRACE.length - 1);
+    return `<p class="inv"><span class="${r === true ? 'ok' : r === false ? 'bad' : 'tbd'}">${r === true ? '✓' : r === false ? '✗' : '…'}</span> ${inv.label}${AN.firstBreak[inv.id] >= 0 ? ` <span class="bad">(breaks at step ${AN.firstBreak[inv.id] + 1})</span>` : ''}</p>`; }).join('');
+  $('atStep').innerHTML = h;
+  const n = Math.max(CORRECT.length, TRACE.length);
+  $('cmp').innerHTML = `<tr><th>#</th><th>${REF_LABEL}</th><th>This run</th></tr>` + [...Array(n)].map((_, i) => {
+    const a = CORRECT[i], b = TRACE[i], d = DIV >= 0 && i >= DIV;
+    return `<tr data-k="${b ? i : ''}" class="${i === K ? 'cur' : ''}"><td class="n">${i + 1}</td><td>${a ? labelOf(a) : '—'}</td><td class="${d ? 'd' : ''}">${b ? labelOf(b) : '—'}</td></tr>`; }).join('');
+}
+function dynValues(){   // every D('key') used in STEPS must have an entry here
+  const end = TRACE[TRACE.length - 1].state, br = AN.firstBreak.once;
+  return { charges: String(end.W.charges), hops: String(TRACE.filter(e => e.kind === 'msg').length), timeout: P.timeout + ' ms', workMs: P.workMs + ' ms',
+    breakAt: br >= 0 ? String(br + 1) : 'never', div: DIV >= 0 ? String(DIV + 1) : 'never (same as the correct run)' };
+}
+
+// ============================ MAIN ============================
+let shownKey = '';
+function renderAll(){
+  if (!G || Math.abs(G.W - $('lanes').clientWidth) > 2) buildLanes();
+  updateLanes();
+  const key = K + '|' + TRACE.length + '|' + JSON.stringify(P); if (key !== shownKey){ shownKey = key; renderAtStep(); updateSource(); keepInView($('lanewrap'), G.entries[K] && G.entries[K].g); keepInView($('cmpwrap'), document.querySelector('#cmp tr.cur')); }
+  const dv = dynValues();
+  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
+  $('k').max = TRACE.length - 1; if (+$('k').value !== K) $('k').value = K; $('k_o').textContent = `step ${K + 1} of ${TRACE.length}`;
+  $('kprev').disabled = K === 0; $('knext').disabled = K === TRACE.length - 1;
+  const bad = INVARIANTS.filter(inv => AN.firstBreak[inv.id] >= 0).map(inv => inv.label.toLowerCase());
+  $('readout').innerHTML = `Final: card charged <b>${dv.charges}</b> time(s) · ${bad.length ? `<b style="color:#ff7aa8">broken: ${bad.join('; ')}</b>` : '<b>all rules hold</b>'} · ` +
+    (DIV >= 0 ? `leaves the correct run at step <b>${DIV + 1}</b>` : 'same steps as the correct run');
+}
+function setK(k){ K = Math.max(0, Math.min(TRACE.length - 1, k)); dirty = true; }
+function syncUI(){
+  for (const s of SPEC){ $(s.id).value = P[s.id]; $(s.id + '_o').textContent = s.fmt(P[s.id]); }
+  for (const b of BOOLS) $(b).checked = !!P[b];
+  document.querySelectorAll('#whatSeg button').forEach(b => { const w = { ...REAL, ...WHAT[b.dataset.w] }; b.classList.toggle('on', WHAT_KEYS.every(k => P[k] === w[k])); });
+}
+function setParams(o){ Object.assign(P, o); syncUI(); recompute(); }
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
+  if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params }); }
+  playing = false; $('play').textContent = '▶ Play';
+  setK(st.k === 'end' ? TRACE.length - 1 : typeof st.k === 'function' ? st.k() : (st.k || 0));
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
+}
+function init(){
+  for (const s of SPEC){ const d = document.createElement('div'); d.className = 'ctl';
+    d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    $('params').appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); }
+  for (const b of BOOLS) $(b).onchange = () => setParams({ [b]: $(b).checked });
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  $('stepText').addEventListener('click', ev => { const b = ev.target.closest('button[data-set]'); if (!b) return;
+    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('=').map(s => s.trim()); o[k] = BOOLS.includes(k) ? v === '1' : parseFloat(v); }); setParams(o); });
+  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...REAL, ...Object.fromEntries(SPEC.map(s => [s.id, REAL[s.id]])), ...WHAT[b.dataset.w] }));
+  $('reset').onclick = () => setParams({ ...REAL });
+  $('kprev').onclick = () => { playing = false; setK(K - 1); }; $('knext').onclick = () => { playing = false; setK(K + 1); };
+  $('k').oninput = () => { playing = false; setK(+$('k').value); };
+  $('play').onclick = () => { playing = !playing; if (playing && K === TRACE.length - 1) setK(0); $('play').textContent = playing ? '❚❚ Pause' : '▶ Play'; };
+  $('lanes').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t){ playing = false; setK(+t.dataset.pick.split(':')[1]); } });
+  $('cmp').addEventListener('click', ev => { const r = ev.target.closest('tr[data-k]'); if (r && r.dataset.k !== ''){ playing = false; setK(+r.dataset.k); } });
+  document.addEventListener('keydown', ev => { if (ev.target.closest('input, textarea')) return;
+    if (ev.key === 'ArrowRight'){ setK(K + 1); ev.preventDefault(); } else if (ev.key === 'ArrowLeft'){ setK(K - 1); ev.preventDefault(); } });
+  window.addEventListener('resize', () => dirty = true);
+  $('cmpTitle').textContent = `${REF_LABEL} vs this run`; buildSource();
+  syncUI(); goStep(0);
+  const frame = now => {
+    if (playing){ if (lastPlay === null || now - lastPlay > 750){ lastPlay = now;
+      if (K < TRACE.length - 1) setK(K + 1); else { playing = false; $('play').textContent = '▶ Play'; } } } else lastPlay = null;
+    if (dirty){ dirty = false; renderAll(); }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  COMPARE SKELETON for the interactive-explainer skill (shape: comparison, options × criteria, trade-offs — see
+  shapes/SHAPES.md). Everything marked REPLACE is placeholder.
+  Demo data: choosing an Ab Initio lookup approach for an enrichment step (LOOKUP FILE, dynamic lookup, ICFF,
+  database lookup) against five criteria. The numbers are illustrative and the page says so.
+  Model: min–max normalisation per criterion over the options in play (optionally on log10 for criteria that span
+  orders of magnitude), direction "higher/lower is better", weighted mean total = Σ w·score / Σ w. Because the
+  model is linear in each weight, the weight at which the top rank flips is computed exactly (sensitivity).
+  Keep the structure: MODEL (pure) -> STATE -> STEPS -> table / ranking / small views / sensitivity / sweep chart
+  -> detail card -> main loop. Same engine contract as skeleton.html: STEPS + goStep, [data-w] what-ifs (weight
+  presets), [data-dyn] live numbers, data-set buttons, canvases sized with setupCanvas/data-h, plus [data-pick] on
+  every clickable column, cell, row, bar and small chart (check.js clicks them all).
+-->
+<style>
+  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --pos:#6fe3cf; --neg:#ff7aa8; --win:#ffd84d; --sel:#ffffff; --accent:#5aa9ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600;overflow-wrap:anywhere}
+  code{overflow-wrap:anywhere}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  .tag{display:inline-block;background:#3a2f12;color:var(--win);border:1px solid #6b5720;border-radius:4px;padding:0 6px;font-size:.75rem;font-weight:600}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px;min-width:0}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button,.btn,#stepText button,#detail button,#sens button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--win)}
+  #stepText,#detail{font-size:.87rem} #stepText p,#detail p{margin:0 0 8px} #stepText ul{margin:0 0 8px;padding-left:18px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap} .dyn.wrap{white-space:normal}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  h5{margin:6px 0 2px;font-size:.78rem;color:var(--muted);font-weight:600}
+  .ctl{margin-bottom:7px} .ctl .lab{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted)}
+  .ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .ctl.zero{opacity:.45}
+  .seg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px} .seg button{flex:1 1 30%;border-radius:6px;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px 4px;font-size:.75rem;cursor:pointer}
+  .seg button.on{background:#2b4a7a;border-color:var(--accent)}
+  .chk{display:flex;gap:7px;font-size:.78rem;color:var(--muted);margin-bottom:4px}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 8px;color:var(--muted);font-size:.78rem}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)} canvas.chart{cursor:crosshair}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2>*{min-width:0}
+  .mut{color:var(--muted);font-size:.74rem;font-weight:400}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+  /* comparison table */
+  .tablewrap{overflow-x:auto;border-radius:6px}
+  table.cmp{width:100%;min-width:640px;border-collapse:separate;border-spacing:0;font-size:.8rem;background:var(--panel2)}
+  .cmp th,.cmp td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .cmp thead th{border-bottom:2px solid var(--line)} .cmp th.corner{color:var(--muted);font-weight:500;width:28%}
+  .cmp tbody th{font-weight:600;cursor:pointer} .cmp th.opt{cursor:pointer;min-width:110px} .cmp th.opt .oname{font-weight:600}
+  .cmp td{white-space:nowrap;cursor:pointer}
+  .cmp .selcol{background:rgba(90,169,255,.09)}
+  .cmp tr.selrow>*{background:rgba(90,169,255,.09)} .cmp tr.selrow>th{box-shadow:inset 3px 0 0 var(--accent)}
+  .cmp td.win{box-shadow:inset 0 0 0 1px rgba(255,216,77,.6);background:rgba(255,216,77,.1)}
+  .cmp td.sel{outline:2px solid var(--sel);outline-offset:-2px}
+  .cmp tr.zero>*{opacity:.38} .cmp .out{opacity:.35}
+  .cmp th.lead .oname{color:var(--win)}
+  .cmp tr.tot>*{border-top:2px solid var(--line);font-weight:600}
+  .raw{font-weight:600} .sc{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.72rem}
+  .sc b{display:block;width:46px;height:5px;background:#1b2640;border-radius:2px;overflow:hidden} .sc b i{display:block;height:100%}
+  .rk{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;border-radius:11px;background:#1b2640;border:1px solid var(--line);font-size:.75rem;font-weight:700}
+  .rk.r1{background:#3a2f12;border-color:var(--win);color:var(--win)}
+  .up{color:var(--pos);font-size:.72rem} .down{color:var(--neg);font-size:.72rem}
+  /* ranking */
+  #ranking{position:relative}
+  .rrow{position:absolute;left:0;right:0;top:0;height:30px;display:grid;grid-template-columns:30px minmax(0,118px) minmax(0,1fr) 46px;gap:8px;align-items:center;cursor:pointer;transition:transform .5s ease,opacity .3s;font-size:.8rem;border-radius:6px;padding:0 4px}
+  .rrow.sel{background:rgba(90,169,255,.12)} .rrow.out{opacity:.35}
+  .rname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stack{display:flex;height:16px;background:#0c1323;border-radius:3px;overflow:hidden} .stack i{display:block;height:100%;transition:width .5s ease}
+  .rrow .num,.mrow .num{text-align:right;font-weight:600;white-space:nowrap}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.74rem;color:var(--muted);margin-top:8px}
+  /* small side-by-side views */
+  .minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+  .mini{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;min-width:0}
+  .mini.win{border-color:var(--win)} .mini.sel{border-color:var(--sel);box-shadow:0 0 0 1px var(--sel)} .mini.out{opacity:.35}
+  .mhead{display:flex;justify-content:space-between;gap:6px;font-size:.8rem;margin-bottom:4px} .mhead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .mhead span{white-space:nowrap;flex-shrink:0}
+  .mrow{display:grid;grid-template-columns:62px minmax(0,1fr) 32px;gap:6px;align-items:center;font-size:.74rem;margin:3px 0}
+  .track{position:relative;height:10px;background:#0c1323;border-radius:3px} .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .5s ease,opacity .3s}
+  .track .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(220,230,245,.18)}
+  /* sensitivity + detail */
+  .srow{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:start;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:.8rem}
+  .srow.sel{background:rgba(90,169,255,.12)} .srow.frag{box-shadow:inset 3px 0 0 var(--neg)}
+  .srow .sw{margin-top:5px}
+  .ev{width:100%;border-collapse:collapse;font-size:.76rem;margin:4px 0 8px} .ev td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  .ev td.v{white-space:nowrap;font-weight:600} .ev td.n{color:var(--muted)}
+  .pc{display:grid;grid-template-columns:1fr 1fr;gap:10px} .pc ul{margin:0;padding-left:16px;font-size:.8rem}
+  .note{border-left:3px solid var(--win);padding:4px 8px;background:#151d31;border-radius:0 6px 6px 0;font-size:.82rem}
+  @media (prefers-reduced-motion:reduce){.rrow,.stack i,.track .fill{transition:none}}
+  @media (max-width:1000px){.layout{flex-direction:column;align-items:stretch}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+  @media (max-width:520px){.layout{padding:10px 12px 24px}header{padding:14px 12px 2px}.pc{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Which lookup for the enrichment step? (REPLACE)</h1>
+  <p>Four ways to give every record its reference data, scored on five criteria (REPLACE). Move the weights and watch the ranking move; click any column, cell, bar or small chart to read the notes behind its numbers; ask "how sure is this?" in the sensitivity panel. <span class="tag">Illustrative numbers</span> — plausible orders of magnitude, not measurements; measure your own before deciding.</p>
+</header>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <h2 id="stepTitle"></h2><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if you care about…</h4>
+    <div class="seg" id="whatSeg"></div>
+    <h4>Weights (0 = ignore, 10 = matters most)</h4>
+    <div id="params"></div>
+    <h4 style="margin-top:10px">Options in play</h4>
+    <div class="opts" id="optsIn"></div>
+    <label class="chk" style="margin-top:6px"><input type="checkbox" id="lin"><span>Score every criterion on a linear scale (ignore "log scale")</span></label>
+    <button class="btn" id="reset" style="margin-top:6px">Reset to balanced</button>
+  </div>
+</aside>
+<main>
+  <section class="panel"><h3>Options × criteria (REPLACE)</h3>
+    <p class="sub">Raw values keep their units. The small bar is the 0–1 score: min–max per criterion across the options in play (best = 1, worst = 0; on log10 where it says "log scale"). <span style="color:var(--win)">Gold</span> = best in the row. Rows with weight 0 are dimmed. <span class="tag">Illustrative</span></p>
+    <div class="tablewrap"><table class="cmp" id="cmp"></table></div></section>
+  <div class="grid2">
+    <section class="panel"><h3>Ranking</h3><p class="sub">Weighted total = Σ weight × score / Σ weight, 0–1. Each slice is one criterion's share; bars re-sort when the weights change.</p>
+      <div id="ranking"></div><div class="legend" id="legend"></div></section>
+    <section class="panel"><h3>Selected</h3><div id="detail"></div></section>
+  </div>
+  <section class="panel"><h3>Side by side</h3><p class="sub">One small chart per option, same criteria in the same order, same 0–1 scale (the faint line is 0.5). Faded bars have weight 0. Click one to select it.</p><div class="minis" id="minis"></div></section>
+  <div class="grid2">
+    <section class="panel"><h3>How sure is this?</h3><p class="sub">For the current winner: how far each weight would have to move, on its own, to change who is first. Exact for this linear model. Click a line to sweep that weight.</p><div id="sens"></div></section>
+    <section class="panel"><h3 id="sweepTitle">Sweep one weight</h3><p class="sub">Each option's total as one weight goes from 0 to 10 (others fixed). Where the top line is overtaken is a flip point. Click to set the weight.</p><canvas id="sweep" class="chart" data-h="250"></canvas></section>
+  </div>
+  <div id="readout"></div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL (pure functions, no DOM) — REPLACE the data ============================
+// dir: +1 = higher is better, -1 = lower is better. log: score on log10(value) (only if every value > 0), for
+// criteria spanning orders of magnitude. fmt: how a raw value is shown with its unit. short: label in small views.
+const CRITERIA = [
+  { id: 'size', label: 'Reference data it handles well', short: 'size', dir: +1, log: true, color: '#5aa9ff',
+    fmt: v => v >= 1000 ? v / 1000 + ' TB' : v + ' GB', desc: 'The reference-data size at which this approach still works well.' },
+  { id: 'mem', label: 'Memory per partition', short: 'memory', dir: -1, color: '#6fe3cf',
+    fmt: v => v < 1 ? Math.round(v * 1000) + ' MB' : v + ' GB', desc: 'Memory one partition of the enrichment component needs for a 4 GB reference file.' },
+  { id: 'lat', label: 'Time per lookup', short: 'latency', dir: -1, log: true, color: '#c9a0ff',
+    fmt: v => v + ' µs', desc: 'Typical time for one lookup once everything is loaded.' },
+  { id: 'age', label: 'Age of the looked-up data', short: 'data age', dir: -1, color: '#ff9f5a',
+    fmt: v => v === 0 ? 'live' : v < 1 ? Math.round(v * 60) + ' min' : v + ' h', desc: 'How old the reference data can be at the moment of the lookup.' },
+  { id: 'eff', label: 'Setup effort', short: 'effort', dir: -1, color: '#ff7aa8',
+    fmt: v => v + (v === 1 ? ' day' : ' days'), desc: 'Development and operations work to set it up and keep it running.' },
+];
+// v[criterion] = [value, source note]. Notes are shown in the detail card; say where each number comes from.
+const SRC = 'Lookup Data and Operations Guide';
+const OPTIONS = [
+  { id: 'LF', label: 'LOOKUP FILE', short: 'Lookup file', sub: 'static, in memory',
+    notes: 'A LOOKUP FILE component; the transform calls lookup(). The default for small reference data.',
+    pros: ['Fastest lookups', 'Least setup'], cons: ['Whole file in memory', 'Data frozen at graph start'],
+    v: { size: [5, `${SRC}: "good" below about 5 GB when loaded from disk.`],
+      mem: [4, 'A serial lookup file is loaded whole into the component\'s memory (memory-mapped, so one copy is shared per host). Assumes a 4 GB file.'],
+      lat: [1, 'In-memory indexed lookup. Illustrative order of magnitude.'],
+      age: [24, 'Loaded when the graph starts; a daily extract can be up to a day old.'],
+      eff: [0.5, 'Add the component and the key; preindex with WRITE LOOKUP. Illustrative.'] } },
+  { id: 'DYN', label: 'Dynamic lookup', short: 'Dynamic', sub: 'lookup_load',
+    notes: 'A lookup template type; the transform calls lookup_load() at run time and can load a newer file later.',
+    pros: ['Choose or reload the file at run time', 'Unload when done'], cons: ['Partitioned lookup data cannot be loaded dynamically', 'Slow first load without a precomputed index'],
+    v: { size: [20, `${SRC}: 5–50 GB is "suboptimal" from disk, improved by dynamic loading and preindexing.`],
+      mem: [2, 'Loaded only when needed and can be unloaded; cache limits apply per partition. Assumes about half the file live at once.'],
+      lat: [1, 'In memory once loaded. Without a precomputed index the first load builds one.'],
+      age: [1, 'The graph can call lookup_load again for a newer file. Assumes hourly refresh.'],
+      eff: [1.5, 'Template type, load calls, preindexing, cache settings. Illustrative.'] } },
+  { id: 'ICFF', label: 'ICFF', short: 'ICFF', sub: 'block-compressed',
+    notes: 'Indexed compressed flat file: data sorted by the key, compressed in blocks, with an index. Only the blocks a lookup needs are read.',
+    pros: ['Very large reference data', 'Small memory footprint', 'Appendable by generations'], cons: ['Slower per lookup', 'Exact and range lookups only; fixed-length keys', 'Avoid cloud object storage'],
+    v: { size: [500, `${SRC}: above about 50 GB, choose ICFF unless there is a compelling reason not to.`],
+      mem: [0.3, 'The index is memory-mapped; compressed blocks are read into heap only as needed. Assumes a modest block cache.'],
+      lat: [20, 'Each retrieval costs an OS call, a block copy and an uncompress.'],
+      age: [0.25, 'New data arrives as generations; a block-compressed lookup template can reload automatically. Assumes 15-minute generations.'],
+      eff: [3, 'Presort by the key, compress, index, and merge generations periodically. Illustrative.'] } },
+  { id: 'DB', label: 'Database lookup', short: 'Database', sub: 'query per record',
+    notes: 'Query the database for each record (or small batch) instead of holding a copy.',
+    pros: ['Always current', 'No copy to build or store'], cons: ['A network round trip per lookup', 'Load on a shared database'],
+    v: { size: [1000, 'Limited by the database, not by graph memory. Illustrative.'],
+      mem: [0.05, 'Only connection and statement buffers per partition.'],
+      lat: [800, 'One network round trip per lookup. Illustrative; varies with network and database load.'],
+      age: [0, 'Reads the live table.'],
+      eff: [3.5, 'Connection (.dbc) setup, credentials, and agreeing the query load with the DBA. Illustrative.'] } },
+];
+const W_MAX = 10, EPS = 1e-9;
+const wKey = c => 'w_' + c.id, OPT = Object.fromEntries(OPTIONS.map(o => [o.id, o])), CRIT = Object.fromEntries(CRITERIA.map(c => [c.id, c]));
+// Normalise: min–max per criterion over the options in play; flat criterion (all equal) = 0.5 for everyone.
+function normalise(p){
+  const ins = OPTIONS.filter(o => !p['off_' + o.id]).map(o => o.id), score = {}, range = {};
+  OPTIONS.forEach(o => score[o.id] = {});
+  for (const c of CRITERIA){
+    const log = !!c.log && !p.lin && OPTIONS.every(o => o.v[c.id][0] > 0), f = v => log ? Math.log10(v) : v;
+    const xs = ins.map(id => f(OPT[id].v[c.id][0])), lo = Math.min(...xs), hi = Math.max(...xs), flat = !ins.length || hi - lo < EPS;
+    range[c.id] = { lo, hi, flat, log };
+    for (const o of OPTIONS){ const x = f(o.v[c.id][0]);
+      score[o.id][c.id] = p['off_' + o.id] ? null : flat ? 0.5 : c.dir > 0 ? (x - lo) / (hi - lo) : (hi - x) / (hi - lo); }
+  }
+  return { ins, score, range };
+}
+// Totals, ranks (ties share a rank) and the status in words-ready form.
+function evaluate(p){
+  const nm = normalise(p), wsum = CRITERIA.reduce((a, c) => a + p[wKey(c)], 0), N = {}, total = {}, part = {};
+  for (const id of nm.ins){ N[id] = 0; part[id] = {};
+    for (const c of CRITERIA){ const t = p[wKey(c)] * nm.score[id][c.id]; N[id] += t; part[id][c.id] = wsum > EPS ? t / wsum : 0; }
+    total[id] = wsum > EPS ? N[id] / wsum : null; }
+  const order = nm.ins.slice().sort((a, b) => N[b] - N[a]), rank = {};
+  if (wsum > EPS) order.forEach(id => rank[id] = 1 + order.filter(j => N[j] > N[id] + EPS).length);
+  const top = wsum > EPS ? order.filter(id => rank[id] === 1) : [];
+  const status = !nm.ins.length ? 'none' : nm.ins.length === 1 ? 'single' : wsum <= EPS ? 'noweights' : top.length > 1 ? 'tie' : 'winner';
+  const rowWin = {};
+  for (const c of CRITERIA){ const best = Math.max(...nm.ins.map(id => nm.score[id][c.id]));
+    rowWin[c.id] = nm.range[c.id].flat ? [] : nm.ins.filter(id => nm.score[id][c.id] > best - EPS); }
+  const winner = status === 'winner' ? top[0] : null, runner = winner ? order[1] : null;
+  return { ...nm, wsum, N, total, part, order, rank, top, status, winner, runner, margin: winner ? total[winner] - total[runner] : null, rowWin };
+}
+// Sensitivity: change weight c alone to w'. Totals share the denominator, so the rank order is the order of
+// N_j = Σ w·s_j. Winner i loses to j when (N_i − N_j) + (w' − w_c)(s_ic − s_jc) < 0, i.e. at
+// w' = w_c + (N_i − N_j)/(s_jc − s_ic). The nearest such w' in each direction is where the top rank flips.
+// Up to the second-nearest one, the first overtaker leads (anyone who beats it beats i first), so the suggested
+// value 'act' is picked inside that window and re-checked with evaluate().
+const ceil1 = x => { let a = Math.ceil(x * 10 - 1e-7) / 10; if (a <= x + 1e-9) a += 0.1; return Math.round(a * 10) / 10; };
+const floor1 = x => { let a = Math.floor(x * 10 + 1e-7) / 10; if (a >= x - 1e-9) a -= 0.1; return Math.round(a * 10) / 10; };
+const fmtW = v => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? v.toFixed(1) : String(+v.toFixed(3));
+function sensitivity(p, R){
+  if (R.status !== 'winner') return { status: R.status, rows: {}, best: null };
+  const i = R.winner, rows = {}; let best = null;
+  for (const c of CRITERIA){
+    const w = p[wKey(c)], ups = [], downs = [];
+    for (const j of R.ins){ if (j === i) continue;
+      const gap = R.N[i] - R.N[j], d = R.score[i][c.id] - R.score[j][c.id];
+      if (d < -EPS) ups.push({ at: w + gap / -d, by: j }); else if (d > EPS) downs.push({ at: w - gap / d, by: j }); }
+    ups.sort((a, b) => a.at - b.at); downs.sort((a, b) => b.at - a.at);
+    const row = { w, up: null, down: null, beyond: null };
+    const choose = (list, dir) => {   // a round value just past the first flip, before the second
+      const f = list[0], lim = list[1] ? list[1].at : dir > 0 ? Infinity : -Infinity, ok = v => dir > 0 ? v > f.at && v < lim && v <= W_MAX : v < f.at && v > lim && v >= 0;
+      const cand = [dir > 0 ? ceil1(f.at + 0.04) : floor1(f.at - 0.04), dir > 0 ? ceil1(f.at) : floor1(f.at), dir > 0 ? W_MAX : 0,
+        Math.round((f.at + (Number.isFinite(lim) ? lim : f.at + dir * 0.02)) / 2 * 100) / 100].find(ok);
+      const act = cand !== undefined ? cand : Math.min(W_MAX, Math.max(0, Math.round((f.at + dir * 0.005) * 1000) / 1000));   // flips coincide
+      const e = evaluate({ ...p, [wKey(c)]: act });
+      return { at: f.at, act, by: e.status === 'winner' ? e.winner : null, tie: e.status === 'tie' ? e.top : null };
+    };
+    if (ups.length && ups[0].at < W_MAX - 1e-6) row.up = choose(ups, +1); else if (ups.length) row.beyond = ups[0];
+    if (downs.length && downs[0].at > 1e-6) row.down = choose(downs, -1);
+    for (const dir of ['up', 'down']) if (row[dir]){ const dist = Math.abs(row[dir].act - w);
+      if (!best || dist < best.dist) best = { c: c.id, dir, dist, ...row[dir] }; }
+    rows[c.id] = row;
+  }
+  return { status: 'winner', winner: i, rows, best };
+}
+const nameOf = id => OPT[id].label;
+const listNames = ids => ids.map(nameOf).join(ids.length > 2 ? ', ' : ' and ');
+function statusText(R){
+  return R.status === 'winner' ? nameOf(R.winner) : R.status === 'tie' ? 'a tie between ' + listNames(R.top)
+    : R.status === 'noweights' ? 'nobody: no criteria weighted' : R.status === 'single' ? nameOf(R.ins[0]) + ' (the only option in play)' : 'nobody: no options in play';
+}
+function sensText(c, S, R){   // one criterion, in words
+  if (S.status !== 'winner') return S.status === 'tie' ? 'the top is already a tie, so there is no single winner to flip'
+    : S.status === 'noweights' ? 'no criteria weighted: raise any weight to get a ranking' : 'nothing to compare';
+  const r = S.rows[c.id], lab = c.short + ' weight', parts = [];
+  const then = f => f.by ? `${nameOf(f.by)} wins` : `${listNames(f.tie)} tie for first`;
+  if (r.up) parts.push(`raise the ${lab} from ${r.w.toFixed(1)} to ${fmtW(r.up.act)} and ${then(r.up)} (flip at ${r.up.at.toFixed(2)})`);
+  if (r.down) parts.push(`${parts.length ? 'lower it' : 'lower the ' + lab} from ${r.w.toFixed(1)} to ${fmtW(r.down.act)} and ${then(r.down)} (flip at ${r.down.at.toFixed(2)})`);
+  if (parts.length) return parts.join('; or ');
+  return `no ${lab} from 0 to 10 changes the winner` + (r.beyond ? ` (${nameOf(r.beyond.by)} would need ${r.beyond.at.toFixed(1)})` : '');
+}
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const W_KEYS = CRITERIA.map(wKey), BOOLS = [...OPTIONS.map(o => 'off_' + o.id), 'lin'];
+const weights = o => Object.fromEntries(CRITERIA.map(c => [wKey(c), o[c.id] ?? 0]));
+const BALANCED = weights(Object.fromEntries(CRITERIA.map(c => [c.id, 5])));
+const BASE = { ...BALANCED, ...Object.fromEntries(BOOLS.map(k => [k, false])) };
+// What-ifs = weight presets. REPLACE with the named viewpoints from the source ("a batch team", "real-time").
+const WHAT = { balanced: { label: 'Balanced', w: BALANCED },
+  ...Object.fromEntries(CRITERIA.map(c => ['only_' + c.id, { label: 'Only ' + c.short, w: weights({ [c.id]: W_MAX }) }])) };
+const P = { ...BASE };
+let R = null, S = null, PREV = null, SEL = { o: null, k: null }, STEP = 0, dirty = true;
+function recompute(){
+  const nr = evaluate(P);
+  if (R && R.order.join() + R.status !== nr.order.join() + nr.status) PREV = { rank: { ...R.rank }, status: R.status };   // last rank change
+  R = nr; S = sensitivity(P, R); dirty = true;
+}
+
+// ============================ STEPS (guided tour) — REPLACE ============================
+// Each step: title, full params on entry, sel (selected option o / criterion k), html with D('key') live numbers.
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const DW = k => `<span class="dyn wrap" data-dyn="${k}"></span>`;   // sentence-valued fields (names, sensitivity) may wrap
+const ONLY = id => W_KEYS.map(k => `${k}=${k === 'w_' + id ? W_MAX : 0}`).join(';');
+const STEPS = [
+  { title: '1 · The question', params: { ...BASE }, sel: { o: null, k: null },
+    html: () => `<p>An enrichment step needs reference data for every record. Four ways to do it are the columns; five things you might care about are the rows. The numbers are <b>illustrative</b>.</p>
+      <p>With every criterion weighted the same, ${DW('winner')} leads with ${D('top_total')}, only ${D('margin')} ahead of ${DW('runner')}. Click a column, a cell or a small chart to read its notes.</p>` },
+  { title: '2 · Read one row', params: { ...BASE }, sel: { o: null, k: 'mem' },
+    html: () => `<p><b>Memory per partition.</b> A LOOKUP FILE holds the whole file: ${D('raw_LF_mem')}. ICFF keeps the index and a few blocks: ${D('raw_ICFF_mem')}.</p>
+      <p>Lower is better, so min–max gives the smallest value 1 and the largest 0: ICFF scores ${D('n_ICFF_mem')}, dynamic lookup ${D('n_DYN_mem')}. The raw values keep their units; only the scores can be added across rows. Size and latency span orders of magnitude, so they are scored on a log scale.</p>` },
+  { title: '3 · The weights decide', params: { ...BASE }, sel: { o: 'ICFF', k: null },
+    html: () => `<p>Total = Σ weight × score / Σ weight. ICFF ${D('t_ICFF')} vs dynamic lookup ${D('t_DYN')}. Each slice of a ranking bar is one criterion's share.</p>
+      <p>Care a bit more about speed: <button data-set="w_lat=8">latency weight 8</button> <button data-set="w_lat=5">back to 5</button>. First place: ${DW('winner')}.</p>` },
+  { title: '4 · A preset that flips the winner', params: { ...BASE, ...WHAT.only_size.w }, sel: { o: null, k: 'size' },
+    html: () => `<p>If only the size of the reference data matters, ${DW('winner')} comes first and ICFF is rank ${D('r_ICFF')}; LOOKUP FILE is last, rank ${D('r_LF')}.</p>
+      <p>Not every preset has a winner: try <button data-set="${ONLY('lat')}">Only latency</button> and the page says so instead of picking one. First place: ${DW('winner')}.</p>` },
+  { title: '5 · How sure is this?', params: { ...BASE }, sel: { o: null, k: 'lat' },
+    html: () => { const u = S.rows.lat && S.rows.lat.up;
+      return `<p>Back to balanced. For the winner, ${DW('winner')}, each line in <i>How sure is this?</i> says how far one weight must move, alone, to change first place. The closest call: ${DW('sens_best')}.</p>
+      <p>Data age: ${DW('sens_age')}. The sweep chart shows latency: the flip is where the lines cross.${u ? ` <button data-set="w_lat=${u.act}">Try latency ${fmtW(u.act)}</button> <button data-set="w_lat=5">back to 5</button>` : ''}</p>`; } },
+  { title: '6 · What the table can\'t tell you', params: { ...BASE }, sel: { o: null, k: null },
+    html: () => `<ul><li><b>The numbers are illustrative.</b> Measure your own data size, memory and lookup time.</li>
+      <li><b>Scores are relative.</b> Min–max depends on which options are in the table. Database lookup is not winning, yet <button data-set="off_DB=1">drop it</button> <button data-set="off_DB=0">bring it back</button> and watch first place: ${DW('winner')}.</li>
+      <li><b>Scaling is a choice.</b> <button data-set="lin=1">Linear scales</button> <button data-set="lin=0">Log where marked</button></li>
+      <li><b>Deal-breakers are not weights.</b> ICFF does exact and range lookups only; partitioned data cannot be loaded dynamically. Check hard limits first, then compare.</li>
+      <li><b>No error bars.</b> A 0.02 lead on guessed numbers is a tie in practice.</li></ul>` },
+];
+
+// ============================ CHART HELPERS ============================
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.floor(cv.clientWidth)), H = +cv.dataset.h;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { ctx, W, H, dpr };
+}
+function txt(ctx, s, x, y, o = {}){
+  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif'; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(s).width, CW = ctx.canvas.clientWidth || 9999;
+  let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+  const nbx = Math.max(4, Math.min(CW - w - 4, bx)); x += nbx - bx; bx = nbx;
+  if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.72)'; ctx.fillRect(bx - 3, y - 7, w + 6, 14); }
+  ctx.fillStyle = o.color || '#dfe6f2'; ctx.fillText(s, x, y);
+}
+const niceStep = (span, target) => { const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; };
+// The criterion the sweep chart shows: the selected one, else the closest call, else the first.
+const focusCrit = () => CRIT[SEL.k] || (S.best && CRIT[S.best.c]) || CRITERIA[0];
+function drawSweep(){
+  const cv = $('sweep'), { ctx, W, H } = setupCanvas(cv), pad = { l: 40, r: 78, t: 22, b: 22 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const c = focusCrit(), cur = P[wKey(c)], n = 101;
+  $('sweepTitle').textContent = `Sweep one weight: ${c.short}`;
+  cv._geo = { pad, pw, key: wKey(c) };
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
+  if (!R.ins.length){ txt(ctx, 'No options in play', pad.l + pw / 2, pad.t + ph / 2, { align: 'center', color: '#ff7aa8' }); return; }
+  // Totals as a function of this one weight (scores do not depend on weights, so no re-normalising is needed).
+  const at = (id, w) => { const ws = R.wsum - cur + w; return ws > EPS ? (R.N[id] + (w - cur) * R.score[id][c.id]) / ws : null; };
+  const ser = R.ins.map(id => ({ id, v: [...Array(n)].map((_, k) => at(id, k / (n - 1) * W_MAX)) }));
+  const vals = ser.flatMap(s => s.v).filter(v => v != null);
+  let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 0.1){ const m = (lo + hi) / 2; lo = m - 0.05; hi = m + 0.05; }
+  const m = (hi - lo) * 0.08; lo = Math.max(0, lo - m); hi = Math.min(1, hi + m);
+  const X = w => pad.l + w / W_MAX * pw, Y = v => pad.t + ph - (v - lo) / (hi - lo) * ph, st = niceStep(hi - lo, 4);
+  ctx.lineWidth = 1;
+  for (let v = Math.ceil(lo / st) * st; v <= hi + 1e-9; v += st){ ctx.strokeStyle = 'rgba(140,160,200,0.12)'; ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(pad.l + pw, Y(v)); ctx.stroke();
+    txt(ctx, v.toFixed(2), pad.l - 5, Y(v), { align: 'right', bg: false, color: '#8e9ab2', font: '10px Segoe UI' }); }
+  for (let w = 0; w <= W_MAX; w += 2) txt(ctx, String(w), X(w), H - 9, { align: 'center', bg: false, color: '#8e9ab2', font: '10px Segoe UI' });
+  // flip points of the current winner for this weight
+  const row = S.rows[c.id];
+  if (row) for (const f of [row.up, row.down].filter(Boolean)){ ctx.strokeStyle = 'rgba(255,122,168,0.7)'; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(X(f.at), pad.t); ctx.lineTo(X(f.at), pad.t + ph); ctx.stroke(); ctx.setLineDash([]);
+    txt(ctx, 'flip ' + f.at.toFixed(2), X(f.at), pad.t - 10, { align: 'center', color: '#ff7aa8', font: '10px Segoe UI' }); }
+  const colOf = id => id === R.winner || (R.status === 'tie' && R.top.includes(id)) ? '#ffd84d' : id === SEL.o ? '#ffffff' : '#7d8db0';
+  const draw = s => { ctx.strokeStyle = colOf(s.id); ctx.lineWidth = colOf(s.id) === '#7d8db0' ? 1.6 : 2.4; ctx.beginPath(); let on = false;
+    s.v.forEach((v, k) => { if (v == null){ on = false; return; } const x = X(k / (n - 1) * W_MAX), y = Y(v); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; }); ctx.stroke(); };
+  ser.filter(s => colOf(s.id) === '#7d8db0').forEach(draw); ser.filter(s => colOf(s.id) !== '#7d8db0').forEach(draw);
+  // cursor at the current weight
+  ctx.strokeStyle = 'rgba(90,169,255,0.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(cur), pad.t); ctx.lineTo(X(cur), pad.t + ph); ctx.stroke();
+  txt(ctx, 'now ' + cur.toFixed(1), Math.max(pad.l + 26, Math.min(pad.l + pw - 26, X(cur))), pad.t + ph - 9, { align: 'center', color: '#5aa9ff', font: '10px Segoe UI' });
+  // end-of-line labels, sorted by y and pushed at least 13 px apart
+  const lab = ser.map(s => ({ id: s.id, y: Y(s.v[n - 1] ?? lo) })).sort((a, b) => a.y - b.y);
+  lab.forEach((l, k) => { if (k) l.y = Math.max(l.y, lab[k - 1].y + 13); });
+  const over = lab.length ? lab[lab.length - 1].y - (pad.t + ph) : 0; if (over > 0) lab.forEach(l => l.y -= over);
+  lab.forEach(l => txt(ctx, OPT[l.id].short, pad.l + pw + 6, l.y, { bg: false, color: colOf(l.id), font: '11px Segoe UI' }));
+  if (R.wsum - cur <= EPS) txt(ctx, 'Only this weight is on: at 0 nothing is weighted', pad.l + pw / 2, pad.t + 12, { align: 'center', color: '#8e9ab2', font: '10px Segoe UI' });
+}
+
+// ============================ TABLE, RANKING, SMALL VIEWS, SENSITIVITY (rebuilt on change, never per frame) ============================
+const rankText = id => P['off_' + id] ? 'not in play' : R.rank[id] == null ? '—' : R.rank[id] + (R.order.filter(j => R.rank[j] === R.rank[id]).length > 1 ? '=' : '');
+function moveText(id){
+  if (!PREV || PREV.rank[id] == null || R.rank[id] == null || PREV.rank[id] === R.rank[id]) return '';
+  const d = PREV.rank[id] - R.rank[id]; return d > 0 ? ` <span class="up">▲${d}</span>` : ` <span class="down">▼${-d}</span>`;
+}
+function renderTable(){
+  const colCls = id => [P['off_' + id] ? 'out' : '', SEL.o === id ? 'selcol' : ''].join(' ');
+  let h = '<thead><tr><th class="corner">Criterion<br><span class="mut">weight · direction · scale</span></th>';
+  for (const o of OPTIONS) h += `<th class="opt ${colCls(o.id)} ${R.winner === o.id ? 'lead' : ''}" data-pick="o:${o.id}"><div class="oname">${o.label}</div><div class="mut">${o.sub}</div></th>`;
+  h += '</tr></thead><tbody>';
+  for (const c of CRITERIA){ const w = P[wKey(c)], rg = R.range[c.id];
+    h += `<tr class="${w === 0 ? 'zero' : ''} ${SEL.k === c.id ? 'selrow' : ''}"><th data-pick="k:${c.id}"><span class="sw" style="background:${c.color}"></span>${c.label}` +
+      `<div class="mut">w ${w.toFixed(1)} · ${c.dir > 0 ? 'higher' : 'lower'} is better${rg.log ? ' · log scale' : ''}${rg.flat ? ' · all equal' : ''}</div></th>`;
+    for (const o of OPTIONS){ const s = R.score[o.id][c.id];
+      h += `<td data-pick="c:${o.id}:${c.id}" class="${colCls(o.id)} ${R.rowWin[c.id].includes(o.id) ? 'win' : ''} ${SEL.o === o.id && SEL.k === c.id ? 'sel' : ''}"><div class="raw">${c.fmt(o.v[c.id][0])}</div>` +
+        (s == null ? '<div class="sc">not in play</div>' : `<div class="sc"><b><i style="width:${(s * 100).toFixed(1)}%;background:${c.color}"></i></b>${s.toFixed(2)}</div>`) + '</td>'; }
+    h += '</tr>'; }
+  h += '<tr class="tot"><th>Weighted total<div class="mut">Σ w·score / Σ w</div></th>' + OPTIONS.map(o => { const t = R.total[o.id];
+    return `<td data-pick="o:${o.id}" class="${colCls(o.id)}">${t == null ? (P['off_' + o.id] ? 'not in play' : '—') : `<div class="raw">${t.toFixed(3)}</div><div class="sc"><b><i style="width:${(t * 100).toFixed(1)}%;background:#ffd84d"></i></b></div>`}</td>`; }).join('') + '</tr>';
+  h += '<tr><th>Rank</th>' + OPTIONS.map(o => { const r = R.rank[o.id];
+    return `<td data-pick="o:${o.id}" class="${colCls(o.id)}">${r == null ? `<span class="mut">${rankText(o.id)}</span>` : `<span class="rk ${r === 1 ? 'r1' : ''}">${rankText(o.id)}</span>${moveText(o.id)}`}</td>`; }).join('') + '</tr></tbody>';
+  $('cmp').innerHTML = h;
+}
+const ROW_H = 34;
+function buildViews(){   // ranking rows and small views: built once, updated in place so CSS transitions can animate
+  $('ranking').style.height = OPTIONS.length * ROW_H + 'px';
+  $('ranking').innerHTML = OPTIONS.map(o => `<div class="rrow" id="rr_${o.id}" data-pick="r:${o.id}"><span class="rk" id="rrk_${o.id}"></span><span class="rname">${o.label}</span>` +
+    `<div class="stack">${CRITERIA.map(c => `<i id="rs_${o.id}_${c.id}" style="background:${c.color};width:0"></i>`).join('')}</div><span class="num" id="rt_${o.id}"></span></div>`).join('');
+  $('legend').innerHTML = CRITERIA.map(c => `<span><span class="sw" style="background:${c.color}"></span>${c.short}</span>`).join('');
+  $('minis').innerHTML = OPTIONS.map(o => `<div class="mini" id="mini_${o.id}" data-pick="m:${o.id}"><div class="mhead"><b>${o.label}</b><span class="mut" id="mt_${o.id}"></span></div>` +
+    CRITERIA.map(c => `<div class="mrow"><span>${c.short}</span><div class="track"><div class="mid"></div><div class="fill" id="mf_${o.id}_${c.id}" style="background:${c.color};width:0"></div></div><span class="num" id="mn_${o.id}_${c.id}"></span></div>`).join('') + '</div>').join('');
+}
+function updateViews(){
+  const seq = [...R.order, ...OPTIONS.map(o => o.id).filter(id => !R.order.includes(id))];
+  seq.forEach((id, k) => { const el = $('rr_' + id), t = R.total[id], r = R.rank[id];
+    el.style.transform = `translateY(${k * ROW_H}px)`; el.classList.toggle('out', !!P['off_' + id]); el.classList.toggle('sel', SEL.o === id);
+    $('rrk_' + id).textContent = r == null ? '–' : rankText(id); $('rrk_' + id).classList.toggle('r1', r === 1);
+    $('rt_' + id).textContent = t == null ? (P['off_' + id] ? 'out' : '—') : t.toFixed(3);
+    CRITERIA.forEach(c => $(`rs_${id}_${c.id}`).style.width = (t == null ? 0 : R.part[id][c.id] * 100).toFixed(2) + '%'); });
+  OPTIONS.forEach(o => { const off = !!P['off_' + o.id], m = $('mini_' + o.id);
+    m.classList.toggle('out', off); m.classList.toggle('sel', SEL.o === o.id); m.classList.toggle('win', R.winner === o.id || (R.status === 'tie' && R.top.includes(o.id)));
+    $('mt_' + o.id).textContent = off ? 'not in play' : R.total[o.id] == null ? 'no total' : `#${rankText(o.id)} · ${R.total[o.id].toFixed(3)}`;
+    CRITERIA.forEach(c => { const s = R.score[o.id][c.id], f = $(`mf_${o.id}_${c.id}`);
+      f.style.width = (s == null ? 0 : s * 100).toFixed(1) + '%'; f.style.opacity = P[wKey(c)] === 0 ? 0.3 : 1;
+      $(`mn_${o.id}_${c.id}`).textContent = s == null ? '–' : s.toFixed(2); }); });
+}
+function renderSens(){
+  if (S.status !== 'winner'){ $('sens').innerHTML = `<p>First place: <b>${statusText(R)}</b>. ${R.status === 'tie' ? 'With no single winner there is nothing to flip; change a weight on which the tied options differ.' : R.status === 'noweights' ? 'Raise any weight to get a ranking.' : 'Put at least two options in play to compare them.'}</p>`; return; }
+  $('sens').innerHTML = `<p class="mut" style="margin:0 0 6px">Winner now: <b style="color:var(--win)">${nameOf(S.winner)}</b>, ${R.margin.toFixed(3)} ahead of ${nameOf(R.runner)}. Pink edge = the closest call.</p>` +
+    CRITERIA.map(c => { const r = S.rows[c.id], near = r.up && r.down ? (Math.abs(r.up.act - r.w) <= Math.abs(r.down.act - r.w) ? r.up : r.down) : r.up || r.down;
+      const s = sensText(c, S, R);
+      return `<div class="srow ${SEL.k === c.id ? 'sel' : ''} ${S.best && S.best.c === c.id ? 'frag' : ''}" data-pick="s:${c.id}"><span class="sw" style="background:${c.color}"></span>` +
+        `<span><b>${c.short}</b>: ${s}</span>${near ? `<button data-set="${wKey(c)}=${near.act}">try</button>` : '<span></span>'}</div>`; }).join('');
+}
+
+// ============================ DETAIL CARD (built on selection/param change, never per frame) ============================
+function renderDetail(){
+  const o = OPT[SEL.o], c = CRIT[SEL.k];
+  if (!o && !c){ $('detail').innerHTML = '<p>Click a column header, a cell, a ranking bar or a small chart to read that option\'s notes and the source of each number. Click a criterion name to see how it is scored.</p>'; return; }
+  let h = '';
+  if (o && c) h += `<p class="note"><b>${o.label} · ${c.label}</b>: ${c.fmt(o.v[c.id][0])}, score ${D(`n_${o.id}_${c.id}`)}<br>Source: ${o.v[c.id][1]}</p>`;
+  if (o){
+    h += `<p><b>${o.label}</b> <span class="mut">${o.sub}</span> · total ${D('t_' + o.id)} · rank ${D('r_' + o.id)}</p><p>${o.notes}</p>` +
+      `<div class="pc"><div><h5>Pros</h5><ul>${o.pros.map(x => `<li>${x}</li>`).join('')}</ul></div><div><h5>Cons</h5><ul>${o.cons.map(x => `<li>${x}</li>`).join('')}</ul></div></div>`;
+    if (!c) h += '<h5>Where each number comes from</h5><table class="ev">' + CRITERIA.map(k => `<tr><td>${k.short}</td><td class="v">${k.fmt(o.v[k.id][0])}</td><td class="n">${o.v[k.id][1]}</td></tr>`).join('') + '</table>';
+    h += `<button data-set="off_${o.id}=${P['off_' + o.id] ? 0 : 1}">${P['off_' + o.id] ? 'Put it back in play' : 'Take it out of the comparison'}</button>`;
+  } else {
+    const rg = R.range[c.id], win = R.rowWin[c.id];
+    h += `<p><b>${c.label}</b> · weight ${D('w_' + c.id)}</p><p>${c.desc}</p>` +
+      `<p>${c.dir > 0 ? 'Higher' : 'Lower'} is better. Score = min–max ${rg.log ? 'on log10(value)' : 'on the value'} across the options in play: ` +
+      `${rg.flat ? 'all equal, so everyone gets 0.5 and it cannot change the ranking' : `the best gets 1, the worst 0. Best here: <b>${listNames(win)}</b>`}.</p>` +
+      `<p>How sure: ${DW('sens_' + c.id)}.</p><button data-set="${ONLY(c.id)}">Only this criterion</button> <button data-set="${wKey(c)}=0">Ignore it</button> <button data-set="${wKey(c)}=5">Weight 5</button>`;
+  }
+  $('detail').innerHTML = h;
+}
+function dynValues(){   // every D('key') used anywhere must have an entry here
+  const v = { winner: statusText(R), runner: R.runner ? nameOf(R.runner) : 'nobody', margin: R.margin == null ? 'no margin' : R.margin.toFixed(3),
+    top_total: R.top.length ? R.total[R.top[0]].toFixed(3) : 'no total' };
+  OPTIONS.forEach(o => { v['t_' + o.id] = R.total[o.id] == null ? (P['off_' + o.id] ? 'not in play' : 'no total') : R.total[o.id].toFixed(3); v['r_' + o.id] = rankText(o.id);
+    CRITERIA.forEach(c => { const s = R.score[o.id][c.id]; v[`raw_${o.id}_${c.id}`] = c.fmt(o.v[c.id][0]); v[`n_${o.id}_${c.id}`] = s == null ? 'not in play' : s.toFixed(2); }); });
+  CRITERIA.forEach(c => { v['w_' + c.id] = P[wKey(c)].toFixed(1); v['sens_' + c.id] = sensText(c, S, R); });
+  v.sens_best = S.best ? sensText(CRIT[S.best.c], S, R) : S.status === 'winner' ? 'no single weight change from 0 to 10 changes the winner' : sensText(CRITERIA[0], S, R);
+  return v;
+}
+
+// ============================ MAIN ============================
+let shownKey = '';
+function renderAll(){
+  const key = JSON.stringify(P) + '|' + SEL.o + '|' + SEL.k;
+  if (key !== shownKey){ shownKey = key; renderTable(); renderSens(); renderDetail(); }
+  updateViews(); drawSweep();
+  const dv = dynValues();
+  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
+  $('readout').innerHTML = R.status === 'winner'
+    ? `First: <b>${dv.winner}</b> ${dv.top_total} · second: ${dv.runner} (gap <b>${dv.margin}</b>) · closest call: ${dv.sens_best}`
+    : `First place: <b>${dv.winner}</b>`;
+}
+function syncUI(){
+  for (const c of CRITERIA){ const k = wKey(c); $(k).value = P[k]; $(k + '_o').textContent = P[k].toFixed(1); $(k).closest('.ctl').classList.toggle('zero', P[k] === 0); }
+  for (const o of OPTIONS) $('in_' + o.id).checked = !P['off_' + o.id];
+  $('lin').checked = !!P.lin;
+  document.querySelectorAll('#whatSeg button').forEach(b => { const w = WHAT[b.dataset.w].w; b.classList.toggle('on', W_KEYS.every(k => Math.abs(P[k] - w[k]) < 1e-9)); });
+}
+function setParams(o){ Object.assign(P, o); syncUI(); recompute(); }
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
+  if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params }); }
+  SEL = { o: null, k: null, ...(st.sel || {}) };
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
+}
+function pick(code){
+  const [kind, a, b] = code.split(':');
+  if (kind === 'o' || kind === 'r' || kind === 'm') SEL = { o: a, k: null };
+  else if (kind === 'k') SEL = { o: null, k: a };
+  else if (kind === 's') SEL = { o: SEL.o, k: a };
+  else if (kind === 'c') SEL = { o: a, k: b };
+  dirty = true;
+}
+function init(){
+  for (const c of CRITERIA){ const k = wKey(c), d = document.createElement('div'); d.className = 'ctl';
+    d.innerHTML = `<div class="lab"><span><span class="sw" style="background:${c.color}"></span>${c.label}</span><output id="${k}_o"></output></div><input type="range" id="${k}" min="0" max="${W_MAX}" step="0.1">`;
+    $('params').appendChild(d); $(k).addEventListener('input', () => setParams({ [k]: +$(k).value })); }
+  $('whatSeg').innerHTML = Object.entries(WHAT).map(([id, w]) => `<button data-w="${id}">${w.label}</button>`).join('');
+  $('optsIn').innerHTML = OPTIONS.map(o => `<label class="chk"><input type="checkbox" id="in_${o.id}"><span>${o.label}</span></label>`).join('');
+  for (const o of OPTIONS) $('in_' + o.id).onchange = () => setParams({ ['off_' + o.id]: !$('in_' + o.id).checked });
+  $('lin').onchange = () => setParams({ lin: $('lin').checked });
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  const onSet = ev => { const b = ev.target.closest('button[data-set]'); if (!b) return; ev.stopPropagation();
+    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('=').map(s => s.trim()); o[k] = BOOLS.includes(k) ? v === '1' : parseFloat(v); }); setParams(o); };
+  for (const id of ['stepText', 'detail', 'sens']) $(id).addEventListener('click', onSet);
+  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...WHAT[b.dataset.w].w }));
+  $('reset').onclick = () => { Object.keys(P).forEach(k => delete P[k]); setParams({ ...BASE }); };
+  for (const id of ['cmp', 'ranking', 'minis', 'sens']) $(id).addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t) pick(t.dataset.pick); });
+  const sw = $('sweep'), setW = e => { const g = sw._geo; if (!g) return;
+    const w = Math.max(0, Math.min(W_MAX, Math.round((e.clientX - sw.getBoundingClientRect().left - g.pad.l) / g.pw * W_MAX * 10) / 10)); setParams({ [g.key]: w }); };
+  sw.addEventListener('pointerdown', e => { sw.setPointerCapture(e.pointerId); if (!SEL.k) SEL = { o: SEL.o, k: focusCrit().id }; setW(e); });   // pin the swept criterion sw.addEventListener('pointermove', e => { if (e.buttons) setW(e); });
+  window.addEventListener('resize', () => dirty = true);
+  buildViews(); syncUI(); goStep(0);
+  const frame = () => { if (dirty){ dirty = false; renderAll(); } requestAnimationFrame(frame); };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

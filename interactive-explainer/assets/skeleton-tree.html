@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  TREE SKELETON for the interactive-explainer skill (shape: hierarchy — "kinds of…", taxonomies, nested totals;
+  see shapes/SHAPES.md). Everything marked REPLACE is placeholder.
+  Demo model: where the disk space of an Ab Initio sandbox goes (illustrative numbers), with two measures per leaf:
+  bytes and file count. Totals are computed bottom-up; hiding a branch re-totals every ancestor, every share and the boxes.
+  One shared selection state: the selected node P.sel (and its path). The boxes show the selected node's children as the
+  top level (a leaf shows its siblings), so selecting = zooming; the breadcrumb zooms back out.
+  Keep the structure: MODEL (pure) -> STATE -> STEPS -> treemap SVG (build per zoom/size, update attributes per frame,
+  tweened) -> HTML panels (tree, breadcrumb, detail, top leaves; rebuilt when the state changes) -> main loop.
+  Same engine contract as skeleton.html: STEPS + goStep, [data-w] what-ifs, [data-dyn] live numbers, data-set buttons,
+  plus a UNIQUE [data-pick] on every tree row (t:), box (b:), breadcrumb item (c:) and top-leaf row (l:); check.js clicks them all.
+-->
+<style>
+  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --sel:#ffd84d; --accent:#5aa9ff; --bad:#ff7aa8; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600;overflow-wrap:anywhere}
+  code{overflow-wrap:anywhere}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button,.btn,#stepText button,#detail button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--sel)}
+  #stepText,#detail{font-size:.87rem} #stepText p,#detail p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  .seg{display:flex;flex-wrap:wrap;margin-bottom:8px} .seg button{flex:1;border-radius:0;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px;font-size:.75rem;cursor:pointer}
+  .seg button:first-child{border-radius:6px 0 0 6px} .seg button:last-child{border-radius:0 6px 6px 0} .seg button.on{background:#2b4a7a;border-color:var(--accent)}
+  .seglab{font-size:.75rem;color:var(--muted);margin:0 0 3px}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
+  .panel.spot{outline:2px solid var(--sel);outline-offset:-2px}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px;align-items:start} .grid2>*{min-width:0}
+  /* breadcrumb */
+  #crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;background:var(--panel);border-radius:10px;padding:8px 14px;font-size:.85rem}
+  #crumbs .lab{color:var(--muted);font-size:.75rem;margin-right:4px}
+  #crumbs .crumb{background:none;border:1px solid transparent;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:5px;font:inherit;overflow-wrap:anywhere;text-align:left}
+  #crumbs .crumb:hover{border-color:var(--line)} #crumbs .crumb.cur{color:var(--ink);font-weight:600;border-color:var(--line)}
+  #crumbs .sep{color:var(--muted)}
+  /* tree */
+  #tree{font-size:.82rem}
+  #tree .hd,#tree .row{display:grid;grid-template-columns:minmax(0,1fr) 44px 62px 46px 46px;gap:6px;align-items:center}
+  #tree .hd{color:var(--muted);font-size:.7rem;border-bottom:1px solid var(--line);padding:0 4px 3px;margin-bottom:2px}
+  #tree .row{padding:2px 4px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+  #tree .row:hover{background:#18233b} #tree .row.path{background:#152038} #tree .row.sel{background:#2b3a5e;border-color:var(--sel)}
+  #tree .row:focus-visible{outline:2px solid var(--accent)}
+  #tree .row.hid{opacity:.45} #tree .row.hid .nm b{text-decoration:line-through}
+  #tree .nm{display:flex;align-items:center;gap:4px;min-width:0;white-space:nowrap;overflow:hidden}
+  #tree .nm b{font-weight:600} #tree .nm .t{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+  #tree .tog{width:16px;flex-shrink:0;text-align:center;color:var(--muted);border-radius:3px} #tree .tog:hover{background:#2b3a5e;color:var(--ink)}
+  #tree .hd .sh{display:none}
+  #tree .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .minibar{display:block;height:6px;background:#0c1323;border-radius:3px;overflow:hidden} .minibar i{display:block;height:100%}
+  /* treemap */
+  #map{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none}
+  #map g.box{cursor:pointer} #map g.box:hover rect.b1{stroke-width:2}
+  #map g.box.sel rect.b1{stroke:#fff;stroke-width:3}
+  #map text{fill:var(--ink);font:600 12px 'Segoe UI',system-ui,sans-serif;pointer-events:none}
+  #map text.v1{font:11px 'Segoe UI',system-ui,sans-serif;fill:#cfd7e6}
+  #map text.n2{font:600 11px 'Segoe UI',system-ui,sans-serif} #map text.v2{font:10.5px 'Segoe UI',system-ui,sans-serif;fill:#cfd7e6}
+  #map text.msg{font:13px 'Segoe UI',system-ui,sans-serif;fill:var(--muted);text-anchor:middle}
+  /* top leaves */
+  #top .li{display:grid;grid-template-columns:20px minmax(0,1fr) 70px 52px;gap:8px;align-items:center;padding:3px 4px;border-radius:5px;cursor:pointer;font-size:.82rem;border:1px solid transparent}
+  #top .li:hover{background:#18233b} #top .li.sel{background:#2b3a5e;border-color:var(--sel)}
+  #top .rk{color:var(--muted);text-align:right} #top .pth{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #top .pth .minibar{margin-top:2px} #top .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .kv{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:8px} .kv td{padding:2px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  .kv td:first-child{color:var(--muted);white-space:nowrap;width:1%}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:minmax(0,1fr)}}
+  @media (max-width:560px){.layout{padding:10px 12px 24px}header{padding:14px 12px 2px}
+    #tree .hd,#tree .row{grid-template-columns:minmax(0,1fr) 58px 44px 44px;gap:4px} #tree .bar{display:none} #tree .hd .lg{display:none} #tree .hd .sh{display:inline}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TITLE (REPLACE): where does the disk space of a sandbox go?</h1>
+  <p>One-paragraph framing of the question from the source (REPLACE). Illustrative numbers. Follow the tour, open folders in the tree, click a box to zoom in, use the breadcrumb to zoom out, hide a branch to see everything re-total, and switch between bytes and file count.</p>
+</header>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <h2 id="stepTitle"></h2><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if?</h4>
+    <p class="seglab">Hide a branch (it leaves every total)</p>
+    <div class="seg" id="whatSeg"><button data-w="all" class="on">Everything</button><button data-w="noData">− data</button><button data-w="noTmp">− tmp</button><button data-w="noRun">− run</button><button data-w="noTests">− tests</button></div>
+    <p class="seglab">Measure</p>
+    <div class="seg" id="measureSeg"><button data-w="bytes" class="on">Bytes</button><button data-w="files">File count</button></div>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+  <div class="card"><h4>Selected</h4><div id="detail"></div></div>
+</aside>
+<main>
+  <nav id="crumbs" aria-label="Path to the selected folder"></nav>
+  <div class="grid2">
+    <section class="panel" id="treePanel"><h3>The tree (REPLACE)</h3>
+      <p class="sub">▸ opens a folder; click a row to select it. Bar = share of its parent.</p>
+      <div id="tree" role="tree"></div></section>
+    <section class="panel" id="mapPanel"><h3>Nested boxes</h3>
+      <p class="sub" id="mapCap"></p>
+      <svg id="map" role="img" aria-label="Treemap of the selected folder"></svg></section>
+  </div>
+  <section class="panel" id="topPanel"><h3>Biggest leaves in the whole tree</h3>
+    <p class="sub">The step up: every leaf folder ranked, wherever it sits. Click one to jump to it.</p><div id="top"></div></section>
+  <div id="readout"></div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL (pure functions, no DOM) — REPLACE ============================
+// A node: { id (unique, [A-Za-z0-9_]), name (short; drawn in boxes), title (a few words), desc, children? }.
+// Leaves carry every measure (here bytes and files); internal nodes are always totalled bottom-up, never stored.
+// hue: optional colour of a top-level branch; its whole subtree uses it, so the tree and the boxes match.
+const MB = x => Math.round(x * 1e6);
+const TREE = { id: 'root', name: 'my_project', title: 'the whole sandbox', desc: 'REPLACE: an Ab Initio sandbox (project directory) with its standard folders. Illustrative numbers.', children: [
+  { id: 'dml', name: 'dml', title: 'record formats', hue: '#c9a0ff', desc: 'Record formats (.dml) that describe every file and table. Tiny text files.', children: [
+    { id: 'dml_src', name: 'source', title: 'input formats', bytes: MB(0.6), files: 210, desc: 'Formats of the files the graphs read.' },
+    { id: 'dml_tgt', name: 'target', title: 'output formats', bytes: MB(0.3), files: 95, desc: 'Formats of the files the graphs write.' } ] },
+  { id: 'mp', name: 'mp', title: 'graphs', hue: '#6fe3cf', desc: 'The graphs (.mp): the code you draw in the GDE.', children: [
+    { id: 'mp_load', name: 'load', title: 'load graphs', bytes: MB(14), files: 38, desc: 'Graphs that load data into tables.' },
+    { id: 'mp_xform', name: 'transform', title: 'transform graphs', bytes: MB(22), files: 61, desc: 'Graphs that reshape and join data.' },
+    { id: 'mp_gen', name: 'generic', title: 'generic graphs', bytes: MB(5), files: 9, desc: 'Parameterised graphs reused by many jobs.' } ] },
+  { id: 'plan', name: 'plan', title: 'plans', hue: '#7fb2c9', desc: 'Plans (.plan) that run graphs in order.', children: [
+    { id: 'plan_daily', name: 'daily', title: 'daily batch', bytes: MB(2.1), files: 12, desc: 'The nightly plan and its sub-plans.' },
+    { id: 'plan_month', name: 'monthly', title: 'month end', bytes: MB(0.9), files: 5, desc: 'Month-end plans.' } ] },
+  { id: 'xfr', name: 'xfr', title: 'transform functions', hue: '#ffd84d', desc: 'Transform files (.xfr) shared by graphs.', children: [
+    { id: 'xfr_rules', name: 'rules', title: 'business rules', bytes: MB(1.8), files: 320, desc: 'Business-rule transforms, one small file each.' },
+    { id: 'xfr_util', name: 'util', title: 'shared functions', bytes: MB(0.4), files: 75, desc: 'Utility functions included by other transforms.' } ] },
+  { id: 'run', name: 'run', title: 'scripts, logs, recovery', hue: '#ff7aa8', desc: 'Deployed scripts and what running them leaves behind.', children: [
+    { id: 'run_ksh', name: 'scripts', title: 'deployed .ksh', bytes: MB(9), files: 140, desc: 'Deployed shell scripts, one per graph or plan.' },
+    { id: 'run_logs', name: 'logs', title: 'job .log and .err files', bytes: MB(1800), files: 9400, desc: 'One or more log files per job run, never cleaned up. Many small files.' },
+    { id: 'run_rec', name: 'recovery', title: '.rec of failed jobs', bytes: MB(350), files: 260, desc: 'Recovery files of jobs that failed and were never rolled back.' } ] },
+  { id: 'tests', name: 'tests', title: 'unit tests', hue: '#8fd86f', desc: 'Graph unit tests: definitions and expected outputs.', children: [
+    { id: 'tests_def', name: 'cases', title: 'test definitions', bytes: MB(3), files: 180, desc: 'Test definitions (.tst).' },
+    { id: 'tests_exp', name: 'expected', title: 'expected outputs', bytes: MB(2400), files: 1150, desc: 'Saved expected outputs that each test compares against.' } ] },
+  { id: 'data', name: 'data', title: 'serial files and multifiles', hue: '#5aa9ff', desc: 'The data the graphs read and write.', children: [
+    { id: 'data_serial', name: 'serial', title: 'ordinary files', desc: 'Ordinary (serial) data files.', children: [
+      { id: 'ser_main', name: 'main', title: 'main serial data', bytes: MB(6200), files: 48, desc: 'Serial input and output files.' },
+      { id: 'ser_lookup', name: 'lookup', title: 'lookup files', bytes: MB(900), files: 15, desc: 'Lookup files loaded into memory by graphs.' },
+      { id: 'ser_error', name: 'error', title: 'reject and error files', bytes: MB(150), files: 380, desc: 'Reject and error outputs, one set per run.' } ] },
+    { id: 'data_mfs', name: 'mfs_8way', title: '8-way multifiles', desc: 'Multifiles: each is a control file plus 8 partition files, so one multifile = 9 files on disk.', children: [
+      { id: 'mfs_main', name: 'main', title: 'main multifile data', bytes: MB(41000), files: 252, desc: '28 big multifiles = 28 × 9 = 252 files on disk.' },
+      { id: 'mfs_lookup', name: 'lookup', title: 'partitioned lookups', bytes: MB(4300), files: 81, desc: '9 partitioned lookup multifiles.' } ] } ] },
+  { id: 'tmp', name: 'tmp', title: 'scratch space', hue: '#ff9f5a', desc: 'Scratch space. Should be empty between runs.', children: [
+    { id: 'tmp_failed', name: 'leftovers', title: 'temp files of failed jobs', bytes: MB(7200), files: 640, desc: 'Sort and join spill files that failed jobs left behind.' },
+    { id: 'tmp_debug', name: 'debug', title: 'watcher and debug files', bytes: MB(600), files: 2100, desc: 'Watcher and debug outputs, many small files.' } ] },
+] };
+const MEASURES = { bytes: 'bytes', files: 'files' };   // REPLACE: the measures every leaf carries (key → word)
+
+function indexTree(t){
+  const by = {}, parent = {}, depth = {}, order = [];
+  const walk = (n, p, d) => { by[n.id] = n; parent[n.id] = p; depth[n.id] = d; order.push(n.id); (n.children || []).forEach(c => walk(c, n.id, d + 1)); };
+  walk(t, null, 0);
+  return { by, parent, depth, order, leaves: order.filter(id => !by[id].children) };
+}
+const IX = indexTree(TREE), ROOT = TREE.id;
+const kids = id => (IX.by[id].children || []).map(c => c.id);
+const pathTo = id => { const p = []; for (let v = id; v != null; v = IX.parent[v]) p.unshift(v); return p; };
+const branchOf = id => pathTo(id)[1] || ROOT;
+const isHidden = (id, hidden) => pathTo(id).some(v => hidden[v]);
+// sub[id] = total of the visible leaves inside id, ignoring id's own (and its ancestors') hide flag: "what it would add back".
+// eff[id] = sub[id] if neither id nor an ancestor is hidden, else 0. Hidden children add 0 to their parent: re-totalling.
+function totals(measure, hidden){
+  const sub = {};
+  const rec = id => { const n = IX.by[id]; if (!n.children) return (sub[id] = n[measure]);
+    let s = 0; for (const c of n.children){ const v = rec(c.id); if (!hidden[c.id]) s += v; } return (sub[id] = s); };
+  rec(ROOT);
+  const eff = {}; IX.order.forEach(id => { eff[id] = isHidden(id, hidden) ? 0 : sub[id]; });
+  return { sub, eff };
+}
+const share = (a, b) => b > 0 ? a / b : null;   // null = no whole to divide by (say so in words)
+const largestChild = (id, eff) => kids(id).filter(c => eff[c] > 0).sort((a, b) => eff[b] - eff[a])[0] || null;
+const topLeaves = (eff, n) => IX.leaves.filter(id => eff[id] > 0).sort((a, b) => eff[b] - eff[a]).slice(0, n);
+
+// Squarified treemap (Bruls, Huizing & van Wijk 2000). Chosen over an icicle because disk use is a "how big" question:
+// area reads as amount, the boxes fill any panel shape (wide desktop, narrow phone) without thin slivers, and
+// two nested levels show parts-of-parts. An icicle is better when depth matters more than size; swap the layout then.
+// items: [{id, v}] with v > 0; rect {x, y, w, h}. Returns [{id, v, x, y, w, h}], areas exactly proportional to v, tiling rect.
+function squarify(items, rect){
+  const tot = items.reduce((a, it) => a + it.v, 0), out = [];
+  if (!(tot > 0) || rect.w <= 0 || rect.h <= 0) return out;
+  const k = rect.w * rect.h / tot;
+  let rest = items.filter(it => it.v > 0).sort((a, b) => b.v - a.v).map(it => ({ ...it, a: it.v * k }));
+  let { x, y, w, h } = rect;
+  const worst = (row, side) => { const s = row.reduce((a, r) => a + r.a, 0), mx = Math.max(...row.map(r => r.a)), mn = Math.min(...row.map(r => r.a));
+    return Math.max(side * side * mx / (s * s), s * s / (side * side * mn)); };
+  while (rest.length){
+    const side = Math.min(w, h); let n = 1;
+    while (n < rest.length && worst(rest.slice(0, n + 1), side) <= worst(rest.slice(0, n), side)) n++;
+    const row = rest.slice(0, n), s = row.reduce((a, r) => a + r.a, 0), last = n === rest.length;
+    if (w >= h){ const cw = last ? w : s / h; let yy = y;   // a column along the shorter (vertical) side
+      row.forEach((r, i) => { const rh = i === n - 1 ? y + h - yy : r.a / cw; out.push({ id: r.id, v: r.v, x, y: yy, w: cw, h: rh }); yy += rh; }); x += cw; w -= cw; }
+    else { const rh = last ? h : s / w; let xx = x;                // a row along the shorter (horizontal) side
+      row.forEach((r, i) => { const rw = i === n - 1 ? x + w - xx : r.a / rh; out.push({ id: r.id, v: r.v, x: xx, y, w: rw, h: rh }); xx += rw; }); y += rh; h -= rh; }
+    rest = rest.slice(n);
+  }
+  return out;
+}
+// Two nested levels inside W×H: the zoom node's visible children, and inside each big enough child, its visible children
+// below a header strip that holds the child's name and value. Pure geometry; the view decides which labels fit.
+const HEAD = 32, NEST_MIN_W = 56, NEST_MIN_H = HEAD + 30;
+function nestedLayout(zoom, eff, W, H){
+  const top = squarify(kids(zoom).filter(c => eff[c] > 0).map(c => ({ id: c, v: eff[c] })), { x: 0, y: 0, w: W, h: H });
+  const out = top.map(r => ({ ...r, level: 1, head: false }));
+  for (const r of out.slice()){
+    const cs = kids(r.id).filter(c => eff[c] > 0);
+    if (!cs.length || r.w < NEST_MIN_W || r.h < NEST_MIN_H) continue;
+    r.head = true;
+    squarify(cs.map(c => ({ id: c, v: eff[c] })), { x: r.x + 3, y: r.y + HEAD, w: r.w - 6, h: r.h - HEAD - 3 })
+      .forEach(g => out.push({ ...g, level: 2, parent: r.id }));
+  }
+  return out;
+}
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const HIDE_KEYS = IX.order.filter(id => id !== ROOT).map(id => 'hide_' + id);   // a hide flag for every node
+const BASE = { measure: 'bytes', sel: ROOT, open: [ROOT], ...Object.fromEntries(HIDE_KEYS.map(k => [k, false])) };
+const WHAT = { all: {}, noData: { hide_data: true }, noTmp: { hide_tmp: true }, noRun: { hide_run: true }, noTests: { hide_tests: true } };   // REPLACE: one per meaningful branch
+const MEASURE_W = { bytes: 'bytes', files: 'files' };   // data-w of the measure seg → measure key
+const TOP_N = 5;
+const P = { ...BASE, open: [...BASE.open] };
+let T = null, TM = null, TA = null, STEP = 0, dirty = true, SPOT = null;
+const hiddenOf = p => Object.fromEntries(IX.order.map(id => [id, !!p['hide_' + id]]));
+function recompute(){
+  const hid = hiddenOf(P);
+  T = { bytes: totals('bytes', hid), files: totals('files', hid) };
+  TM = T[P.measure];                            // current measure, current hides
+  TA = totals(P.measure, {});                   // current measure, nothing hidden (the "before" numbers)
+  dirty = true;
+}
+const grp = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const fmtBytes = v => v >= 1e9 ? (v / 1e9).toFixed(1) + ' GB' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' MB' : v >= 1e3 ? (v / 1e3).toFixed(0) + ' KB' : Math.round(v) + ' B';
+const fmtIn = (m, v) => m === 'bytes' ? fmtBytes(v) : grp(v) + (v === 1 ? ' file' : ' files');
+const fmtV = v => fmtIn(P.measure, v), fmtNum = v => P.measure === 'bytes' ? fmtBytes(v) : grp(v);
+const fmtP = s => s == null || !Number.isFinite(s) ? '—' : s > 0 && s < 0.001 ? '<0.1%' : s < 1 && s >= 0.995 ? (Math.floor(s * 1000) / 10).toFixed(1) + '%'   // never round a part up to 100%
+  : (s * 100).toFixed(s < 0.1 ? 1 : 0) + '%';
+const relPath = id => pathTo(id).slice(1).map(v => IX.by[v].name).join('/') || IX.by[ROOT].name;
+const hueOf = id => (IX.by[branchOf(id)].hue) || '#5aa9ff';
+// The node the boxes zoom to: the selection if it has parts, else its parent; climb past anything hidden or empty.
+function zoomOf(){
+  let z = kids(P.sel).length ? P.sel : (IX.parent[P.sel] ?? P.sel);
+  while (z !== ROOT && !(TM.eff[z] > 0)) z = IX.parent[z];
+  return z;
+}
+
+// ============================ STEPS (guided tour) — REPLACE ============================
+// Each step: title, FULL params on entry (measure, selection, open folders, every hide flag), optional spot (panel id
+// to outline), html with D('key') live numbers. Keys are built in dynValues: val_/pct_/par_/pctall_/files_<id> for every node.
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const SHOW_ALL = HIDE_KEYS.map(k => k + '=0').join(';'), HIDE_ALL = kids(ROOT).map(c => `hide_${c}=1`).join(';');
+const STEPS = [
+  { title: '1 · The whole sandbox', params: { ...BASE },
+    html: () => `<p>Illustrative numbers. The sandbox takes ${D('root_total')} in ${D('root_files')}. Box area is size: <b>data</b> alone is ${D('pct_data')} of it.</p>
+      <p>Everything you actually write (dml, mp, plan, xfr) is ${D('pct_code')} of the bytes.</p>` },
+  { title: '2 · One branch: data', params: { ...BASE, sel: 'data', open: [ROOT, 'data'] },
+    html: () => `<p>Selecting <b>data</b> zooms the boxes into it: ${D('val_data')}. The 8-way multifiles hold ${D('par_data_mfs')} of it.</p>
+      <p>Click a box to go deeper; click a breadcrumb item to go back up.</p>` },
+  { title: '3 · The biggest leaf', params: { ...BASE, sel: 'mfs_main', open: [ROOT, 'data', 'data_mfs'] },
+    html: () => `<p><b>data/mfs_8way/main</b> is ${D('val_mfs_main')}: ${D('pct_mfs_main')} of the whole sandbox in only ${D('files_mfs_main')} (each multifile = 1 control file + 8 partitions).</p>
+      <p>Removed, it would shrink mfs_8way by ${D('par_mfs_main')} and the sandbox by ${D('pct_mfs_main')}. <button data-set="hide_mfs_main=1">Hide it</button> <button data-set="hide_mfs_main=0">Show it</button></p>` },
+  { title: '4 · Hide a branch: everything re-totals', params: { ...BASE, hide_data: true },
+    html: () => `<p>Hide <b>data</b> (say it moves to a shared data area). The total drops from ${D('root_total_all')} to ${D('root_total')}, and <b>tmp</b> goes from ${D('pctall_tmp')} to ${D('pct_tmp')} of it: the same amount, a smaller whole.</p>
+      <p><button data-set="hide_tmp=1">Also hide tmp</button> <button data-set="${HIDE_ALL}">Hide everything</button> <button data-set="${SHOW_ALL}">Show all</button></p>` },
+  { title: '5 · Count files instead: a different story', params: { ...BASE, measure: 'files' },
+    html: () => `<p>By file count, <b>run</b> (mostly job logs) is ${D('pct_run')} of all files and <b>tmp</b> ${D('pct_tmp')}; <b>data</b> is only ${D('pct_data')}.</p>
+      <p>Bytes cost disk; files cost backup time, directory listings and inodes. <button data-set="measure=bytes">Back to bytes</button></p>` },
+  { title: '6 · Step up: the biggest leaves', params: { ...BASE }, spot: 'topPanel',
+    html: () => `<p>Rank all ${D('n_leaves')} leaf folders wherever they sit: the top ${D('top_n')} hold ${D('top_pct')} of the ${D('measure_name')}. That short list is where a clean-up pays.</p>
+      <p><button data-set="measure=files">Rank by files</button> <button data-set="measure=bytes">Rank by bytes</button></p>` },
+];
+
+// ============================ TREEMAP SVG: build per zoom/size, update attributes per frame ============================
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.appendChild(el); return el; };
+const MC = document.createElement('canvas').getContext('2d');
+const F = { n1: "600 12px 'Segoe UI', system-ui, sans-serif", v1: "11px 'Segoe UI', system-ui, sans-serif", n2: "600 11px 'Segoe UI', system-ui, sans-serif", v2: "10.5px 'Segoe UI', system-ui, sans-serif" };
+const textW = (s, f) => { MC.font = F[f]; return MC.measureText(s).width; };
+const DUR = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220;
+let G = null;   // { key, W, H, zoom, els: {id: {level, g?, rect, name, val, cur, from, to}}, msg, layKey, t0 }
+function buildMap(zoom){
+  const svg = $('map'), W = Math.max(260, Math.floor(svg.clientWidth || svg.parentNode.clientWidth)), H = Math.round(Math.max(240, Math.min(440, W * 0.68)));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.replaceChildren();
+  const els = {};
+  kids(zoom).forEach(c => {
+    const g = S('g', { class: 'box', 'data-pick': 'b:' + c }, svg), hue = hueOf(c);
+    const rect = S('rect', { class: 'b1', rx: 3, fill: hue, 'fill-opacity': kids(c).length ? 0.16 : 0.42, stroke: hue }, g);
+    const t = S('title', {}, g);
+    els[c] = { level: 1, g, rect, t, cur: null };
+    kids(c).forEach((gc, k) => { const r2 = S('rect', { rx: 2, fill: hue, 'fill-opacity': Math.max(0.2, 0.5 - 0.08 * k), stroke: '#0e1526', 'stroke-width': 1 }, g);
+      els[gc] = { level: 2, rect: r2, parent: c, cur: null }; });
+    // labels after all rects of the box so they sit on top
+    els[c].name = S('text', { class: 'n1 lbl' }, g); els[c].val = S('text', { class: 'v1 lbl' }, g);
+    kids(c).forEach(gc => { els[gc].name = S('text', { class: 'n2 lbl' }, g); els[gc].val = S('text', { class: 'v2 lbl' }, g); });
+  });
+  const msg = S('text', { class: 'msg lbl', x: W / 2, y: H / 2 }, svg);
+  G = { key: zoom + '|' + W, W, H, zoom, els, msg, layKey: null, t0: 0 };
+}
+const collapse = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, w: 0, h: 0 });
+function setLayout(now){
+  const lay = nestedLayout(G.zoom, TM.eff, G.W, G.H), byId = Object.fromEntries(lay.map(r => [r.id, r]));
+  const key = P.measure + JSON.stringify(lay.map(r => [r.id, Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h), r.head, r.v]));
+  if (key === G.layKey) return;
+  const first = G.layKey === null; G.layKey = key; G.t0 = first ? -Infinity : now; G.lay = byId; G.placed = false;   // no tween on a fresh build
+  for (const [id, e] of Object.entries(G.els)){
+    const to = byId[id];
+    const from = e.cur && e.cur.w > 0 ? e.cur : to ? collapse(to) : null;
+    e.from = first ? (to || null) : from; e.to = to ? { x: to.x, y: to.y, w: to.w, h: to.h } : (from ? collapse(from) : null);
+    e.name.setAttribute('display', 'none'); e.val.setAttribute('display', 'none');
+  }
+}
+function placeLabels(){
+  for (const [id, e] of Object.entries(G.els)){
+    const r = G.lay[id], n = IX.by[id];
+    e.name.setAttribute('display', 'none'); e.val.setAttribute('display', 'none');
+    if (!r) continue;
+    const l1 = e.level === 1, fn = l1 ? 'n1' : 'n2', fv = l1 ? 'v1' : 'v2', px = l1 ? 6 : 5, vs = fmtV(r.v);
+    const nameFits = r.w >= textW(n.name, fn) + 2 * px && r.h >= (l1 ? 20 : 17);
+    const valFits = nameFits && r.w >= textW(vs, fv) + 2 * px && r.h >= (l1 ? 34 : 30);
+    if (nameFits){ e.name.textContent = n.name; e.name.setAttribute('x', r.x + px); e.name.setAttribute('y', r.y + (l1 ? 15 : 13)); e.name.removeAttribute('display'); }
+    if (valFits){ e.val.textContent = vs; e.val.setAttribute('x', r.x + px); e.val.setAttribute('y', r.y + (l1 ? 28 : 25)); e.val.removeAttribute('display'); }
+  }
+}
+function updateMap(now){
+  const t = DUR ? Math.min(1, (now - G.t0) / DUR) : 1, k = 1 - Math.pow(1 - t, 3);
+  for (const [id, e] of Object.entries(G.els)){
+    if (!e.to){ if (e.g) e.g.setAttribute('display', 'none'); else e.rect.setAttribute('display', 'none'); continue; }
+    const f = e.from || e.to, c = { x: f.x + (e.to.x - f.x) * k, y: f.y + (e.to.y - f.y) * k, w: f.w + (e.to.w - f.w) * k, h: f.h + (e.to.h - f.h) * k };
+    e.cur = c; const ins = e.level === 1 ? 1 : 0.5, show = c.w > 2 * ins && c.h > 2 * ins;
+    if (show){ e.rect.setAttribute('x', (c.x + ins).toFixed(1)); e.rect.setAttribute('y', (c.y + ins).toFixed(1)); e.rect.setAttribute('width', (c.w - 2 * ins).toFixed(1)); e.rect.setAttribute('height', (c.h - 2 * ins).toFixed(1)); }
+    (e.g || e.rect).toggleAttribute('display', false); if (!show) (e.g || e.rect).setAttribute('display', 'none');
+    if (e.g){ e.g.classList.toggle('sel', P.sel === id && !(TM.eff[id] === 0));
+      e.t.textContent = `${relPath(id)}: ${TM.eff[id] > 0 ? fmtV(TM.eff[id]) : 'hidden'}`; }
+  }
+  const empty = !(TM.eff[ROOT] > 0);
+  G.msg.textContent = empty ? 'Everything is hidden: nothing to total.' : '';
+  G.msg.setAttribute('display', empty ? 'inline' : 'none');
+  if (t >= 1){ if (!G.placed){ placeLabels(); G.placed = true; } } else { G.placed = false; dirty = true; }
+}
+
+// ============================ HTML PANELS (rebuilt when the state changes, never per frame) ============================
+const isOpen = id => P.open.includes(id);
+function renderTree(){
+  const tot = TM.eff[ROOT], hid = hiddenOf(P), onPath = new Set(pathTo(P.sel));
+  let h = `<div class="hd"><span>folder</span><span class="bar"></span><span class="num">${P.measure === 'bytes' ? 'size' : 'files'}</span><span class="num"><span class="lg">of parent</span><span class="sh">%par</span></span><span class="num"><span class="lg">of total</span><span class="sh">%all</span></span></div>`;
+  for (const id of IX.order){
+    if (!pathTo(id).slice(0, -1).every(isOpen)) continue;
+    const n = IX.by[id], d = IX.depth[id], hs = isHidden(id, hid), v = TM.eff[id], par = IX.parent[id];
+    const sp = par == null ? null : share(v, TM.eff[par]), st = share(v, tot), has = !!n.children;
+    h += `<div class="row${P.sel === id ? ' sel' : onPath.has(id) ? ' path' : ''}${hs ? ' hid' : ''}" data-pick="t:${id}" role="treeitem" tabindex="0"${has ? ` aria-expanded="${isOpen(id)}"` : ''}>
+      <span class="nm" style="padding-left:${Math.min(d, 4) * 12}px"><span class="tog" data-tog="${has ? id : ''}">${has ? (isOpen(id) ? '▾' : '▸') : ''}</span><b>${n.name}</b><span class="t">${n.title || ''}</span></span>
+      <span class="bar"><span class="minibar"><i style="width:${hs || sp == null ? 0 : (sp * 100).toFixed(1)}%;background:${hueOf(id)}"></i></span></span>
+      <span class="num">${hs ? 'hidden' : fmtNum(v)}</span><span class="num">${hs ? '—' : par == null ? '—' : fmtP(sp)}</span><span class="num">${hs ? '—' : fmtP(st)}</span></div>`;
+  }
+  $('tree').innerHTML = h;
+}
+function renderCrumbs(){
+  const p = pathTo(P.sel);
+  $('crumbs').innerHTML = '<span class="lab">Path</span>' + p.map((id, i) => (i ? '<span class="sep">›</span>' : '') +
+    `<button class="crumb${id === P.sel ? ' cur' : ''}" data-pick="c:${id}">${IX.by[id].name}</button>`).join('');
+}
+function renderDetail(){
+  const id = P.sel, n = IX.by[id], hid = hiddenOf(P), tot = TM.eff[ROOT], v = TM.eff[id], par = IX.parent[id];
+  let h = `<p><b>${relPath(id)}</b>${n.title ? ' — ' + n.title : ''}</p><p>${n.desc || ''}</p>`;
+  if (!(tot > 0)) h += `<p><b>Everything is hidden</b>, so there is nothing to total and no shares to show.</p><button data-set="${SHOW_ALL}">Show everything</button>`;
+  else if (isHidden(id, hid)){
+    const top = pathTo(id).find(x => hid[x]), back = TM.sub[id];
+    h += `<p><b>Hidden</b>: left out of every total. Shown again it would add ${fmtV(back)} (${fmtP(share(back, tot + (top === id ? back : 0)))} of the new total${top === id ? '' : ', once ' + IX.by[top].name + ' is shown'}).</p><button data-set="hide_${top}=0">Show ${IX.by[top].name} again</button>`;
+  } else {
+    const lc = largestChild(id, TM.eff), pv = par == null ? null : TM.eff[par], other = P.measure === 'bytes' ? 'files' : 'bytes';
+    h += `<table class="kv"><tr><td>${MEASURES[P.measure]}</td><td><b>${fmtV(v)}</b> <span style="color:var(--muted)">(${fmtIn(other, T[other].eff[id])})</span></td></tr>` +
+      (par == null ? `<tr><td>share</td><td>the whole (100%)</td></tr>` : `<tr><td>of ${IX.by[par].name}</td><td>${fmtP(share(v, pv))}</td></tr><tr><td>of total</td><td>${fmtP(share(v, tot))}</td></tr>`) +
+      `<tr><td>largest part</td><td>${lc ? `${IX.by[lc].name} — ${fmtV(TM.eff[lc])} (${fmtP(share(TM.eff[lc], v))})` : n.children ? 'all parts hidden' : 'none (a leaf)'}</td></tr></table>`;
+    h += par == null ? `<p>This is the whole tree. Hide its branches to see what is left.</p>`
+      : `<p>If this were removed, <b>${IX.by[par].name}</b> would shrink from ${fmtV(pv)} to ${fmtV(pv - v)} (−${fmtP(share(v, pv))}) and the whole tree by ${fmtP(share(v, tot))}.</p><button data-set="hide_${id}=1">Hide this branch</button>`;
+  }
+  $('detail').innerHTML = h;
+}
+function renderTop(){
+  const tot = TM.eff[ROOT], ls = topLeaves(TM.eff, TOP_N), m = ls.length ? TM.eff[ls[0]] : 1;
+  $('top').innerHTML = ls.length ? ls.map((id, i) => `<div class="li${P.sel === id ? ' sel' : ''}" data-pick="l:${id}"><span class="rk">${i + 1}</span>
+    <span class="pth">${relPath(id)}<span class="minibar"><i style="width:${(TM.eff[id] / m * 100).toFixed(1)}%;background:${hueOf(id)}"></i></span></span>
+    <span class="num">${fmtV(TM.eff[id])}</span><span class="num">${fmtP(share(TM.eff[id], tot))}</span></div>`).join('')
+    : '<p class="sub">Nothing left: every branch is hidden.</p>';
+}
+function renderSide(){
+  const z = zoomOf(), tot = TM.eff[ROOT];
+  $('mapCap').textContent = !(tot > 0) ? 'Everything is hidden.' : `Area = ${MEASURES[P.measure]}. Inside ${relPath(z)}: its parts, and their parts. Click a box to zoom in; the breadcrumb zooms out.`;
+  const hidNames = kids(ROOT).filter(c => P['hide_' + c]).map(c => IX.by[c].name), deeper = HIDE_KEYS.filter(k => P[k] && IX.parent[k.slice(5)] !== ROOT).length;
+  const hidTxt = hidNames.length || deeper ? ` · hidden: <b>${[...hidNames, ...(deeper ? [deeper + ' deeper folder(s)'] : [])].join(', ')}</b>` : '';
+  $('readout').innerHTML = !(tot > 0) ? `<b style="color:var(--bad)">Everything is hidden</b>: there is no total, so no shares. Show a branch again.`
+    : `Total <b>${fmtV(tot)}</b> in ${IX.leaves.filter(id => TM.eff[id] > 0).length} leaf folders${hidTxt} · selected <b>${relPath(P.sel)}</b>` +
+      (isHidden(P.sel, hiddenOf(P)) ? ' (hidden)' : ` = ${IX.parent[P.sel] == null ? 'the whole' : fmtP(share(TM.eff[P.sel], TM.eff[IX.parent[P.sel]])) + ' of its parent, ' + fmtP(share(TM.eff[P.sel], tot)) + ' of the total'}`);
+  document.querySelectorAll('main .panel').forEach(p => p.classList.toggle('spot', p.id === SPOT));
+}
+function dynValues(){   // every D('key') used anywhere must have an entry here; never empty, NaN or undefined
+  const v = {}, tot = TM.eff[ROOT], hid = hiddenOf(P), none = 'n/a (everything is hidden)';
+  for (const id of IX.order){
+    const hs = isHidden(id, hid), par = IX.parent[id], e = TM.eff[id];
+    v['val_' + id] = hs ? 'hidden' : fmtV(e);
+    v['files_' + id] = hs ? 'hidden' : fmtIn('files', T.files.eff[id]);
+    v['pct_' + id] = hs ? 'hidden' : tot > 0 ? fmtP(share(e, tot)) : none;
+    v['par_' + id] = par == null ? 'the whole' : hs ? 'hidden' : TM.eff[par] > 0 ? fmtP(share(e, TM.eff[par])) : none;
+    v['pctall_' + id] = fmtP(share(TA.eff[id], TA.eff[ROOT]));
+  }
+  v.root_total = tot > 0 ? fmtV(tot) : 'nothing (everything is hidden)';
+  v.root_total_all = fmtV(TA.eff[ROOT]);
+  v.root_files = T.files.eff[ROOT] > 0 ? fmtIn('files', T.files.eff[ROOT]) : 'no files';
+  v.pct_code = tot > 0 ? fmtP(share(['dml', 'mp', 'plan', 'xfr'].reduce((a, id) => a + TM.eff[id], 0), tot)) : none;   // REPLACE
+  const tl = topLeaves(TM.eff, TOP_N);
+  v.n_leaves = String(IX.leaves.filter(id => TM.eff[id] > 0).length); v.top_n = String(tl.length);
+  v.top_pct = tot > 0 ? fmtP(share(tl.reduce((a, id) => a + TM.eff[id], 0), tot)) : none;
+  v.measure_name = MEASURES[P.measure];
+  return v;
+}
+
+// ============================ MAIN ============================
+let shownKey = '';
+function renderAll(now){
+  const z = zoomOf(), W = Math.floor($('map').clientWidth);
+  if (!G || G.zoom !== z || Math.abs(G.W - Math.max(260, W)) > 2) buildMap(z);
+  setLayout(now); updateMap(now);
+  const key = JSON.stringify(P) + '|' + SPOT;
+  if (key !== shownKey){ shownKey = key; renderTree(); renderCrumbs(); renderDetail(); renderTop(); renderSide(); }
+  const dv = dynValues();
+  document.querySelectorAll('[data-dyn]').forEach(el => { const val = dv[el.dataset.dyn]; if (val !== undefined && el.textContent !== val) el.textContent = val; });
+}
+function syncUI(){
+  document.querySelectorAll('#whatSeg button').forEach(b => { const w = WHAT[b.dataset.w]; b.classList.toggle('on', HIDE_KEYS.every(k => !!P[k] === !!w[k])); });
+  document.querySelectorAll('#measureSeg button').forEach(b => b.classList.toggle('on', P.measure === MEASURE_W[b.dataset.w]));
+}
+function setParams(o){
+  Object.assign(P, o);
+  P.open = [...new Set([...(P.open || []), ...pathTo(P.sel).slice(0, -1)])];   // the selection's ancestors are always open
+  syncUI(); recompute();
+}
+const select = id => setParams({ sel: id, open: [...P.open, id] });   // selecting also opens the node
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
+  SPOT = st.spot || null;
+  if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params, open: [...st.params.open] }); }
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
+}
+function parseSet(s){
+  const o = {};
+  s.split(';').forEach(kv => { const [k, v] = kv.split('=').map(x => x.trim()); if (!k) return;
+    o[k] = k.startsWith('hide_') ? (v === '1' || v === 'true') : k === 'open' ? v.split(',') : v !== '' && !isNaN(+v) ? +v : v; });
+  return o;
+}
+function init(){
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  const onSet = ev => { const b = ev.target.closest('button[data-set]'); if (b) setParams(parseSet(b.dataset.set)); };
+  $('stepText').addEventListener('click', onSet); $('detail').addEventListener('click', onSet);
+  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...Object.fromEntries(HIDE_KEYS.map(k => [k, false])), ...WHAT[b.dataset.w] }));
+  document.querySelectorAll('#measureSeg button').forEach(b => b.onclick = () => setParams({ measure: MEASURE_W[b.dataset.w] }));
+  $('reset').onclick = () => { SPOT = null; Object.keys(P).forEach(k => delete P[k]); setParams({ ...BASE, open: [...BASE.open] }); };
+  $('tree').addEventListener('click', ev => {
+    const tg = ev.target.closest('[data-tog]');
+    if (tg && tg.dataset.tog){ const id = tg.dataset.tog;
+      if (isOpen(id)){ const keep = P.open.filter(x => x !== id); setParams({ open: keep, sel: pathTo(P.sel).includes(id) && P.sel !== id ? id : P.sel }); }
+      else setParams({ open: [...P.open, id] });
+      return; }
+    const r = ev.target.closest('[data-pick]'); if (r) select(r.dataset.pick.slice(2)); });
+  $('tree').addEventListener('keydown', ev => { const r = ev.target.closest('[data-pick]'); if (!r) return;
+    if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); select(r.dataset.pick.slice(2)); } });
+  for (const id of ['map', 'crumbs', 'top']) $(id).addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t) select(t.dataset.pick.slice(2)); });
+  window.addEventListener('resize', () => dirty = true);
+  syncUI(); goStep(0);
+  const frame = now => { if (dirty){ dirty = false; renderAll(now); } requestAnimationFrame(frame); };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>

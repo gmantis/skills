@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  GRAPH SKELETON for the interactive-explainer skill (shapes: causal network, structure, state machine — see shapes/SHAPES.md).
+  Everything marked REPLACE is placeholder.
+  Demo model: two drivers push an outcome, directly and through a mediator; a "brake" closes a balancing loop.
+  Linear signed influence: x = ext + W·x, solved by rounds of influence, so each input's share of every node adds up exactly.
+  Keep the structure: MODEL (pure) -> STATE -> STEPS -> layout -> SVG build (once) / update (per frame) -> charts -> main loop.
+  Same engine contract as skeleton.html: STEPS + goStep, [data-w] what-ifs, [data-dyn] live numbers, data-set buttons,
+  canvases sized with setupCanvas/data-h, plus [data-pick] on every clickable box/arrow (check.js clicks them all).
+-->
+<style>
+  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
+    --pos:#6fe3cf; --neg:#ff7aa8; --zero:#56627a; --total:#ffd84d; --accent:#5aa9ff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600}
+  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
+  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
+  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .stepnav{display:flex;align-items:center;gap:8px}
+  .stepnav button,.btn,#stepText button,#detail button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
+  .stepnav button:disabled{opacity:.35;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center}
+  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--total)}
+  #stepText,#detail{font-size:.87rem} #stepText p,#detail p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
+  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  .ctl{margin-bottom:9px} .ctl .lab{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+  .ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .ctl.overridden{opacity:.45}
+  .seg{display:flex;flex-wrap:wrap;margin-bottom:8px} .seg button{flex:1;border-radius:0;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px;font-size:.75rem;cursor:pointer}
+  .seg button:first-child{border-radius:6px 0 0 6px} .seg button:last-child{border-radius:0 6px 6px 0} .seg button.on{background:#2b4a7a;border-color:var(--accent)}
+  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)} canvas.chart{cursor:crosshair}
+  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  /* diagram */
+  #diagram{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none}
+  #diagram .node rect.box{fill:#16213a;stroke:#33476e;stroke-width:1.5}
+  #diagram .node.input rect.box{stroke:var(--accent)} #diagram .node.output rect.box{stroke:var(--total);stroke-width:2}
+  #diagram .node.sel rect.box{stroke:#fff;stroke-width:2.5}
+  #diagram .node.off rect.box{stroke-dasharray:5 4;fill:#10182b}
+  #diagram .node, #diagram .ehit{cursor:pointer} #diagram .dim{opacity:.22}
+  #diagram text{fill:var(--ink);font:12px 'Segoe UI',system-ui,sans-serif;pointer-events:none}
+  #diagram text.name{font-weight:600} #diagram text.val{fill:var(--muted);font-size:11px}
+  #diagram text.badge{font:bold 12px 'Segoe UI',system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}
+  #diagram text.loop{font:bold 11px 'Segoe UI',system-ui,sans-serif;text-anchor:middle}
+  #diagram path.edge{fill:none}
+  #diagram path.edge.flow{stroke-dasharray:7 5;animation:flow 1s linear infinite}
+  #diagram path.ehit{fill:none;stroke:transparent;stroke-width:14}
+  @keyframes flow{to{stroke-dashoffset:-12}}
+  @media (prefers-reduced-motion:reduce){#diagram path.edge.flow{animation:none}}
+  .bars .row{display:grid;grid-template-columns:96px 1fr 64px;gap:8px;align-items:center;font-size:.8rem;margin:4px 0}
+  .bars .track{position:relative;height:14px;background:#0c1323;border-radius:3px}
+  .bars .fill{position:absolute;top:0;bottom:0;border-radius:3px} .bars .zero{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(220,230,245,.5)}
+  .bars .num{text-align:right;font-weight:600;white-space:nowrap}
+  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TITLE (REPLACE)</h1>
+  <p>One-paragraph framing of the question from the source (REPLACE). Say what the reader can do: step through the tour, click any box or arrow, switch causes off, watch the change spread.</p>
+</header>
+<div class="layout">
+<aside>
+  <div class="card">
+    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <h2 id="stepTitle"></h2><div id="stepText"></div>
+  </div>
+  <div class="card">
+    <h4>What if?</h4>
+    <div class="seg" id="whatSeg"><button data-w="real" class="on">Real</button><button data-w="noA">No driver A</button><button data-w="noB">No driver B</button><button data-w="noLoop">No brake</button></div>
+    <div id="params"></div>
+    <button class="btn" id="reset">Reset to real values</button> <button class="btn" id="play">▶ Replay the change</button>
+  </div>
+  <div class="card"><h4>Selected</h4><div id="detail"></div></div>
+</aside>
+<main>
+  <section class="panel"><h3>Map of causes (REPLACE)</h3>
+    <p class="sub">Arrows: <span style="color:var(--pos)">teal +</span> pushes up, <span style="color:var(--neg)">pink −</span> pushes down; thicker = more influence right now. Click a box or arrow for details.</p>
+    <svg id="diagram" role="img" aria-label="Diagram of causes"></svg></section>
+  <div class="grid2">
+    <section class="panel"><h3>What drives the outcome</h3><p class="sub">Each cause's share of the outcome. The shares add up exactly to the total.</p><div id="contrib" class="bars"></div></section>
+    <section class="panel"><h3>How the change spreads</h3><p class="sub">The outcome after each round of influence, from the old settings (grey) to the new ones (gold). Click to pick a round.</p><canvas id="settle" class="chart" data-h="220"></canvas></section>
+  </div>
+  <div id="readout"></div>
+</main>
+</div>
+
+<script>
+// ============================ MODEL (pure functions, no DOM) — REPLACE ============================
+// kind: 'input' (level set by a slider in{id}), 'output' (the quantity the reader cares about), or omitted.
+// pos: optional [layer, order] to place a node by hand; otherwise the layered layout decides.
+const NODES = [
+  { id: 'A', label: 'Driver A', kind: 'input', desc: 'REPLACE: an outside cause. Its level is a slider.' },
+  { id: 'B', label: 'Driver B', kind: 'input', desc: 'REPLACE: a second outside cause. It acts directly and through the mediator.' },
+  { id: 'M', label: 'Mediator', desc: 'REPLACE: an in-between quantity that passes influence on.' },
+  { id: 'O', label: 'Outcome', kind: 'output', desc: 'REPLACE: the thing the reader cares about.' },
+  { id: 'F', label: 'Brake', desc: 'REPLACE: grows with the outcome and pushes the mediator back down, which closes a balancing loop.' },
+];
+// w: a parameter key (slider / step param) or a fixed number. Negative = pushes down.
+const EDGES = [
+  { id: 'AM', from: 'A', to: 'M', w: 'wAM', desc: 'REPLACE: how A raises the mediator.' },
+  { id: 'BM', from: 'B', to: 'M', w: 'wBM', desc: 'REPLACE: B also raises the mediator.' },
+  { id: 'BO', from: 'B', to: 'O', w: 'wBO', desc: 'REPLACE: B acts on the outcome directly.' },
+  { id: 'MO', from: 'M', to: 'O', w: 'wMO', desc: 'REPLACE: the mediator drives the outcome.' },
+  { id: 'OF', from: 'O', to: 'F', w: 'wOF', desc: 'REPLACE: a high outcome switches the brake on.' },
+  { id: 'FM', from: 'F', to: 'M', w: 'wFM', desc: 'REPLACE: the brake pushes the mediator down.' },
+];
+const REAL = { inA: 1, inB: 0.6, wAM: 0.8, wBM: 0.4, wBO: 0.5, wMO: 0.9, wOF: 0.7, wFM: -0.6 };
+const IDX = Object.fromEntries(NODES.map((n, i) => [n.id, i]));
+const OUT = NODES.find(n => n.kind === 'output').id, INPUTS = NODES.filter(n => n.kind === 'input').map(n => n.id);
+
+function weight(e, p){
+  if (p['cut_' + e.id] || p['off_' + e.from] || p['off_' + e.to]) return 0;
+  return typeof e.w === 'string' ? p[e.w] : e.w;
+}
+// Rounds of influence: x_{k+1} = ext + W·x_k, starting from x0 (the old steady state), until it settles or runs away.
+function settle(p, x0, maxIt = 400){
+  const ext = NODES.map(n => n.kind === 'input' && !p['off_' + n.id] ? p['in' + n.id] : 0);
+  let x = x0 ? x0.slice() : ext.slice(); const trace = [x.slice()];
+  for (let k = 0; k < maxIt; k++){
+    const y = ext.slice();
+    for (const e of EDGES) if (NODES[IDX[e.to]].kind !== 'input') y[IDX[e.to]] += weight(e, p) * x[IDX[e.from]];
+    const d = Math.max(...y.map((v, i) => Math.abs(v - x[i]))); x = y; trace.push(x.slice());
+    if (!x.every(Number.isFinite) || Math.max(...x.map(Math.abs)) > 1e6) return { x, trace, converged: false };
+    if (d < 1e-9) return { x, trace, converged: true };
+  }
+  return { x, trace, converged: false };
+}
+// Exact split: the model is linear, so the outcome = sum over inputs of "only this input on".
+function decompose(p){
+  const c = {};
+  for (const id of INPUTS){ const q = { ...p }; for (const o of INPUTS) if (o !== id) q['off_' + o] = true; const s = settle(q); c[id] = s.converged ? s.x : null; }
+  const ok = INPUTS.every(id => c[id]);
+  return { c, ok, sum: ok ? INPUTS.reduce((a, id) => a + c[id][IDX[OUT]], 0) : NaN };
+}
+// Feedback loops (simple cycles), with loop gain = product of weights; >0 reinforcing (R), <0 balancing (B).
+function findCycles(){
+  const out = [], ids = NODES.map(n => n.id);
+  ids.forEach((s, si) => {
+    const dfs = (v, path, seen) => { for (const e of EDGES.filter(e => e.from === v)){
+      const ti = ids.indexOf(e.to); if (ti < si) continue;
+      if (e.to === s) out.push([...path, e.id]);
+      else if (!seen.has(e.to)){ seen.add(e.to); dfs(e.to, [...path, e.id], seen); seen.delete(e.to); } } };
+    dfs(s, [], new Set([s]));
+  });
+  return out;
+}
+const CYCLES = findCycles();
+const EDGE = Object.fromEntries(EDGES.map(e => [e.id, e]));
+function loopInfo(p){
+  let nR = 0, nB = 0;
+  return CYCLES.map(c => { const g = c.reduce((a, id) => a * weight(EDGE[id], p), 1);
+    const type = g > 0 ? 'R' : g < 0 ? 'B' : '0'; const name = type === 'R' ? 'R' + (++nR) : type === 'B' ? 'B' + (++nB) : 'cut';
+    return { edges: c, gain: g, type, name }; });
+}
+
+// ============================ STATE ============================
+const $ = id => document.getElementById(id);
+const SPEC = [   // REPLACE: one slider per input level and per weight worth exploring
+  { id: 'inA', label: 'Driver A level', min: 0, max: 2, step: 0.05, fmt: v => v.toFixed(2), off: 'off_A' },
+  { id: 'inB', label: 'Driver B level', min: 0, max: 2, step: 0.05, fmt: v => v.toFixed(2), off: 'off_B' },
+  { id: 'wFM', label: 'Brake strength (negative = pushes down)', min: -2, max: 2, step: 0.05, fmt: v => v.toFixed(2), off: 'cut_FM' },
+];
+const TOGGLES = ['off_A', 'off_B', 'cut_FM'];                    // REPLACE: every boolean the what-ifs manage
+const BASE = { ...REAL, ...Object.fromEntries(TOGGLES.map(k => [k, false])) };
+const WHAT = { real: {}, noA: { off_A: true }, noB: { off_B: true }, noLoop: { cut_FM: true } };
+const P = { ...BASE };
+let SOL = null, DEC = null, LOOPS = [], K = 0, playing = false, dirty = true, STEP = 0, SEL = null, FOCUS = null;
+const fmt = v => (v == null || !Number.isFinite(v)) ? 'runs away' : (Math.abs(v) < 0.005 ? '0.00' : v.toFixed(2));
+function recompute(){
+  const x0 = SOL && SOL.converged ? SOL.x : null;
+  SOL = settle(P, x0); DEC = decompose(P); LOOPS = loopInfo(P);
+  K = 0; playing = !matchMedia('(prefers-reduced-motion: reduce)').matches; if (!playing) K = SOL.trace.length - 1;
+  dirty = true;
+}
+const settleOf = o => { const s = settle({ ...P, ...o }); return s.converged ? s.x[IDX[OUT]] : NaN; };
+
+// ============================ STEPS (guided tour) — REPLACE ============================
+// Each step: title, full params on entry, focus (node/edge ids to highlight; null = all), html with D('key') live numbers.
+const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
+const STEPS = [
+  { title: '1 · The map', params: { ...BASE }, focus: null,
+    html: () => `<p>Two drivers set the outcome. Right now the outcome is ${D('x_O')}. Click any box or arrow to read what it does.</p>` },
+  { title: '2 · Driver A on its own', params: { ...BASE, off_B: true }, focus: ['A', 'AM', 'M', 'MO', 'O'],
+    html: () => `<p>B is switched off. A works only <b>through the mediator</b>: A ${D('x_A')} → mediator ${D('x_M')} → outcome ${D('x_O')}.
+      <button data-set="inA=2">Double A</button> <button data-set="inA=1">Real A</button></p>` },
+  { title: '3 · Driver B has two routes', params: { ...BASE, off_A: true }, focus: ['B', 'BM', 'BO', 'M', 'MO', 'O'],
+    html: () => `<p>A is off. B pushes the outcome <b>directly</b> (${D('f_BO')}) and <b>through the mediator</b> (${D('f_MO')}).</p>` },
+  { title: '4 · The brake is a balancing loop', params: { ...BASE }, focus: ['O', 'OF', 'F', 'FM', 'M', 'MO'],
+    html: () => `<p>Outcome → brake → mediator → outcome is loop ${D('loop1')} with gain ${D('gain1')}. Without the brake the outcome would be ${D('noLoop')}, not ${D('x_O')}.
+      <button data-set="cut_FM=1">Cut the brake</button> <button data-set="cut_FM=0">Restore it</button></p>` },
+  { title: '5 · Who is responsible', params: { ...BASE }, focus: null,
+    html: () => `<p>Outcome ${D('x_O')} = A's share ${D('c_A')} + B's share ${D('c_B')}. The loop is already inside both shares.</p>` },
+];
+
+// ============================ LAYOUT (layered; back edges = feedback) ============================
+function layered(){
+  const back = new Set(), state = {}, order = [...INPUTS, ...NODES.map(n => n.id).filter(id => !INPUTS.includes(id))];
+  const dfs = v => { state[v] = 1; for (const e of EDGES.filter(e => e.from === v)){
+    if (state[e.to] === 1) back.add(e.id); else if (!state[e.to]) dfs(e.to); } state[v] = 2; };
+  order.forEach(v => { if (!state[v]) dfs(v); });
+  const fwd = EDGES.filter(e => !back.has(e.id)), layer = {};
+  const L = v => layer[v] ?? (layer[v] = Math.max(0, ...fwd.filter(e => e.to === v).map(e => L(e.from) + 1)));
+  NODES.forEach(n => { layer[n.id] = n.pos ? n.pos[0] : L(n.id); });
+  const nL = Math.max(...Object.values(layer)) + 1, rows = [...Array(nL)].map(() => []);
+  NODES.forEach(n => rows[layer[n.id]].push(n.id));
+  // a forward edge that skips layers gets an invisible waypoint in each skipped layer, so it routes around boxes
+  const via = {}, segs = [];
+  for (const e of fwd){ const chain = [e.from];
+    for (let l = layer[e.from] + 1; l < layer[e.to]; l++){ const d = `~${e.id}~${l}`; layer[d] = l; rows[l].push(d); chain.push(d); }
+    chain.push(e.to); via[e.id] = chain.slice(1, -1); for (let i = 1; i < chain.length; i++) segs.push([chain[i - 1], chain[i]]); }
+  for (let sweep = 0; sweep < 4; sweep++) rows.forEach((r, li) => { if (!li) return;   // barycenter ordering
+    const at = id => { const ps = segs.filter(s => s[1] === id).map(s => rows[layer[s[0]]].indexOf(s[0])); return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : rows[li].indexOf(id); };
+    const key = Object.fromEntries(r.map(id => [id, at(id)])); r.sort((a, b) => key[a] - key[b]); });
+  NODES.forEach(n => { if (n.pos){ const r = rows[n.pos[0]]; r.splice(r.indexOf(n.id), 1); r.splice(Math.min(n.pos[1], r.length), 0, n.id); } });
+  return { layer, rows, back, via };
+}
+const LAY = layered();
+
+// ============================ SVG: build once per size, update per frame ============================
+const NS = 'http://www.w3.org/2000/svg';
+const S = (tag, attrs, parent) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.appendChild(el); return el; };
+let G = null;   // built geometry + element handles
+function buildDiagram(){
+  const svg = $('diagram'), W = Math.max(280, svg.clientWidth || svg.parentNode.clientWidth), pad = 16;
+  const nL = LAY.rows.length, maxPer = Math.max(...LAY.rows.map(r => r.length)), nBack = LAY.back.size;
+  let vert = false, NW = Math.min(140, (W - 2 * pad) / nL - 40), NH = 50;
+  if (NW < 92){ vert = true; NW = Math.min(150, (W - 2 * pad) / maxPer - 16 - (nBack ? 20 : 0)); }
+  const backDepth = nBack ? 36 + 14 * nBack : 0, pos = {};
+  let H;
+  if (!vert){
+    const colW = (W - 2 * pad) / nL, rowH = NH + 30; H = 2 * pad + maxPer * rowH + backDepth;
+    LAY.rows.forEach((r, li) => r.forEach((id, k) => { pos[id] = { x: pad + colW * (li + 0.5), y: pad + (maxPer - r.length) * rowH / 2 + rowH * (k + 0.5) }; }));
+  } else {
+    const usable = W - 2 * pad - (nBack ? backDepth : 0), colW = usable / maxPer, rowH = NH + 52; H = 2 * pad + NH + (nL - 1) * rowH;
+    LAY.rows.forEach((r, li) => r.forEach((id, k) => { pos[id] = { x: pad + (maxPer - r.length) * colW / 2 + colW * (k + 0.5), y: pad + NH / 2 + rowH * li }; }));
+  }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.replaceChildren();
+  const defs = S('defs', {}, svg);
+  for (const [k, c] of [['pos', '#6fe3cf'], ['neg', '#ff7aa8'], ['zero', '#56627a']]){
+    const m = S('marker', { id: 'm-' + k, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 9, markerHeight: 9, markerUnits: 'userSpaceOnUse', orient: 'auto-start-reverse' }, defs);
+    S('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }, m);
+  }
+  const gE = S('g', {}, svg), gN = S('g', {}, svg), gL = S('g', {}, svg), edges = {}, nodes = {};
+  let bi = 0;
+  for (const e of EDGES){
+    const a = pos[e.from], b = pos[e.to], isBack = LAY.back.has(e.id); let d, mid;
+    const cub = (p0, p1, p2, p3) => { d = `M${p0[0]},${p0[1]} C${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`;
+      mid = [(p0[0] + 3 * p1[0] + 3 * p2[0] + p3[0]) / 8, (p0[1] + 3 * p1[1] + 3 * p2[1] + p3[1]) / 8]; };
+    if (!isBack){   // forward: smooth run through the waypoints of any skipped layers
+      const w = LAY.via[e.id].map(id => [pos[id].x, pos[id].y]);
+      const pts = vert ? [[a.x, a.y + NH / 2], ...w, [b.x, b.y - NH / 2]] : [[a.x + NW / 2, a.y], ...w, [b.x - NW / 2, b.y]];
+      d = `M${pts[0][0]},${pts[0][1]}`;
+      for (let i = 1; i < pts.length; i++){ const p = pts[i - 1], q = pts[i];
+        if (vert){ const dy = (q[1] - p[1]) * 0.45; d += ` C${p[0]},${p[1] + dy} ${q[0]},${q[1] - dy} ${q[0]},${q[1]}`; }
+        else { const dx = (q[0] - p[0]) * 0.45; d += ` C${p[0] + dx},${p[1]} ${q[0] - dx},${q[1]} ${q[0]},${q[1]}`; } }
+      if (w.length) mid = w[Math.floor((w.length - 1) / 2)];
+      else { const p = pts[0], q = pts[1]; mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; } }
+    else if (!vert){ const off = 36 + 14 * bi++, s = [a.x, a.y + NH / 2], t = [b.x, b.y + NH / 2], yb = H - pad - backDepth + off; cub(s, [s[0], yb], [t[0], yb], t); }
+    else { const off = 30 + 14 * bi++, s = [a.x + NW / 2, a.y], t = [b.x + NW / 2, b.y], xr = Math.max(a.x, b.x) + NW / 2 + off; cub(s, [xr, s[1]], [xr, t[1]], t); }
+    const path = S('path', { d, class: 'edge', 'stroke-linecap': 'round' }, gE);
+    const hit = S('path', { d, class: 'ehit', 'data-pick': 'e:' + e.id }, gE);
+    const bg = S('circle', { cx: mid[0], cy: mid[1], r: 9, fill: '#0e1526', stroke: '#33476e' }, gL);
+    const badge = S('text', { x: mid[0], y: mid[1], class: 'badge lbl' }, gL);
+    const t = S('title', {}, hit); edges[e.id] = { path, hit, bg, badge, t, isBack, mid };
+  }
+  for (const n of NODES){
+    const p = pos[n.id], g = S('g', { class: 'node ' + (n.kind || ''), 'data-pick': 'n:' + n.id }, gN);
+    S('rect', { class: 'box', x: p.x - NW / 2, y: p.y - NH / 2, width: NW, height: NH, rx: 8 }, g);
+    const bar = S('rect', { x: p.x - NW / 2 + 6, y: p.y + NH / 2 - 8, height: 3, rx: 1.5, fill: '#ffd84d' }, g);
+    const name = S('text', { x: p.x, y: p.y - 6, 'text-anchor': 'middle', class: 'name lbl' }, g);
+    name.textContent = n.label;
+    const val = S('text', { x: p.x, y: p.y + 10, 'text-anchor': 'middle', class: 'val lbl' }, g);
+    nodes[n.id] = { g, bar, val, p };
+  }
+  // loop labels (R1/B1) next to each loop's back edge
+  const loopLbl = CYCLES.map(c => { const be = c.find(id => LAY.back.has(id)) || c[0], m = edges[be].mid;
+    return S('text', { x: m[0], y: m[1] + 24, class: 'loop lbl' }, gL); });
+  G = { W, H, NW, NH, vert, pos, edges, nodes, loopLbl };
+}
+function updateDiagram(x){
+  const flux = EDGES.map(e => weight(e, P) * x[IDX[e.from]]), fmax = Math.max(1e-9, ...flux.map(Math.abs));
+  const vmax = Math.max(1e-9, ...x.map(Math.abs)), on = id => !FOCUS || FOCUS.includes(id);
+  EDGES.forEach((e, i) => { const h = G.edges[e.id], w = weight(e, P), f = flux[i], k = w > 0 ? 'pos' : w < 0 ? 'neg' : 'zero';
+    const col = { pos: '#6fe3cf', neg: '#ff7aa8', zero: '#56627a' }[k];
+    h.path.setAttribute('stroke', col); h.path.setAttribute('stroke-width', (1.5 + 5 * Math.abs(f) / fmax).toFixed(2));
+    h.path.setAttribute('marker-end', `url(#m-${k})`); h.path.classList.toggle('flow', Math.abs(f) > 1e-6);
+    const dur = Math.max(0.35, Math.min(3, 0.6 * fmax / Math.max(Math.abs(f), 1e-6))).toFixed(1) + 's'; if (h.path.style.animationDuration !== dur) h.path.style.animationDuration = dur;
+    if (w === 0) h.path.setAttribute('stroke-dasharray', '3 5'); else h.path.removeAttribute('stroke-dasharray');
+    h.badge.textContent = w > 0 ? '+' : w < 0 ? '−' : '×'; h.badge.setAttribute('fill', col);
+    h.t.textContent = `${NODES[IDX[e.from]].label} → ${NODES[IDX[e.to]].label}: weight ${fmt(w)}, influence now ${fmt(f)}`;
+    for (const el of [h.path, h.bg, h.badge]) el.classList.toggle('dim', !on(e.id));
+    h.path.parentNode.appendChild(h.path); });
+  NODES.forEach((n, i) => { const h = G.nodes[n.id], off = !!P['off_' + n.id];
+    h.val.textContent = off ? 'switched off' : fmt(x[i]);
+    h.bar.setAttribute('width', Math.max(0, (G.NW - 12) * Math.abs(x[i]) / vmax).toFixed(1));
+    h.g.classList.toggle('off', off); h.g.classList.toggle('sel', SEL === 'n:' + n.id); h.g.classList.toggle('dim', !on(n.id)); });
+  LOOPS.forEach((l, i) => { const t = G.loopLbl[i]; t.textContent = l.type === '0' ? (G.vert ? 'cut' : 'loop cut') : G.vert ? l.name : `${l.name} ${l.type === 'B' ? 'balancing' : 'reinforcing'}`;
+    t.setAttribute('fill', l.type === 'B' ? '#ff7aa8' : l.type === 'R' ? '#6fe3cf' : '#56627a'); t.classList.toggle('dim', !l.edges.every(on)); });
+}
+
+// ============================ CHART HELPERS ============================
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.floor(cv.clientWidth)), H = +cv.dataset.h;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { ctx, W, H, dpr };
+}
+function txt(ctx, s, x, y, o = {}){
+  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif'; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(s).width, CW = ctx.canvas.clientWidth || 9999;
+  let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+  const nbx = Math.max(4, Math.min(CW - w - 4, bx)); x += nbx - bx; bx = nbx;
+  if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.72)'; ctx.fillRect(bx - 3, y - 7, w + 6, 14); }
+  ctx.fillStyle = o.color || '#dfe6f2'; ctx.fillText(s, x, y);
+}
+function drawSettle(){
+  const cv = $('settle'), { ctx, W, H } = setupCanvas(cv), pad = { l: 44, r: 10, t: 12, b: 22 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const tr = SOL.trace.map(x => x[IDX[OUT]]), n = Math.min(tr.length, SOL.converged ? Math.max(8, tr.findIndex((v, i) => i > 0 && Math.abs(v - SOL.x[IDX[OUT]]) < 1e-3) + 3) : 40);
+  const vs = tr.slice(0, n).filter(Number.isFinite).map(v => Math.max(-50, Math.min(50, v)));
+  let lo = Math.min(0, ...vs), hi = Math.max(0.1, ...vs); const m = (hi - lo) * 0.1; lo -= m; hi += m;
+  const X = i => pad.l + i / Math.max(1, n - 1) * pw, Y = v => pad.t + ph - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * ph;
+  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
+  for (const v of [lo + m, (lo + hi) / 2, hi - m]) txt(ctx, v.toFixed(2), pad.l - 5, Y(v), { align: 'right', bg: false, color: '#8e9ab2', font: '10px Segoe UI' });
+  const hl = (v, c) => { ctx.strokeStyle = c; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(pad.l + pw, Y(v)); ctx.stroke(); ctx.setLineDash([]); };
+  hl(tr[0], 'rgba(170,180,200,0.6)'); if (SOL.converged) hl(SOL.x[IDX[OUT]], 'rgba(255,216,77,0.7)');
+  ctx.strokeStyle = '#ffd84d'; ctx.lineWidth = 2.2; ctx.beginPath(); tr.slice(0, n).forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(0), Y(v))); ctx.stroke();
+  const k = Math.min(K, n - 1); ctx.strokeStyle = 'rgba(255,216,77,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(k), pad.t); ctx.lineTo(X(k), pad.t + ph); ctx.stroke();
+  txt(ctx, 'rounds of influence →', pad.l + pw, H - 9, { align: 'right', bg: false, color: '#8e9ab2', font: '10px Segoe UI' });
+  if (!SOL.converged) txt(ctx, 'Does not settle: the loop runs away', pad.l + pw / 2, pad.t + 14, { align: 'center', color: '#ff7aa8' });
+  else if (Math.abs(tr[0] - SOL.x[IDX[OUT]]) < 1e-6) txt(ctx, 'No change from the previous settings', pad.l + pw / 2, pad.t + 14, { align: 'center', color: '#8e9ab2' });
+  cv._geo = { pad, pw, n };
+}
+function drawContrib(){
+  const rows = INPUTS.map(id => [NODES[IDX[id]].label, DEC.ok ? DEC.c[id][IDX[OUT]] : NaN]);
+  rows.push(['Total', SOL.converged ? SOL.x[IDX[OUT]] : NaN]);
+  const m = Math.max(1e-9, ...rows.map(r => Math.abs(r[1])).filter(Number.isFinite)), neg = rows.some(r => r[1] < 0), z = neg ? 50 : 0;
+  $('contrib').innerHTML = rows.map(([lab, v], i) => { const w = Number.isFinite(v) ? Math.abs(v) / m * (neg ? 50 : 100) : 0, left = v < 0 ? z - w : z;
+    const col = i === rows.length - 1 ? '#ffd84d' : v < 0 ? '#ff7aa8' : '#6fe3cf';
+    return `<div class="row"><span>${lab}</span><div class="track"><div class="fill" style="left:${left}%;width:${w}%;background:${col}"></div>${neg ? '<div class="zero" style="left:50%"></div>' : ''}</div><span class="num">${fmt(v)}</span></div>`; }).join('');
+}
+
+// ============================ DETAIL PANEL (built on selection/param change, never per frame) ============================
+function renderDetail(){
+  if (!SEL){ $('detail').innerHTML = '<p>Click any box or arrow in the map to see what it does and switch it off.</p>'; return; }
+  const [kind, id] = SEL.split(':');
+  if (kind === 'n'){ const n = NODES[IDX[id]], ins = EDGES.filter(e => e.to === id), off = 'off_' + id;
+    $('detail').innerHTML = `<p><b>${n.label}</b> = ${D('x_' + id)}</p><p>${n.desc}</p>` +
+      (ins.length && n.kind !== 'input' ? `<p>Pushed by: ${ins.map(e => `${NODES[IDX[e.from]].label} ${D('f_' + e.id)}`).join(', ')}</p>` : '') +
+      `<button data-set="${off}=${P[off] ? 0 : 1}">${P[off] ? 'Switch it back on' : 'Switch it off'}</button>`; }
+  else { const e = EDGE[id], cut = 'cut_' + id;
+    $('detail').innerHTML = `<p><b>${NODES[IDX[e.from]].label} → ${NODES[IDX[e.to]].label}</b>: influence now ${D('f_' + id)}</p><p>${e.desc}</p>` +
+      `<button data-set="${cut}=${P[cut] ? 0 : 1}">${P[cut] ? 'Restore this link' : 'Cut this link'}</button>`; }
+}
+function dynValues(){   // every D('key') used anywhere must have an entry here
+  const v = {}, x = SOL.x, ok = SOL.converged;
+  NODES.forEach((n, i) => v['x_' + n.id] = ok ? fmt(x[i]) : 'runs away');
+  EDGES.forEach(e => v['f_' + e.id] = ok ? fmt(weight(e, P) * x[IDX[e.from]]) : 'runs away');
+  INPUTS.forEach(id => v['c_' + id] = DEC.ok ? fmt(DEC.c[id][IDX[OUT]]) : 'runs away');
+  LOOPS.forEach((l, i) => { v['loop' + (i + 1)] = l.name; v['gain' + (i + 1)] = fmt(l.gain); });
+  v.noLoop = fmt(settleOf({ cut_FM: true }));   // REPLACE: counterfactual numbers the steps quote
+  return v;
+}
+
+// ============================ MAIN ============================
+function renderAll(){
+  if (!G || Math.abs(G.W - $('diagram').clientWidth) > 2) buildDiagram();
+  const k = Math.min(K, SOL.trace.length - 1);
+  updateDiagram(SOL.trace[k].map(v => Number.isFinite(v) ? v : 0)); drawSettle(); drawContrib();
+  const dv = dynValues();
+  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
+  const lp = LOOPS.filter(l => l.type !== '0').map(l => `<b>${l.name}</b> ${l.type === 'B' ? 'balancing' : 'reinforcing'} (gain ${fmt(l.gain)})`).join(', ') || 'no active loops';
+  $('readout').innerHTML = SOL.converged
+    ? `Outcome <b>${dv['x_' + OUT]}</b> = ${INPUTS.map(id => `${NODES[IDX[id]].label} <b>${dv['c_' + id]}</b>`).join(' + ')} · loops: ${lp}`
+    : `<b style="color:#ff7aa8">The system does not settle</b>: a loop gain of 1 or more (or −1 or less) makes each round bigger than the last. Loops: ${lp}`;
+}
+function syncUI(){
+  for (const s of SPEC){ $(s.id).value = P[s.id]; $(s.id + '_o').textContent = s.fmt(P[s.id]); $(s.id).closest('.ctl').classList.toggle('overridden', !!P[s.off]); }
+  document.querySelectorAll('#whatSeg button').forEach(b => { const w = WHAT[b.dataset.w]; b.classList.toggle('on', TOGGLES.every(k => !!P[k] === !!w[k])); });
+}
+function setParams(o){ Object.assign(P, o); syncUI(); recompute(); renderDetail(); }
+function goStep(i){
+  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
+  FOCUS = st.focus || null; if (st.params) setParams({ ...st.params });
+  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
+  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
+  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
+}
+function init(){
+  for (const s of SPEC){ const d = document.createElement('div'); d.className = 'ctl';
+    d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    $('params').appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); }
+  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
+  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
+  const onSet = ev => { const b = ev.target.closest('button[data-set]'); if (!b) return;
+    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('='); o[k.trim()] = k.trim().startsWith('off_') || k.trim().startsWith('cut_') ? v.trim() === '1' : parseFloat(v); }); setParams(o); };
+  $('stepText').addEventListener('click', onSet); $('detail').addEventListener('click', onSet);
+  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...Object.fromEntries(TOGGLES.map(k => [k, false])), ...WHAT[b.dataset.w] }));
+  $('reset').onclick = () => { FOCUS = null; setParams({ ...BASE }); };
+  $('play').onclick = () => { K = 0; playing = true; dirty = true; };
+  $('diagram').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); SEL = t ? t.dataset.pick : null; renderDetail(); dirty = true; });
+  const ch = $('settle'), pick = e => { const g = ch._geo; if (!g) return; playing = false;
+    K = Math.max(0, Math.min(g.n - 1, Math.round((e.clientX - ch.getBoundingClientRect().left - g.pad.l) / g.pw * (g.n - 1)))); dirty = true; };
+  ch.addEventListener('pointerdown', e => { ch.setPointerCapture(e.pointerId); pick(e); }); ch.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
+  window.addEventListener('resize', () => dirty = true);
+  syncUI(); goStep(0); renderDetail();
+  let last = null;
+  const frame = now => {
+    if (playing){ if (last === null || now - last > 110){ last = now; K++; dirty = true;
+      if (K >= Math.min(SOL.trace.length - 1, (G && $('settle')._geo ? $('settle')._geo.n - 1 : 40))){ K = SOL.trace.length - 1; playing = false; } } } else last = null;
+    if (dirty){ dirty = false; renderAll(); }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>
