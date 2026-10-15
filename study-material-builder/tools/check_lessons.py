@@ -181,7 +181,7 @@ def run(paths, shots):
                         if fix.get("traps"):
                             inp.fill(trap_input(fix.get("kind"), next(iter(fix["traps"])))); box.locator("button.primary").click()
                             assert "wrong" in fb(), "fix trap not flagged"
-                        inp.fill(fix["answer"]); box.locator("button.primary").click()
+                        inp.fill(fix["answer"][0] if isinstance(fix["answer"], list) else fix["answer"]); box.locator("button.primary").click()
                         assert "right" in fb(), "correct fix rejected"
                     elif t == "explain":
                         box.locator("textarea").fill("Checking that a whole sentence is saved here.")
