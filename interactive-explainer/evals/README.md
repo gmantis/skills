@@ -16,7 +16,8 @@ must reproduce.
 1. Make an empty workspace and copy the case's `source.md` into it: `mkdir "$TEMP/eval-<id>" && cp evals/cases/<id>/source.md "$TEMP/eval-<id>/"`.
 2. Start a fresh agent (a subagent is fine) with the working directory set to that folder and the case's `prompt`
    (prefix: "Use the interactive-explainer skill at ~/.claude/skills/interactive-explainer. Work in <folder>.").
-   Don't help it; note the transcript path (`~/.claude/projects/<cwd-slug>/<session>.jsonl`, or the subagent's output file).
+   Don't help it; note the transcript path: `~/.claude/projects/<cwd-slug>/<session>.jsonl` for a session, or
+   `~/.claude/projects/<cwd-slug>/<parent-session>/subagents/agent-<id>.jsonl` for a subagent (its task output file can be empty).
 3. Score it: `node scripts/eval-score.js evals/cases/<id> "<folder>/<page>.html" --transcript <jsonl> --label "<skill version>"`.
    The card is appended to `evals/results.jsonl`.
 4. Look at the page yourself too (open it; read the check's `contact.png`): the score can't judge whether it explains well.
