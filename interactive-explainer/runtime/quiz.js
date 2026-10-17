@@ -1,4 +1,4 @@
-// Retrieval-practice quiz for lessons. Copy into the workspace's assets/ and link it from every lesson.
+// interactive-explainer runtime: quiz.js. Retrieval-practice quiz for lessons; include with <script data-ie="quiz"></script>.
 //   Quiz.mount(el, questions, { lesson: '0003' })
 //   question: { q, options: [..], answer: index, why: 'explanation with a <a href>citation</a>', from: '0001' (optional) }
 // - `from` marks a spaced-review question from an earlier lesson; it is tagged "Review · lesson 0001".
@@ -53,9 +53,3 @@
   root.Quiz = Quiz;
 })(window);
 
-/* Minimal styles (put them in the workspace's course.css):
-.quiz .q{margin:1em 0}.quiz .opts{display:grid;gap:.4em}.quiz button{text-align:left;padding:.5em .8em;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font:inherit}
-.quiz button.right{border-color:#2a8a4a;background:#e8f6ec}.quiz button.wrong{border-color:#c0392b;background:#fbeaea}
-.quiz .why{display:none;margin-top:.4em;font-size:.95em}.quiz .why.show{display:block}.quiz .tag{font-size:.75em;padding:.1em .5em;border-radius:9px;background:#eef;color:#446}
-.quiz-results textarea{width:100%;box-sizing:border-box;font:12px/1.4 ui-monospace,monospace}
-*/

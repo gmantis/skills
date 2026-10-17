@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a token bucket limits requests — interactive explainer</title>
+<!--
+  SKELETON (machine shape) for the interactive-explainer skill. Guide: shapes/machine.md. API: runtime/API.md.
+  Demo: a token-bucket rate limiter drawn as a machine: tokens drip into a glass tube at r per second up to b; each
+  request (a box on the conveyor) takes a token and passes the barrier, or is pushed down the reject chute. The
+  figure, the chart and the readout are all drawn from one pure model at the selected time (slider, ← → = one
+  request, play). Validated against the exact long-run pass share (M/D/1/K), its large-bucket limit min(1, r/λ),
+  and the burst bound. Build: node scripts/build.js <this file> --from "$TEMP/<name>". Replace everything marked REPLACE.
+-->
+<style data-ie="core"></style>
+<style data-ie="machine"></style>
+<style>/* page-only styles: figure beside the two charts on wide screens */
+  .mgrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:14px;align-items:start}
+  .mgrid .charts{display:flex;flex-direction:column;gap:14px}
+  @media (max-width:1250px){.mgrid{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>How does a rate limiter decide which requests get through? (REPLACE)</h1>
+  <p class="lede">A token bucket is a small machine: tokens drip into a bucket at a steady rate, up to its capacity, and every request must take one to pass (REPLACE). Follow the tour, scrub time with the slider or <kbd>←</kbd> <kbd>→</kbd> (one request at a time), and click any part of the figure to see what it does.</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> in the long run at most r = <span class="dyn" data-dyn="r"></span> requests per second get through, plus bursts of up to b = <span class="dyn" data-dyn="b"></span>. With <span class="dyn" data-dyn="lam"></span> arriving, <span class="dyn" data-dyn="exact"></span> pass; a bucket of any size could not beat <span class="dyn" data-dyn="limit"></span>.</p>
+  <div class="stat"><b data-dyn="exact"></b><span>pass in the long run</span></div>
+  <div class="stat"><b data-dyn="limit"></b><span>large-bucket limit min(1, r/λ)</span></div>
+  <div class="stat"><b data-dyn="tokens"></b><span>tokens in the bucket now</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Time</h4></div>
+</aside>
+<main>
+  <div class="mgrid">
+  <section class="panel"><h3>The machine at this moment</h3>
+    <p class="sub">Boxes are requests riding to the gate. Blue discs are tokens; the falling drop is the next token. Green: passed; red: pushed down the chute to the reject bin.</p>
+    <div id="machine"></div></section>
+  <div class="charts">
+    <section class="panel"><h3>Tokens in the bucket over time</h3><p class="sub">Each step down is a request that took a token; red ticks are rejected requests. Click to jump to a moment.</p>
+      <div id="tokChart"></div></section>
+    <section class="panel"><h3>Long run: share of requests that pass</h3><p class="sub">Exact for Poisson arrivals at this bucket size; dashed: a very large bucket, min(1, r/λ). Click to set the arrival rate.</p>
+      <div id="runChart"></div></section>
+  </div>
+  </div>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the machine behave like the analysis says?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>REPLACE: requests arrive at random (a Poisson stream, λ per second, seeded so the trace is repeatable). The bucket starts full with b tokens and gains r tokens per second, never more than b. A request that finds at least one token takes it and passes; otherwise it is rejected and takes nothing. Everything on the page (figure, chart, readout) is computed from that one rule at the selected time.</p>
+    <p>The long-run share is exact: the bucket's shortfall b − tokens behaves like the work in a queue with one server, fixed service time 1/r and room for b requests (M/D/1/K, K = b), whose loss share comes from its embedded Markov chain. As b grows it tends to min(1, r/λ). The figure's motion is eased between selected times; the positions of boxes and the barrier are pure functions of time, so scrubbing backwards works.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="machine"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, build with --from "$TEMP/<name>".
+     The demo model below is the inlined copy; build.js keeps it until a model.js file is found. -->
+<script data-ie-file="model.js">
+// Demo model for the machine shape: a token-bucket rate limiter. Tokens drip in at r per second up to a capacity b;
+// each request takes one token and passes, or is rejected when fewer than one token is left. Pure functions, no DOM.
+const REAL = { r: 2, b: 5, lam: 3, burst: false };
+const T_END = 30;                       // seconds in the demo trace
+const BURST = { t: 12, n: 8, gap: 0.05 };   // the what-if burst: n requests gap seconds apart from t
+
+function rng(seed){ let s = seed | 0; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// Poisson arrivals at rate lam on [0, tEnd): exponential gaps from a seeded generator (same seed -> same trace)
+function arrivals(lam, tEnd, seed = 11){ const u = rng(seed), out = []; let t = 0; for (;;){ t += -Math.log(1 - u()) / lam; if (t >= tEnd) return out; out.push(t); } }
+// Run the bucket over a list of arrival times. Bucket starts full.
+function runBucket(times, r, b){
+  let tok = b, last = 0; const ev = [];
+  for (const t of times){
+    tok = Math.min(b, tok + r * (t - last)); last = t;
+    const pass = tok >= 1 - 1e-12, before = tok; if (pass) tok -= 1;
+    ev.push({ t, pass, before, after: tok });
+  }
+  return ev;
+}
+function simulate(p){
+  let times = arrivals(p.lam, T_END);
+  if (p.burst) times = times.concat(Array.from({ length: BURST.n }, (_, i) => BURST.t + i * BURST.gap)).sort((a, c) => a - c);
+  const ev = runBucket(times, p.r, p.b);
+  return { ev, passed: ev.filter(e => e.pass).length, rejected: ev.filter(e => !e.pass).length, p };
+}
+// index of the last event at or before t (-1 if none)
+function lastIdx(ev, t){ let lo = 0, hi = ev.length - 1, k = -1; while (lo <= hi){ const m = (lo + hi) >> 1; if (ev[m].t <= t){ k = m; lo = m + 1; } else hi = m - 1; } return k; }
+// The whole machine state at time t: what the figure, the chart and the readout all draw from.
+function stateAt(sim, t){
+  const { ev, p } = sim, k = lastIdx(ev, t), e = k >= 0 ? ev[k] : null;
+  const tokens = Math.min(p.b, (e ? e.after : p.b) + p.r * (t - (e ? e.t : 0)));
+  let passed = 0, rejected = 0; for (let i = 0; i <= k; i++) ev[i].pass ? passed++ : rejected++;
+  // phase of the next drip: 0 just after a whole token arrived, 1 when the next one lands (none while full)
+  const full = tokens >= p.b - 1e-9, phase = full ? 0 : tokens - Math.floor(tokens + 1e-9);
+  return { t, tokens, full, phase, passed, rejected, arrived: k + 1, last: e, idx: k };
+}
+// tokens(t) as chart points: rises at r, flat at b, drops by one at each pass
+function tokenSeries(sim, tEnd = T_END){
+  const { ev, p } = sim, pts = []; let tok = p.b, last = 0; pts.push([0, tok]);
+  const rise = to => { const tf = last + (p.b - tok) / p.r; if (tok < p.b && tf < to){ pts.push([tf, p.b]); } tok = Math.min(p.b, tok + p.r * (to - last)); last = to; pts.push([to, tok]); };
+  for (const e of ev){ rise(e.t); if (e.pass){ tok -= 1; pts.push([e.t, tok]); } }
+  rise(tEnd); return pts;
+}
+// Exact long-run share of requests that pass, Poisson arrivals: the bucket is an M/D/1/K queue with K = b
+// (deficit b − tokens is the workload, each request brings one token of work, served at r per second).
+// Embedded chain at departures, a_k = Poisson(k; rho) arrivals per service; share passing = 1 / (pi_0 + rho).
+function passShare(lam, r, b){
+  const rho = lam / r, K = Math.round(b);
+  if (K < 1) return 0;
+  const a = []; let s = Math.exp(-rho); for (let k = 0; k <= K + 1; k++){ a.push(s); s *= rho / (k + 1); }
+  const n = K, P = Array.from({ length: n }, () => new Float64Array(n));
+  for (let i = 0; i < n; i++){ const base = Math.max(0, i - 1); let acc = 0;
+    for (let j = base; j < n - 1; j++){ const w = a[j - base]; P[i][j] = w; acc += w; } P[i][n - 1] = 1 - acc; }
+  // stationary distribution: solve pi (P - I) = 0 with sum(pi) = 1 (Gaussian elimination; the last equation is replaced)
+  const A = Array.from({ length: n }, (_, j) => { const row = new Float64Array(n + 1); for (let i = 0; i < n; i++) row[i] = P[i][j] - (i === j ? 1 : 0); return row; });
+  A[n - 1] = new Float64Array(n + 1).fill(1);
+  for (let c = 0; c < n; c++){ let piv = c; for (let r2 = c + 1; r2 < n; r2++) if (Math.abs(A[r2][c]) > Math.abs(A[piv][c])) piv = r2;
+    [A[c], A[piv]] = [A[piv], A[c]]; for (let r2 = 0; r2 < n; r2++){ if (r2 === c) continue; const f = A[r2][c] / A[c][c]; if (f) for (let k = c; k <= n; k++) A[r2][k] -= f * A[c][k]; } }
+  const pi = A.map((row, i) => row[n] / row[i]);
+  return 1 / (pi[0] + rho);
+}
+const fluidLimit = (lam, r) => Math.min(1, r / lam);     // a very large bucket: pass rate min(1, r/λ)
+// long seeded run, with batch means for an honest standard error
+function longRun(p, n = 200000, seed = 5, batches = 20){
+  const times = []; const u = rng(seed); let t = 0; for (let i = 0; i < n; i++){ t += -Math.log(1 - u()) / p.lam; times.push(t); }
+  const ev = runBucket(times, p.r, p.b), m = Math.floor(n / batches), bm = [];
+  for (let k = 0; k < batches; k++){ let s = 0; for (let i = k * m; i < (k + 1) * m; i++) s += ev[i].pass; bm.push(s / m); }
+  const mean = bm.reduce((a, c) => a + c, 0) / batches, sd = Math.sqrt(bm.reduce((a, c) => a + (c - mean) ** 2, 0) / (batches - 1));
+  return { share: mean, se: sd / Math.sqrt(batches) };
+}
+// the conformance (burst) bound: in any window [s, t], passes <= b + r (t - s). Returns the worst slack (>= 0 is fine).
+function burstSlack(sim){
+  const ps = sim.ev.filter(e => e.pass).map(e => e.t), { r, b } = sim.p; let worst = Infinity;
+  for (let i = 0; i < ps.length; i++) for (let j = i; j < ps.length; j++) worst = Math.min(worst, b + r * (ps[j] - ps[i]) - (j - i + 1));
+  return worst;
+}
+if (typeof module === 'object' && module.exports) module.exports = { REAL, T_END, BURST, arrivals, runBucket, simulate, lastIdx, stateAt, tokenSeries, passShare, fluidLimit, longRun, burstSlack };
+</script>
+<script>
+// ============================ PAGE: sources, the figure, steps, views (REPLACE) ============================
+const { fmt } = IE, { ease, bump } = IE.machine;
+IE.sources({   // every rule or number the page takes from the source gets an entry; cite with cite('id')
+  tb: { title: 'Token bucket, Wikipedia (REPLACE with your source)', url: 'https://en.wikipedia.org/wiki/Token_bucket', where: 'Algorithm',
+    quote: 'A token is added to the bucket every 1/r seconds. The bucket can hold at the most b tokens. If a token arrives when the bucket is full, it is discarded.' },
+});
+
+// ---- the figure (REPLACE): parts in model units; x to the lower right, y to the lower left, z up
+const V = 3, XD = 4.2, XEND = 11, TOK0 = 0.32, TOKH = 0.22, BMAX = 10, POOL = 26;   // conveyor speed, decision point, rail end, token stack
+const fig = IE.machine('machine', { fig: 'Fig 1', title: 'Token-bucket rate limiter', hint: 'Click a part to see what it does.', label: 'Isometric figure of the token-bucket machine', maxHeight: 560 });
+const P_ = (id, o) => fig.part(id, o);
+P_('base', { name: 'Base plate', layer: 0, info: 'Holds everything in place. It has no role in the rule.' }).box([-0.5, -2.9, -0.35], [13.1, 8.8, 0.35], 'base');
+[[-0.15, -2.55], [12.25, -2.55], [-0.15, 5.55], [12.25, 5.55]].forEach((c, i) => P_('screw' + i, { name: 'Screws', pick: 'screws', info: 'Four screws fix the plate. Decoration, like most real machines have.' }).cyl([c[0], c[1], 0], 0.16, 0.07, 'steel'));
+[[0.3, 1.45], [0.3, 2.3], [10.45, 1.45], [10.45, 2.3]].forEach((c, i) => P_('leg' + i, { name: 'Conveyor frame', pick: 'frame', info: 'Legs and bed of the conveyor that brings requests to the gate.' }).box([c[0], c[1], 0], [0.25, 0.25, 0.55], 'dark'));
+P_('bed', { name: 'Conveyor frame', pick: 'frame' }).box([0, 1.4, 0.55], [XEND, 1.2, 0.2], 'dark');
+P_('railL', { name: 'Rails', pick: 'rails', info: s => `Requests ride the rails at a steady speed, so a box's distance from the gate is its time to arrival. ${s ? s.st.arrived : 0} have arrived so far.` }).box([0, 1.55, 0.75], [XEND, 0.1, 0.12], 'steel');
+P_('railR', { name: 'Rails', pick: 'rails' }).box([0, 2.35, 0.75], [XEND, 0.1, 0.12], 'steel');
+for (let k = 0; k < 4; k++) P_('tick' + k, { name: 'Time marks', pick: 'ticks', info: `Each mark is 1 unit of rail: a request ${fmt.num(1 / V, 2)} s before it reaches the decision point.` }).box([XD - 0.03 - (k + 1), 2.6, 0.6], [0.06, 0.05, 0.12], 'ink');
+P_('postA', { name: 'Gate', pick: 'gate', info: 'The gate frame holds the barrier and the signal lamp.' }).box([5.85, 1.0, 0], [0.3, 0.3, 2.0], 'steel');
+P_('postB', { name: 'Gate', pick: 'gate' }).box([5.85, 2.7, 0], [0.3, 0.3, 2.0], 'steel');
+P_('cross', { name: 'Gate', pick: 'gate' }).box([5.85, 1.0, 2.0], [0.3, 2.0, 0.18], 'steel');
+const lamp = P_('lamp', { name: 'Signal lamp', info: s => s && s.lastAge < 0.6 ? (s.st.last.pass ? 'Green: the last request found a token and passed.' : 'Red: the last request found the bucket empty and was rejected.') : 'Lights green for a pass and red for a rejection.', mat: 'steel' }).cyl([6.0, 2.0, 2.18], 0.15, 0.14);
+const arm = P_('arm', { name: 'Barrier arm', info: 'Lifts only for a request that took a token. Rejected requests never reach it.' }).box([5.93, 1.3, 0.95], [0.14, 1.4, 0.12], 'rubber');
+P_('pusher', { name: 'Reject pusher', info: 'When the bucket has less than one token, the pusher shoves the request off the conveyor.' }).box([XD - 0.3, 0.15, 0], [0.6, 0.85, 1.3], 'dark');
+const plunger = P_('plunger', { name: 'Reject pusher', pick: 'pusher' }).box([XD - 0.2, 1.0, 0.95], [0.4, 0.35, 0.22], 'steel');
+P_('chute', { name: 'Reject chute', info: 'Rejected requests slide down here. Nothing is queued: a rejected request is gone.' }).prism([[2.6, 0.86], [4.3, 0.62], [4.3, 0.54], [2.6, 0.78]], XD - 0.4, 0.8, 'steel', { axis: 'x' });
+const bin = (id, x, y, name, info, mat) => { const o = { name, pick: id, info };
+  P_(id + 'B', { ...o, bias: -1 }).box([x, y, 0], [1.2, 0.08, 0.62], mat).box([x, y, 0], [0.08, 1.2, 0.62], mat);
+  const pile = P_(id + 'P', o); P_(id + 'F', { ...o, bias: 1 }).box([x, y + 1.12, 0], [1.2, 0.08, 0.62], mat).box([x + 1.12, y, 0], [0.08, 1.2, 0.62], mat); return pile; };
+const binPile = bin('bin', XD - 0.6, 4.3, 'Reject bin', s => `Rejected so far: <b>${s ? s.st.rejected : 0}</b>.`, 'steel');
+const trayPile = bin('tray', 11.2, 1.4, 'Passed tray', s => `Passed so far: <b>${s ? s.st.passed : 0}</b>.`, 'steel');
+P_('pedestal', { name: 'Token bucket', pick: 'tube' }).cyl([6.0, -0.5, 0], 0.62, 0.3, 'dark');
+const tubeInfo = s => `The bucket. It holds at most b = ${s ? s.P.b : '?'} tokens (red ring); now ${s ? fmt.num(s.st.tokens, 2) : '?'}.`;
+P_('tubeBack', { name: 'Token bucket', pick: 'tube', bias: -1, info: tubeInfo }).cyl([6.0, -0.5, 0.3], 0.5, 2.55, 'glass', { inside: true, cls: 'glass' });
+P_('tubeFront', { name: 'Token bucket', pick: 'tube', bias: 1, info: tubeInfo }).cyl([6.0, -0.5, 0.3], 0.5, 2.55, 'glass', { cls: 'glass' });
+const tokens = Array.from({ length: BMAX }, (_, i) => P_('tok' + i, { name: 'Tokens', pick: 'tokens', lit: true, info: s => `One disc per whole token: ${s ? Math.floor(s.st.tokens + 1e-9) : '?'} now. Each passing request uses one.` }).cyl([6.0, -0.5, TOK0 + i * TOKH], 0.4, 0.18, 'token'));
+const collar = P_('collar', { name: 'Capacity mark', info: s => `Capacity b = ${s ? s.P.b : '?'}: a drop that lands on a full bucket is discarded.` }).cyl([6.0, -0.5, 0], 0.56, 0.06, 'bad');
+const ruler = P_('ruler', { name: 'Scale', info: 'One mark per token level.' }).box([6.62, -0.6, 0.3], [0.06, 0.12, 2.55], 'steel');
+for (let i = 1; i <= BMAX; i++) ruler.box([6.68, -0.58, TOK0 + i * TOKH - 0.02], [0.08, 0.08, 0.025], 'dark');
+P_('column', { name: 'Drip regulator', pick: 'regulator', info: s => `Releases one token every 1/r = ${s ? fmt.num(1 / s.P.r, 2) : '?'} s, whatever the traffic.` }).box([5.6, -2.6, 0], [0.8, 0.8, 3.5], 'dark');
+P_('dial', { name: 'Drip regulator', pick: 'regulator' }).cyl([6.0, -1.8, 2.5], 0.26, 0.06, 'steel', { axis: 'y' });
+P_('valve', { name: 'Drip regulator', pick: 'regulator' }).cyl([6.0, -1.15, 3.24], 0.2, 0.05, 'brass');
+P_('pipe', { name: 'Drip pipe', info: 'Carries the drip from the regulator to the bucket.' }).cyl([6.0, -1.8, 3.15], 0.09, 1.3, 'steel', { axis: 'y' });
+P_('nozzle', { name: 'Drip pipe', pick: 'pipe' }).cyl([6.0, -0.5, 2.9], 0.07, 0.3, 'steel');
+const drop = P_('drop', { name: 'Next token', lit: true, info: s => s && s.st.full ? 'The bucket is full, so the next drop is discarded.' : `The next token, ${s ? fmt.num((1 - s.st.phase) / s.P.r, 2) : '?'} s from landing.` }).cyl([6.0, -0.5, 0], 0.1, 0.12, 'token');
+const parcels = Array.from({ length: POOL }, (_, i) => P_('req' + i, { name: 'Requests', pick: 'requests', bias: 0.5, info: 'Each box is one request. Its distance from the gate is its time to arrival.', mat: 'paper' }).box([-0.19, -0.19, 0], [0.38, 0.38, 0.38]).show(false));
+fig.build();
+
+// ---- the figure's pose at time t: a pure function of the model (REPLACE with your mechanism)
+const pileH = n => 0.03 + Math.min(0.5, 0.012 * n);
+let lastPiles = '';
+function pose(t, P){
+  const st = stateAt(SIM, t), ev = SIM.ev;
+  tokens.forEach((p, i) => p.show(i < Math.floor(st.tokens + 1e-9) && i < P.b));
+  collar.move([0, 0, TOK0 + P.b * TOKH - 0.04]);
+  const top = TOK0 + Math.floor(st.tokens + 1e-9) * TOKH, z0 = 2.85;
+  drop.show(!st.full).move([0, 0, z0 - ease.in(st.phase) * (z0 - top)]);
+  let lift = 0, push = 0, used = 0;
+  const k0 = Math.max(0, lastIdx(ev, t - 2.8));   // the barrier lifts 0.3 s after a pass: the box needs that long to reach it
+  for (let k = k0; k <= st.idx; k++){ const e = ev[k], a = t - e.t; if (e.pass) lift = Math.max(lift, bump(a - 0.3, 0.15, 0.35, 0.25)); else push = Math.max(push, bump(a, 0.25, 0.05, 0.3)); }
+  arm.move([0, 0, 0.7 * lift]); plunger.move([0, 1.4 * push, 0]);
+  const lastAge = st.last ? t - st.last.t : Infinity;
+  lamp.material(lastAge < 0.6 ? (st.last.pass ? 'good' : 'bad') : 'steel');
+  // requests on the conveyor: approaching (t < arrival), then passing to the tray or pushed down the chute
+  for (let k = k0; k < ev.length && used < POOL; k++){
+    const e = ev[k], a = t - e.t, lane = k % 2 ? 0.2 : -0.2, p = parcels[used];
+    let x = XD + V * a, y = 2 + lane, z = 0.87, on = true;
+    if (a < 0){ if (x < 0.1) break; }
+    else if (e.pass){ if (x > XEND){ const f = (a - (XEND - XD) / V) / 0.3; x = XEND + 0.6 * Math.min(1, f); z = 0.87 - ease.in(f) * (0.87 - pileH(st.passed)); on = f < 1; } }
+    else { x = XD; const f1 = Math.min(1, a / 0.25), f2 = IE.clamp((a - 0.25) / 0.6, 0, 1), f3 = IE.clamp((a - 0.85) / 0.25, 0, 1);
+      y = 2 + lane + ease.inOut(f1) * (0.95 - lane) + f2 * 1.65 + f3 * 0.35; z = 0.87 - f2 * 0.27 - ease.in(f3) * (0.6 - pileH(st.rejected)); on = f3 < 1; }
+    if (!on) continue;
+    p.show(true).move([x, y, z]).material(a < 0 ? 'paper' : e.pass ? 'good' : 'bad'); used++;
+  }
+  for (let k = used; k < POOL; k++) parcels[k].show(false);
+  const piles = st.passed + '|' + st.rejected;
+  if (piles !== lastPiles){ lastPiles = piles; binPile.clear().box([XD - 0.5, 4.4, 0], [1.0, 1.0, pileH(st.rejected)], 'bad'); trayPile.clear().box([11.3, 1.5, 0], [1.0, 1.0, pileH(st.passed)], 'good'); }
+  fig.state = { st, P, lastAge };
+  fig.update();
+  return st;
+}
+
+// ---- app
+let SIM = null, tokChart = null, runChart = null, EXACT = 0, SHOW = IE.machine.follow(0, { maxJump: 3 });   // eases short moves (← →, dragging); cuts on tour jumps
+const evAt = (sim, pred) => sim.ev.find(pred);
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'lam', label: 'Requests arriving per second, λ', min: 0.5, max: 6, step: 0.1, fmt: v => fmt.num(v, 1) },
+    { id: 'r', label: 'Tokens added per second, r', min: 0.5, max: 5, step: 0.1, fmt: v => fmt.num(v, 1) },
+    { id: 'b', label: 'Bucket capacity, b', min: 1, max: BMAX, step: 1, fmt: v => fmt.int(v) },
+  ],
+  toggles: [{ id: 'burst', label: `Add a burst: ${BURST.n} requests within ${fmt.num((BURST.n - 1) * BURST.gap, 2)} s at t = ${BURST.t} s` }],
+  whatIf: [{ key: 'light', label: 'Light load', set: { lam: 1.2, burst: false } }, { key: 'real', label: 'Overload', set: { lam: 3, burst: false } }, { key: 'burst', label: 'Overload + burst', set: { lam: 3, burst: true } }],
+  sel: { label: 'Time', min: 0, max: T_END, step: 0.01, value: 0.4, fmt: v => fmt.num(v, 2) + ' s', play: { rate: 1 }, keyHint: 'one request',
+    stepBy(dir, app){ const t = app.sel, ev = SIM.ev; const e = dir > 0 ? ev.find(e => e.t + 0.4 > t + 1e-6) : [...ev].reverse().find(e => e.t + 0.4 < t - 1e-6); if (e) app.setSel(e.t + 0.4); } },
+  steps: [
+    { title: '1 · One request, one token', sel: a => SIM.ev[0].t + 0.45,
+      html: () => `<p>The bucket starts full: b = ${D('b')} tokens (the blue discs). The first request arrives at ${D('t0')}, takes one token, and the barrier lifts${cite('tb')}.</p>
+        <p>Press <kbd>→</kbd> to step one request at a time, or ▶ Play. Click the tube, the drip or the pusher to see what each does.</p>` },
+    { title: '2 · Tokens drip back in', params: { lam: 1.2 }, sel: a => (evAt(SIM, e => e.before < a.P.b - 1.5) || SIM.ev[3]).t - 0.25,
+      html: () => `<p>Tokens come back at r = ${D('r')} per second: one drop every ${D('dripGap')}. At this light load (λ = ${D('lam')}) the bucket rarely runs dry, and a full bucket discards the drop.</p>
+        <p><button data-set="r=0.8">Slow the drip</button> <button data-set="r=2">Normal drip</button></p>` },
+    { title: '3 · More requests than tokens', sel: a => (evAt(SIM, e => !e.pass) || SIM.ev[0]).t + 0.3,
+      html: () => `<p>With λ = ${D('lam')} requests a second against r = ${D('r')} tokens, the starting tokens run out. At ${D('firstRej')} the bucket holds less than one token, so the pusher shoves the request into the reject bin.</p>
+        <p>The chart shows the bucket emptying, then hovering near zero.</p>` },
+    { title: '4 · A burst', params: { burst: true }, sel: BURST.t + 0.6,
+      html: () => `<p>${BURST.n} extra requests arrive within ${D('burstSpan')} (${D('burstN')} in that window with the regular traffic). Only the ${D('tokBurst')} tokens waiting in the bucket (plus the drip) can serve them: ${D('burstPass')} pass and ${D('burstRej')} are rejected. However bursty the traffic, no window of τ seconds lets more than b + r·τ through.</p>
+        <p><button data-set="b=10">Bucket of 10</button> <button data-set="b=5">Bucket of 5</button></p>` },
+    { title: '5 · A bigger bucket after a quiet spell', params: { burst: true, b: 10, lam: 1.2 }, sel: BURST.t + 0.6,
+      html: () => `<p>At light load a 10-token bucket has refilled to ${D('tokBurst')} tokens when the burst comes, so ${D('burstPass')} of the ${D('burstN')} requests in the burst window pass. A bigger bucket buys bursts, not average rate: the long-run chart barely moves.</p>` },
+    { title: '6 · Across every arrival rate', sel: 10,
+      html: () => `<p>The right-hand chart steps up from this one run to the long run. For b = ${D('b')} the exact share passing is ${D('exact')} at λ = ${D('lam')}; a bucket of any size could not beat min(1, r/λ) = ${D('limit')}.</p>
+        <p><button data-set="lam=1.5">λ below r</button> <button data-set="lam=5">Heavy overload</button> <button data-set="b=1">Bucket of 1</button></p>` },
+  ],
+  recompute(P){
+    SIM = simulate(P); EXACT = passShare(P.lam, P.r, P.b);
+    const tok = tokenSeries(SIM), rej = SIM.ev.filter(e => !e.pass).flatMap(e => [[e.t, -0.45], [e.t, 0.45], [NaN, NaN]]);
+    const spec = { title: 'Tokens in the bucket', summary: `${SIM.passed} passed, ${SIM.rejected} rejected in ${T_END} s`, height: 200,
+      x: { min: 0, max: T_END, label: 'time (s)', fmt: v => fmt.num(v, 0) }, y: { min: -0.6, max: P.b + 1, fmt: v => fmt.num(v, 0), ticks: IE.range(0, P.b, P.b + 1).filter(v => v % Math.max(1, Math.ceil(P.b / 4)) === 0) },
+      series: [{ id: 'tok', label: 'tokens', color: 'accent', points: tok, width: 2.2 }, { id: 'rej', label: 'rejected', color: 'bad', points: rej, width: 2 }],
+      hlines: [{ y: P.b, label: `capacity b = ${P.b}` }] };
+    tokChart ? tokChart.set(spec) : (tokChart = IE.lineChart(document.getElementById('tokChart'), { ...spec, onPick: x => { app.pause(); app.setSel(x); } }));
+    const lams = IE.range(0.2, 8, 79);
+    const rspec = { title: 'Share of requests that pass, long run', summary: `${fmt.pct(EXACT)} at λ = ${P.lam}`, height: 200,
+      x: { min: 0, max: 8, label: 'requests arriving per second, λ', fmt: v => fmt.num(v, 0) }, y: { min: 0, max: 1, fmt: v => fmt.pct(v), ticks: [0, 0.25, 0.5, 0.75, 1] },
+      series: [{ id: 'lim', label: 'very large bucket', color: 'ink', points: lams.map(l => [l, fluidLimit(l, P.r)]), ghost: true },
+               { id: 'b1', label: 'b = 1', color: 's2', points: lams.map(l => [l, passShare(l, P.r, 1)]), ghost: true },
+               { id: 'ex', label: `b = ${P.b}`, color: 'accent', points: lams.map(l => [l, passShare(l, P.r, P.b)]), width: 2.6 }],
+      marks: [{ x: P.lam, y: EXACT, color: 'accent' }, { x: P.lam, y: SIM.passed / SIM.ev.length, color: 'muted', r: 3.5 }], cursor: P.lam };
+    runChart ? runChart.set(rspec) : (runChart = IE.lineChart(document.getElementById('runChart'), { ...rspec, onPick: x => app.set({ lam: Math.round(IE.clamp(x, 0.5, 6) * 10) / 10 }) }));
+  },
+  render({ P, sel, app }){
+    const tShow = SHOW.update(sel, app.playing);
+    const st = pose(tShow, P);
+    if (SHOW.moving) app.redraw();                      // keep easing toward the selected time
+    const now = stateAt(SIM, sel);
+    fig.readout(`t = <b>${fmt.num(sel, 1)} s</b> · tokens <b>${fmt.num(now.tokens, 2)}</b> / ${P.b} · passed <b>${now.passed}</b> · rejected <b>${now.rejected}</b>`);
+    tokChart.set({ cursor: sel, marks: [{ x: sel, y: now.tokens, color: 'accent' }] });
+    valid.render();
+  },
+  dyn({ P, sel }){ const st = stateAt(SIM, sel), fr = evAt(SIM, e => !e.pass), bu = SIM.ev.filter(e => e.t >= BURST.t - 1e-9 && e.t <= BURST.t + (BURST.n - 1) * BURST.gap + 1e-9);
+    return { r: fmt.num(P.r, 1) + '/s', b: String(P.b), lam: fmt.num(P.lam, 1) + '/s', exact: fmt.pct(EXACT, 0), limit: fmt.pct(fluidLimit(P.lam, P.r), 0),
+      tokens: fmt.num(st.tokens, 2), t0: fmt.num(SIM.ev[0].t, 2) + ' s', dripGap: fmt.num(1 / P.r, 2) + ' s', firstRej: fr ? 't = ' + fmt.num(fr.t, 2) + ' s' : 'no time in this run',
+      burstSpan: fmt.num((BURST.n - 1) * BURST.gap, 2) + ' s', burstPass: P.burst ? String(bu.filter(e => e.pass).length) : '–', burstRej: P.burst ? String(bu.filter(e => !e.pass).length) : '–', arrived: String(st.arrived), burstN: P.burst ? String(bu.length) : '–', tokBurst: fmt.num(stateAt(SIM, BURST.t - 1e-6).tokens, 1) }; },
+  readout({ P, sel }){ const st = stateAt(SIM, sel), e = st.last;
+    return `At <b>${fmt.num(sel, 2)} s</b>: ${fmt.num(st.tokens, 2)} of ${P.b} tokens · ${st.arrived} requests so far, <b>${st.passed}</b> passed, <b>${st.rejected}</b> rejected` +
+      (e ? ` · last request at ${fmt.num(e.t, 2)} s ${e.pass ? 'took a token and passed' : 'found the bucket empty and was rejected'}` : ' · no request yet') + (st.full ? ' · bucket full: drops are discarded' : ''); },
+});
+
+// ---- validation (REPLACE): the analysis the machine must agree with
+const LR = new Map(); const lr = P => { const k = [P.lam, P.r, P.b].join(); if (!LR.has(k)) LR.set(k, longRun({ lam: P.lam, r: P.r, b: P.b })); return LR.get(k); };
+const cur = () => app.P;
+const valid = IE.validation('valid', [
+  { claim: 'Long-run pass share at these settings: exact (M/D/1/K) vs 200 000 simulated requests', source: 'exact M/D/1/K, this page', target: 'within 3 s.e.', model: () => `${fmt.pct(EXACT, 2)} vs ${fmt.pct(lr(cur()).share, 2)} ± ${fmt.pct(lr(cur()).se, 2)}`, ok: () => Math.abs(lr(cur()).share - EXACT) < 3 * lr(cur()).se + 1e-9 },
+  { claim: 'A very large bucket passes min(1, r/λ): overload λ = 3, r = 2', source: 'tb', target: fmt.pct(fluidLimit(3, 2), 1), model: () => fmt.pct(passShare(3, 2, 60), 1) + ' at b = 60', ok: () => Math.abs(passShare(3, 2, 60) - fluidLimit(3, 2)) < 0.005 },
+  { claim: '… and light load λ = 1.5, r = 2', source: 'tb', target: fmt.pct(fluidLimit(1.5, 2), 1), model: () => fmt.pct(passShare(1.5, 2, 60), 1) + ' at b = 60', ok: () => Math.abs(passShare(1.5, 2, 60) - 1) < 0.005 },
+  { claim: 'Bucket of one: the loss formula 1/(1 + λ/r)', source: 'Erlang loss (M/G/1/1)', target: '1/(1 + λ/r)', model: () => `${fmt.pct(passShare(cur().lam, cur().r, 1), 2)} vs ${fmt.pct(1 / (1 + cur().lam / cur().r), 2)}`, ok: () => Math.abs(passShare(cur().lam, cur().r, 1) - 1 / (1 + cur().lam / cur().r)) < 1e-9 },
+  { claim: 'Burst bound on this run: no window of τ s passes more than b + r·τ', source: 'tb', target: 'slack ≥ 0', model: () => 'worst slack ' + fmt.num(burstSlack(SIM), 2), ok: () => burstSlack(SIM) >= -1e-9 },
+  { claim: 'Every request is counted once; tokens stay between 0 and b', source: 'tb', target: 'arrived = passed + rejected', model: () => `${SIM.ev.length} = ${SIM.passed} + ${SIM.rejected}`, ok: () => SIM.ev.length === SIM.passed + SIM.rejected && SIM.ev.every(e => e.before <= cur().b + 1e-9 && e.after >= -1e-9) },
+]);
+</script>
+</body>
+</html>

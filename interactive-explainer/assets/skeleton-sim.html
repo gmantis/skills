@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How fast does a purifier clear a smoky room? — interactive explainer (REPLACE)</title>
+<!--
+  SKELETON (sim shape: spatial / agent-based simulation over time) for the interactive-explainer skill.
+  Guide: shapes/sim.md. API: runtime/API.md. Demo: 400 tracer particles in a sealed 50 m³ room with an air purifier,
+  checked against the well-mixed formula C(t) = C0·exp(−(CADR/V)·t). Selection = simulation time (one tick per ← →).
+  The runtime blocks are filled by build.js; never edit inside them. Replace everything marked REPLACE.
+-->
+<style data-ie="core"></style>
+<style data-ie="sim"></style>
+<style>/* page-only styles (usually none) */</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>How fast does a purifier clear a smoky room? (REPLACE)</h1>
+  <p class="lede">Each dot is a speck of haze. Press Play (or <kbd>→</kbd> one tick at a time) and watch the purifier catch them; the chart compares the run with the textbook formula. Try the window and a second purifier under <i>What if?</i>. (Illustrative room and numbers; REPLACE with the source's.)</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> a purifier that cleans <span class="dyn" data-dyn="cadr"></span> of air in a <span class="dyn" data-dyn="vol"></span> room halves the haze every <span class="dyn" data-dyn="halfF"></span>, as long as the air is mixed and the window is shut.</p>
+  <div class="stat"><b data-dyn="halfF"></b><span>half-life (formula)</span></div>
+  <div class="stat"><b data-dyn="c30"></b><span>after 30 min, this run</span></div>
+  <div class="stat"><b data-dyn="c30f"></b><span>after 30 min, formula</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Time</h4></div>
+</aside>
+<main>
+  <div class="grid2">
+    <section class="panel"><h3>The room, seen from above</h3>
+      <p class="sub">Dots: haze particles (each stands for a quarter of a µg/m³). Dashed boxes: where the purifier draws air in, and the window.</p>
+      <p class="ie-sim-hud" id="hud"></p>
+      <div id="room"></div></section>
+    <section class="panel"><h3>Haze in the room over time</h3>
+      <p class="sub">Solid: this run. Dashed: the formula. Shaded: 10–90% of 12 runs with other random seeds. Click to jump to a time.</p>
+      <div id="chart"></div></section>
+  </div>
+  <section class="panel"><h3>Where the particles went</h3><p class="sub">Every particle is counted somewhere, so the bars always add up: in the room + caught + out of the window = start + came in.</p><div id="bars"></div></section>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the simulation reproduce the formula?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>The room holds <b>N<sub>0</sub> = 400</b> tracer particles; each stands for C<sub>0</sub>·V / N<sub>0</sub> of PM2.5. Every tick (3 s)
+      each particle takes a random step whose spread matches turbulent diffusion with coefficient D (“air mixing”), bouncing off
+      the walls. A particle inside a purifier's intake zone is caught with the chance that would remove CADR/V of the room's air
+      per hour if the particles were spread evenly. An open window removes particles the same way at the air-change rate a, and
+      lets outdoor air in: new particles appear at the window at a·C<sub>out</sub>.</p>
+    <p>The formula is the well-mixed mass balance dC/dt = −(k + a)·C + a·C<sub>out</sub> with k = (number of purifiers)·CADR/V, so
+      C(t) = C<sub>ss</sub> + (C<sub>0</sub> − C<sub>ss</sub>)·e<sup>−(k+a)t</sup> and C<sub>ss</sub> = a·C<sub>out</sub>/(k + a). The simulation agrees with it only
+      when the air mixes faster than the purifier cleans it: step 4 shows what still air does. Runs are seeded, so the same
+      settings always give the same run. <span class="badge illustrative">illustrative</span> room size, zone sizes and mixing (REPLACE).</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="sim"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node with runtime/sim.js, build with --from. -->
+<script data-ie-file="model.js">
+// MODEL (REPLACE): smoke particles in a closed room with an air purifier. Each particle is a tracer for C0·V/N0 of
+// PM2.5. Particles diffuse (turbulent mixing), a particle inside a purifier's intake zone is caught with the
+// probability that removes CADR/V of a well-mixed room per hour, and an open window swaps room air for outdoor air.
+// Pure functions, no DOM. Runs on IE.sim.engine (Node: globalThis.IE = {}; require('runtime/sim.js'); require('./model.js')).
+const ROOM = { w: 5, h: 4, height: 2.5 };                  // m: floor plan 5 × 4, ceiling 2.5 -> 50 m³
+const VOL = ROOM.w * ROOM.h * ROOM.height;
+const REAL = { cadr: 200, ach: 2, mix: 0.25, c0: 100, cOut: 100 };   // m³/h, air changes/h with the window open, m²/s, µg/m³, µg/m³
+const N0 = 400, DT = 3, HORIZON = 3600;                    // tracer particles, s per tick, s simulated
+const ZONES = [                                            // m, origin top-left; kind sink = removes, source = lets air in
+  { id: 'pur1', label: 'Purifier', kind: 'sink', x: 0, y: 1.2, w: 1.0, h: 1.6 },     // the intake draws from about 1 m around it
+  { id: 'pur2', label: 'Purifier 2', kind: 'sink', x: 1.7, y: 3.0, w: 1.6, h: 1.0 },
+  { id: 'win', label: 'Window', kind: 'source', x: 4.5, y: 1.2, w: 0.5, h: 1.6 },
+];
+const zone = id => ZONES.find(z => z.id === id);
+const purifiers = p => p.offPur ? [] : p.twoPur ? ['pur1', 'pur2'] : ['pur1'];
+// the room's total first-order removal rate (per hour) and the outdoor supply: the ODE dC/dt = -(k + a)C + a·Cout
+function rates(p){ const k = purifiers(p).length * p.cadr / VOL, a = p.window ? p.ach : 0; return { k, a, tot: k + a, css: k + a > 0 ? a * p.cOut / (k + a) : p.c0 }; }
+function analytic(p, tSec){ const r = rates(p), th = tSec / 3600; return r.tot > 0 ? r.css + (p.c0 - r.css) * Math.exp(-r.tot * th) : p.c0; }
+const halfLife = p => { const r = rates(p); return r.tot > 0 && r.css < p.c0 / 2 ? 3600 * Math.log((p.c0 - r.css) / (p.c0 / 2 - r.css)) / r.tot : Infinity; };   // s
+
+const CAP = N0 * 3;
+const inZone = (z, x, y) => x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h;
+const ROOM_MODEL = {
+  init(p, rng){ const st = { x: new Float64Array(CAP), y: new Float64Array(CAP), px: new Float64Array(CAP), py: new Float64Array(CAP), alive: new Uint8Array(CAP), n: N0, caught: 0, out: 0, inn: 0, lost: 0 };
+    for (let i = 0; i < N0; i++){ st.x[i] = st.px[i] = rng() * ROOM.w; st.y[i] = st.py[i] = rng() * ROOM.h; st.alive[i] = 1; } return st; },
+  step(st, p, rng, t, dt){
+    const a = Math.sqrt(6 * p.mix * dt), A = ROOM.w * ROOM.h;    // uniform step on [-a, a] has the variance 2·D·dt of diffusion
+    // capture chance per tick inside a zone, chosen so a well-mixed room loses exactly 1 - e^(-rate·dt) per tick:
+    // P(in zone) × chance = (zone area / room area) × chance
+    const sinks = purifiers(p).map(id => { const z = zone(id); return { z, pr: Math.min(1, (1 - Math.exp(-(p.cadr / VOL / 3600) * dt)) * A / (z.w * z.h)) }; });
+    const win = p.window ? zone('win') : null, pw = win ? Math.min(1, (1 - Math.exp(-(p.ach / 3600) * dt)) * A / (win.w * win.h)) : 0;
+    for (let i = 0; i < CAP; i++){ if (!st.alive[i]) continue;
+      st.px[i] = st.x[i]; st.py[i] = st.y[i];                     // previous position: the view glides between ticks
+      let x = st.x[i] + (2 * rng() - 1) * a, y = st.y[i] + (2 * rng() - 1) * a;
+      if (x < 0) x = -x; else if (x > ROOM.w) x = 2 * ROOM.w - x; if (y < 0) y = -y; else if (y > ROOM.h) y = 2 * ROOM.h - y;
+      st.x[i] = x; st.y[i] = y;
+      for (const s of sinks) if (inZone(s.z, x, y) && rng() < s.pr){ st.alive[i] = 0; st.n--; st.caught++; break; }
+      if (st.alive[i] && win && inZone(win, x, y) && rng() < pw){ st.alive[i] = 0; st.n--; st.out++; }
+    }
+    if (win){ let m = rng.poisson((p.ach / 3600) * N0 * (p.cOut / p.c0) * dt);   // outdoor air brings particles in at a·Cout
+      for (let i = 0; i < CAP && m > 0; i++) if (!st.alive[i]){ st.alive[i] = 1; st.x[i] = st.px[i] = win.x + rng() * win.w; st.y[i] = st.py[i] = win.y + rng() * win.h; st.n++; st.inn++; m--; }
+      st.lost += m; }
+  },
+  measure(st, p){ return { n: st.n, c: st.n / N0 * p.c0, caught: st.caught, out: st.out, inn: st.inn, lost: st.lost }; },
+  clone(st){ return { ...st, x: st.x.slice(), y: st.y.slice(), px: st.px.slice(), py: st.py.slice(), alive: st.alive.slice() }; },
+};
+// concentration in cells (for the heat layer): particles per cell / expected per cell at the room mean
+function cellCounts(st, nx, ny){ const g = new Float64Array(nx * ny); for (let i = 0; i < CAP; i++) if (st.alive[i]) g[Math.min(ny - 1, Math.floor(st.y[i] / ROOM.h * ny)) * nx + Math.min(nx - 1, Math.floor(st.x[i] / ROOM.w * nx))]++; return g; }
+if (typeof module === 'object' && module.exports) module.exports = { ROOM, VOL, REAL, N0, DT, HORIZON, ZONES, CAP, rates, analytic, halfLife, purifiers, ROOM_MODEL, cellCounts };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE, clock = IE.sim.clock;
+IE.sources({   // every number the page quotes gets an entry; cite with cite('id')
+  demo: { title: 'Room, purifier and haze numbers (illustrative, REPLACE with the source)', where: 'REPLACE: page / table', quote: 'REPLACE: the exact words the numbers come from.' },
+  epa: { title: 'US EPA, Guide to Air Cleaners in the Home', url: 'https://www.epa.gov/indoor-air-quality-iaq/guide-air-cleaners-home', where: 'what CADR means (REPLACE with the exact quote)' },
+});
+const SEED = 1, REPS = 12;
+const sim = IE.sim.engine(ROOM_MODEL, { dt: DT, horizon: HORIZON, every: 5, snapEvery: 50 });
+const SPREAD = new Map(); let spreadNow = null, cancel = null, lastChartKey = '';
+const modelKey = P => JSON.stringify(['cadr', 'ach', 'mix', 'c0', 'cOut', 'offPur', 'window', 'twoPur'].map(k => P[k]));
+const fC = v => fmt.num(v, v < 10 ? 1 : 0) + ' µg/m³';
+
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'cadr', label: 'Purifier CADR', min: 50, max: 500, step: 10, fmt: v => v + ' m³/h', off: 'offPur' },
+    { id: 'mix', label: 'Air mixing D', min: 0.005, max: 0.4, step: 0.005, fmt: v => fmt.num(v, 3) + ' m²/s' },
+    { id: 'ach', label: 'Window air changes', min: 0.5, max: 6, step: 0.5, fmt: v => fmt.num(v, 1) + ' /h' },
+  ],
+  toggles: [{ id: 'offPur', label: 'Switch the purifier off' }, { id: 'window', label: 'Open the window (hazy outside)' }, { id: 'twoPur', label: 'Add a second purifier' }],
+  options: [{ id: 'heat', label: 'Show local concentration (shaded cells)', value: false }, { id: 'logY', label: 'Log scale (exponential decay is a straight line)', value: false }],
+  whatIf: [
+    { key: 'one', label: 'One purifier', set: { offPur: false, window: false, twoPur: false } }, { key: 'off', label: 'Purifier off', set: { offPur: true, window: false, twoPur: false } },
+    { key: 'win', label: 'Window open', set: { offPur: false, window: true, twoPur: false } }, { key: 'two', label: 'Two purifiers', set: { offPur: false, window: false, twoPur: true } },
+  ],
+  sel: { label: 'Time', min: 0, max: HORIZON, step: DT, unit: DT, value: 0, fmt: clock, play: { rate: 60 }, keyHint: 'one tick (3 s)' },
+  steps: [   // concrete first (one minute, one particle's chance), the 12-run spread near the end
+    { title: '1 · A smoky room', sel: 0,
+      html: () => `<p>400 dots stand for ${D('c0')} of haze in a 5 × 4 m room with a 2.5 m ceiling: ${D('vol')}${cite('demo')}. The purifier on the left wall cleans ${D('cadr')} of air.</p><p>Press <b>▶ Play</b>, or <button data-set="sel=60">jump to one minute</button>.</p>` },
+    { title: '2 · One minute in', sel: 60,
+      html: () => `<p>In the first minute ${D('caught')} dots wandered into the intake and were caught. A dot inside the dashed box is caught with a ${D('pzone')} chance each tick; outside it, never.</p><p>That small chance, many times over, is the whole purifier. Step with <kbd>→</kbd> to watch single ticks.</p>` },
+    { title: '3 · The formula', sel: 624,
+      html: () => `<p>If the air is well mixed, the purifier removes CADR/V = ${D('kPerH')} the room's air per hour, so C(t) = C<sub>0</sub>·e<sup>−(CADR/V)·t</sup>${cite('epa')}. It halves every ln 2·V/CADR = <b>${D('halfF')}</b>.</p><p>At ${D('tNow')} this run has ${D('cNow')}; the formula says ${D('cFormula')}. <button data-set="logY=true">Log scale</button> shows the decay as a straight line.</p>` },
+    { title: '4 · Still air breaks the formula', params: { mix: 0.01, heat: true }, sel: 1200,
+      html: () => `<p>With still air (D = 0.01 m²/s) the purifier empties its own corner (the pale cells) and the haze elsewhere drifts in slowly. After ${D('tNow')}: ${D('cNow')}, not the formula's ${D('cFormula')}.</p><p>The formula assumes mixing much faster than cleaning; a fan or the purifier's own airflow provides it.</p>` },
+    { title: '5 · Hazy outside, window open', params: { window: true, heat: false }, sel: 3600,
+      html: () => `<p>Outdoor air at ${D('cOut')} comes in at ${D('ach')} air changes per hour. The room no longer clears: it settles where cleaning balances supply, a·C<sub>out</sub>/(k + a) = <b>${D('css')}</b>.</p><p><button data-set="ach=6">A wide-open window</button> <button data-set="window=false">Shut it</button></p>` },
+    { title: '6 · Twelve rooms at once', params: { heat: false }, sel: 1800,
+      html: () => `<p>The shaded band is the same room run with 12 other random seeds (10–90%). The formula runs through the middle of it, and the validation table below checks the gap against sampling noise.</p><p><button data-set="cadr=400">Double the CADR</button> <button data-set="twoPur=true">Add a second purifier</button></p>` },
+  ],
+  recompute(P){
+    sim.run(P, SEED);
+    room.set({ zones: zonesFor(P) });
+    const key = modelKey(P); spreadNow = SPREAD.get(key) || null;
+    if (cancel) cancel();
+    if (!spreadNow) cancel = sim.spread({ ...P }, REPS, res => { SPREAD.set(key, res); if (modelKey(app.P) === key){ spreadNow = res; lastChartKey = ''; app.redraw(); } }, { delay: 150, chunk: 2 });
+    lastChartKey = '';
+  },
+  render({ P, sel }){
+    const st = sim.at(sel), frac = IE.reducedMotion || !app.playing ? 1 : (sel - sim.tick(sel) * DT) / DT;   // glide between ticks only while playing
+    room.draw({ st, frac, P });
+    const k = sim.tick(sel), ck = [k - k % 5, P.logY, !!spreadNow, modelKey(P)].join('|');   // the run line grows every 5 ticks
+    if (ck !== lastChartKey){ lastChartKey = ck; chart.set(chartSpec(P, sel)); }
+    chart.set({ cursor: sel / 60, cursorLabel: clock(sel), marks: [{ x: sel / 60, y: Math.max(P.logY ? 0.5 : 0, st.n / N0 * P.c0), color: 's2' }] });
+    bars.set({ rows: [
+      { id: 'room', label: 'In the room', value: st.n, color: 's2' }, { id: 'caught', label: 'Caught by purifier', value: st.caught, color: 's3' },
+      { id: 'out', label: 'Out of the window', value: st.out, color: 's1' }, { id: 'in', label: 'Came in (window)', value: st.inn, color: 's1', ghost: true } ], max: Math.max(N0, st.inn, st.caught, st.out) });
+    document.getElementById('hud').innerHTML = `<b>${clock(sel)}</b> · <b>${st.n}</b> particles in the room · <b>${fC(st.n / N0 * P.c0)}</b> (formula ${fC(analytic(P, sel))})`;
+    valid.render();
+  },
+  dyn({ P, sel }){
+    const st = sim.at(sel), r = rates(P), h = halfLife(P), A = ROOM.w * ROOM.h, z = ZONES[0];
+    return { c0: fC(P.c0), cOut: fC(P.cOut), vol: fmt.num(VOL, 0) + ' m³', cadr: P.cadr + ' m³/h', ach: fmt.num(P.ach, 1),
+      halfF: isFinite(h) ? fmt.num(h / 60, 1) + ' min' : 'never', kPerH: fmt.num(P.cadr / VOL, 1) + '×',
+      c30: fC(sim.value('c', 1800)), c30f: fC(analytic(P, 1800)), tNow: clock(sel), cNow: fC(st.n / N0 * P.c0), cFormula: fC(analytic(P, sel)),
+      caught: fmt.int(st.caught), pzone: fmt.pct(Math.min(1, (1 - Math.exp(-(P.cadr / VOL / 3600) * DT)) * A / (z.w * z.h)), 1), css: fC(r.css) };
+  },
+  readout({ P, sel }){
+    const st = sim.at(sel), c = st.n / N0 * P.c0, f = analytic(P, sel), sp = spreadNow, i = sp ? Math.min(sp.t.length - 1, Math.floor(sel / (DT * 5))) : -1;
+    const band = sp ? ` · 12 runs: ${fmt.num(sp.lo.c[i], 0)}–${fmt.num(sp.hi.c[i], 0)}` : ' · (12 runs: computing…)';
+    return `At <b>${clock(sel)}</b>: <b>${fC(c)}</b> in this run, formula <b>${fC(f)}</b>${band} · ` +
+      (P.offPur && !P.window ? '<b>nothing removes haze: the count stays at 400</b>' : Math.abs(c - f) > Math.max(4, 0.15 * f) ? '<b>the run lags the formula: the air is not well mixed</b>' : 'the run follows the formula');
+  },
+});
+
+// ---- views (created before app.start, which runs after this script)
+const room = IE.sim.view(document.getElementById('room'), {
+  world: { w: ROOM.w, h: ROOM.h }, maxHeight: 380, title: 'Room seen from above with haze particles', summary: 'dots are particles; dashed boxes are the purifier intake and the window',
+  draw(ctx, tf, { st, frac, P }){
+    ctx.fillStyle = IE.color('panel'); ctx.fillRect(tf.X(0), tf.Y(0), ROOM.w * tf.k, ROOM.h * tf.k);
+    if (P.heat){ const nx = 10, ny = 8; IE.sim.grid(ctx, tf, cellCounts(st, nx, ny), nx, ny, { world: ROOM, max: 2 * N0 / (nx * ny), color: IE.color('seq3'), alpha: 0.5 }); }
+    const xs = frac < 1 ? st.x.map((x, i) => st.px[i] + (x - st.px[i]) * frac) : st.x, ys = frac < 1 ? st.y.map((y, i) => st.py[i] + (y - st.py[i]) * frac) : st.y;
+    IE.sim.dots(ctx, tf, xs, ys, CAP, { alive: st.alive, color: IE.color('s2'), r: Math.max(1.8, tf.k * 0.045) });
+  },
+});
+const chart = IE.sim.chart(document.getElementById('chart'), { ...chartSpec(REAL, 0), onPick: x => { app.pause(); app.setSel(Math.round(x * 60 / DT) * DT); } });
+const bars = IE.barChart(document.getElementById('bars'), { title: 'Where the particles went', rows: [], fmt: v => fmt.int(v), min: 0, max: N0 });
+IE.sim.transport(app, { rates: [['10×', 10], ['60×', 60], ['300×', 300]], value: 60 });
+function zonesFor(P){
+  return ZONES.filter(z => z.id !== 'pur2' || P.twoPur).map(z => ({ ...z,
+    label: z.id === 'win' ? (P.window ? 'Window (open)' : 'Window (shut)') : z.id === 'pur1' && P.offPur ? 'Purifier (off)' : z.label,
+    off: (z.id === 'win' && !P.window) || (z.id === 'pur1' && P.offPur) }));
+}
+function chartSpec(P, sel){
+  const run = sim.rec ? sim.series('c', t => t / 60).filter(([t]) => t <= sel / 60 + 1e-9) : [];
+  const f = IE.range(0, HORIZON, 121).map(t => [t / 60, analytic(P, t)]), sp = spreadNow, lg = !!P.logY;
+  return { title: 'Haze concentration over time', height: 300, summary: `formula half-life ${isFinite(halfLife(P)) ? fmt.num(halfLife(P) / 60, 1) + ' min' : 'none'}`,
+    x: { min: 0, max: 60, ticks: [0, 10, 20, 30, 40, 50, 60], fmt: String, label: 'minutes' },
+    y: lg ? { min: 0.5, max: 200, log: true, fmt: v => fmt.num(v, v < 1 ? 1 : 0), label: 'µg/m³' } : { min: 0, max: IE.niceMax(Math.max(P.c0, P.window ? P.cOut : 0) * 1.05), fmt: v => fmt.num(v, 0), label: 'µg/m³' },
+    spread: sp ? [{ lo: sp.t.map((t, i) => [t / 60, sp.lo.c[i]]), hi: sp.t.map((t, i) => [t / 60, sp.hi.c[i]]), color: 's2' }] : [],
+    series: [{ id: 'formula', label: 'formula', color: 'ink', points: f, ghost: true }, { id: 'run', label: 'this run', color: 's2', points: run, width: 2.4 }] };
+}
+
+// ---- validation: the simulation against exact results (computed once, after the first paint; seeded, so stable)
+let VAL = null;
+setTimeout(() => {
+  const one = sim.repeats(REAL, REPS, { seed0: 1000 }), two = sim.repeats({ ...REAL, twoPur: true }, 8, { seed0: 2000 }), win = sim.repeats({ ...REAL, window: true }, 8, { seed0: 3000 });
+  const still = sim.repeats({ ...REAL, mix: 0.01 }, 4, { seed0: 4000 }), off = sim.headless({ ...REAL, offPur: true }, 5), book = sim.headless({ ...REAL, window: true, twoPur: true }, 6);
+  const at = (r, t) => r.t.indexOf(t), fit = r => IE.sim.fitExp(r.t.map((t, i) => [t, r.mean.c[i]]), { to: 2400 });
+  const z = [600, 1200, 1800].map(t => (one.mean.c[at(one, t)] - analytic(REAL, t)) / (one.sd.c[at(one, t)] / Math.sqrt(one.n)));
+  const tail = r => { const i0 = at(r, 2700), m = r.mean.c.slice(i0), s = r.sd.c.slice(i0); return { m: IE.sum(m) / m.length, se: IE.sum(s) / s.length / Math.sqrt(r.n) }; };
+  const d1 = sim.headless(REAL, 77), d2 = sim.headless(REAL, 77);
+  VAL = { one, z, k1: fit(one), k2: fit(two), win: tail(win), css: rates({ ...REAL, window: true }).css, still: fit(still),
+    offMin: Math.min(...off.v.n), offMax: Math.max(...off.v.n), book: book.t.every((t, i) => book.v.n[i] + book.v.caught[i] + book.v.out[i] === N0 + book.v.inn[i]) && book.v.lost.at(-1) === 0,
+    same: JSON.stringify(d1) === JSON.stringify(d2) };
+  SPREAD.set(modelKey(REAL), one); if (modelKey(app.P) === modelKey(REAL)){ spreadNow = one; lastChartKey = ''; }
+  app.redraw();
+}, 60);
+const V = (f, d = 'running…') => () => VAL ? f(VAL) : d, VO = f => () => VAL ? f(VAL) : null;
+const valid = IE.validation('valid', [   // REPLACE with your source's numbers; keep the exact checks
+  { claim: 'Mean of 12 runs follows C<sub>0</sub>·e<sup>−(CADR/V)t</sup> at 10, 20 and 30 min (within 3 standard errors)', source: 'epa', target: [600, 1200, 1800].map(t => fmt.num(analytic(REAL, t), 1)).join(' · ') + ' µg/m³',
+    model: V(v => [600, 1200, 1800].map(t => fmt.num(v.one.mean.c[v.one.t.indexOf(t)], 1)).join(' · ') + ` (worst ${fmt.num(Math.max(...v.z.map(Math.abs)), 1)} SE)`), ok: VO(v => v.z.every(x => Math.abs(x) < 3)) },
+  { claim: 'Half-life ln 2·V/CADR', source: 'formula', target: fmt.num(halfLife(REAL) / 60, 2) + ' min ± 5%', model: V(v => fmt.num(v.k1.half / 60, 2) + ' min (fit)'), ok: VO(v => Math.abs(v.k1.half / halfLife(REAL) - 1) < 0.05) },
+  { claim: 'Two purifiers double the removal rate', source: 'formula', target: '×2.00 ± 8%', model: V(v => '×' + fmt.num(v.k2.k / v.k1.k, 2)), ok: VO(v => Math.abs(v.k2.k / v.k1.k / 2 - 1) < 0.08) },
+  { claim: 'Window open: the room settles at a·C<sub>out</sub>/(k + a)', source: 'formula', target: fmt.num(rates({ ...REAL, window: true }).css, 1) + ' µg/m³', model: V(v => `${fmt.num(v.win.m, 1)} ± ${fmt.num(v.win.se, 1)} (45–60 min)`), ok: VO(v => Math.abs(v.win.m - v.css) < 3 * v.win.se + 0.5) },
+  { claim: 'Purifier off, window shut: no particle is lost', source: 'conservation', target: N0 + ' every tick', model: V(v => v.offMin === v.offMax ? String(v.offMin) : `${v.offMin}–${v.offMax}`), ok: VO(v => v.offMin === N0 && v.offMax === N0) },
+  { claim: 'Bookkeeping: in room + caught + out = start + came in', source: 'conservation', target: 'exact, every tick', model: V(v => v.book ? 'exact' : 'broken'), ok: VO(v => v.book) },
+  { claim: 'Same seed, same run (repeatable)', source: 'seeded RNG', target: 'identical', model: V(v => v.same ? 'identical' : 'differs'), ok: VO(v => v.same) },
+  { claim: 'Still air (D = 0.01 m²/s) clears slower than the formula', source: 'well-mixed assumption', target: '> 1.5 × ' + fmt.num(halfLife(REAL) / 60, 1) + ' min', model: V(v => fmt.num(v.still.half / 60, 1) + ' min'), ok: VO(v => v.still.half > 1.5 * halfLife(REAL)) },
+]);
+</script>
+</body>
+</html>

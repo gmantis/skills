@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why an attacker z blocks behind catches up with (q/p)^z — interactive explainer</title>
+<!--
+  SKELETON (derivation shape) for the interactive-explainer skill. Guide: shapes/derivation.md. API: runtime/API.md.
+  Demo: section 11 of the Bitcoin paper, derived line by line: the gambler's-ruin recursion gives (q/p)^z, then a
+  Poisson mixture gives the attacker's success probability P. Every line is checked numerically at the current q and
+  z; the Poisson step is an approximation, compared with the exact (negative binomial) race.
+  The selection is the line index (click a line, ← →, play). Replace everything marked REPLACE.
+  Build: node scripts/build.js <this file> --from "$TEMP/<name>" (fills the data-ie blocks and model.js).
+-->
+<style data-ie="core"></style>
+<style data-ie="derivation"></style>
+<style>/* page-only styles */
+  #check{margin:10px 0 0;font-size:.88rem;color:var(--ink2)}
+</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>How likely is a double spend? The Bitcoin paper's formula, line by line (REPLACE)</h1>
+  <p class="lede">Section 11 of the Bitcoin paper says an attacker who is z blocks behind catches up with probability (q/p)<sup>z</sup>, then mixes that over a Poisson guess of his head start (REPLACE). Step through the derivation on the left or with <kbd>←</kbd> <kbd>→</kbd>; every line is checked with numbers at the current settings, and the plot shows what the line is about.</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> each block the attacker is behind multiplies his chance by q/p = <span class="dyn" data-dyn="qp"></span>. Mixed over his likely head start, the paper's formula gives <span class="dyn" data-dyn="Ppaper"></span> after z = <span class="dyn" data-dyn="z"></span> blocks; the exact race gives <span class="dyn" data-dyn="Pexact"></span>, because the Poisson step underestimates the tail.</p>
+  <div class="stat"><b data-dyn="Ppaper"></b><span>paper's P (Poisson)</span></div>
+  <div class="stat"><b data-dyn="Pexact"></b><span>exact race</span></div>
+  <div class="stat"><b data-dyn="zNeed"></b><span>blocks to wait for P &lt; 0.1% (paper)</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Line of the derivation</h4></div>
+</aside>
+<main>
+  <div class="grid2">
+    <section class="panel"><h3>The derivation</h3>
+      <p class="sub">Click a line (or <kbd>←</kbd> <kbd>→</kbd>). Colours follow a term from line to line; a yellow mark shows what this line changed. Right edge: the line checked with numbers (✓ relative difference, ≈ approximation error).</p>
+      <div id="deriv"></div></section>
+    <section class="panel ie-deriv-side"><h3>What this line is about</h3>
+      <p class="sub">Click the plot to move z or q. Solid: exact; dashed: an approximation, with the error shaded.</p>
+      <div id="plot"></div><p id="check" aria-live="polite"></p></section>
+  </div>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the derivation reproduce the paper?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>REPLACE: the honest network finds the next block with probability p, the attacker with q = 1 − p. Being z blocks behind and needing to draw level is a gambler's-ruin walk: lines 1–6 solve its recursion and get (q/p)<sup>z</sup>, and the page checks that against the recursion solved by plain numbers (a 400-step tridiagonal system, no formula).</p>
+    <p>While the merchant waits for z honest blocks, the attacker makes some progress k. Exactly, k follows a negative binomial distribution; the paper assumes the honest blocks took exactly their average time, which makes k Poisson with mean λ = zq/p (line 8, the only approximation). Lines 9–10 average the catch-up chance over k. The "exact race" numbers use the negative binomial instead; a seeded simulation of 100 000 races checks them.</p>
+    <p>Each line's check evaluates both sides at the current q and z (or at a stated test value of r). Exact lines must agree to a relative difference below 10<sup>−9</sup>; the approximation line shows how far it is off, and counts as close within 10%.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="derivation"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, build with --from "$TEMP/<name>".
+     The demo model below is the inlined copy; build.js keeps it until a model.js file is found. -->
+<script data-ie-file="model.js">
+// Demo model for the derivation shape: why an attacker z blocks behind catches up with probability (q/p)^z, and the
+// Poisson-mixture formula in section 11 of the Bitcoin paper. Pure functions, no DOM; Node can require() it.
+const REAL = { q: 0.1, z: 5 };
+const ZMAX = 20;
+
+// The gambler's-ruin recursion solved by plain numbers, without the closed form: q_k = q·q_{k-1} + p·q_{k+1},
+// q_0 = 1, q_N = 0 with N far away (Thomas algorithm for the tridiagonal system). Returns [q_0 … q_N].
+function ruinNumeric(q, N = 400){
+  const p = 1 - q, c = new Float64Array(N + 1), d = new Float64Array(N + 1), Q = new Float64Array(N + 1);
+  // row k (1..N-1): -q·Q[k-1] + Q[k] - p·Q[k+1] = 0, with Q[0] = 1 moved to the right-hand side
+  c[1] = p; d[1] = q;
+  for (let k = 2; k < N; k++){ const m = 1 - q * c[k - 1]; c[k] = p / m; d[k] = q * d[k - 1] / m; }
+  Q[0] = 1; Q[N] = 0;
+  for (let k = N - 1; k >= 1; k--) Q[k] = c[k] * Q[k + 1] + d[k];
+  return Q;
+}
+const catchUp = (q, z) => { const p = 1 - q; return q >= p ? 1 : Math.pow(q / p, z); };   // q_z = (q/p)^z
+const charPoly = (r, q) => (1 - q) * r * r - r + q;                                        // p r² − r + q
+const lambdaOf = (q, z) => z * q / (1 - q);
+function poisPmf(k, lam){ let s = Math.exp(-lam); for (let i = 1; i <= k; i++) s *= lam / i; return s; }
+// exact count of attacker blocks while the honest chain finds z: negative binomial, C(z+k-1, k) p^z q^k
+function nbPmf(k, z, q){ let l = z * Math.log(1 - q); for (let i = 1; i <= k; i++) l += Math.log(q * (z + k - i) / i); return Math.exp(l); }
+// the paper's mixture, written two ways: the infinite sum (brute force) and the rearranged finite form
+function mixtureSum(q, z, pmf = poisPmf, K = z + 600){
+  const p = 1 - q, lam = lambdaOf(q, z); let s = 0;
+  for (let k = 0; k <= K; k++){ const w = pmf === poisPmf ? poisPmf(k, lam) : pmf(k, z, q); s += w * (k <= z ? Math.pow(q / p, z - k) : 1); }
+  return s;
+}
+function attackerPoisson(q, z){   // the paper's C function AttackerSuccessProbability
+  const p = 1 - q, lam = lambdaOf(q, z); let sum = 1;
+  for (let k = 0; k <= z; k++) sum -= poisPmf(k, lam) * (1 - Math.pow(q / p, z - k));
+  return sum;
+}
+function attackerExact(q, z){     // same mixture with the exact (negative binomial) progress instead of Poisson
+  const p = 1 - q; let sum = 1;
+  for (let k = 0; k <= z; k++) sum -= nbPmf(k, z, q) * (1 - Math.pow(q / p, z - k));
+  return sum;
+}
+const nbMean = (q, z, K = 4000) => { let s = 0, w = Math.pow(1 - q, z); for (let k = 1; k <= K; k++){ w *= q * (z + k - 1) / k; s += k * w; } return s; };   // Σ k·Pr(k), summed directly
+// smallest z with P < target (the paper's second table)
+function zFor(q, target = 0.001, f = attackerPoisson){ for (let z = 0; z < 2000; z++) if (f(q, z) < target) return z; return Infinity; }
+// seeded simulation of the real race: honest finds z blocks while the attacker finds k, then a random walk from z − k
+function simulateRace(q, z, n = 100000, seed = 7){
+  let s = seed | 0; const rnd = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  let wins = 0;
+  for (let i = 0; i < n; i++){
+    let honest = 0, k = 0; while (honest < z){ if (rnd() < q) k++; else honest++; }
+    let gap = z - k; while (gap > 0 && gap < 80) gap += rnd() < q ? -1 : 1;
+    if (gap <= 0) wins++;
+  }
+  const P = wins / n; return { P, se: Math.sqrt(P * (1 - P) / n), n };
+}
+// the paper's two tables (section 11), used by the validation table
+const PAPER = {
+  q10: [[0, 1.0000000], [1, 0.2045873], [2, 0.0509779], [3, 0.0131722], [4, 0.0034552], [5, 0.0009137], [6, 0.0002428], [7, 0.0000647], [8, 0.0000173], [9, 0.0000046], [10, 0.0000012]],
+  q30: [[0, 1.0000000], [5, 0.1773523], [10, 0.0416605], [15, 0.0101008], [20, 0.0024804], [25, 0.0006132], [30, 0.0001522], [35, 0.0000379], [40, 0.0000095], [45, 0.0000024], [50, 0.0000006]],
+  below: [[0.10, 5], [0.15, 8], [0.20, 11], [0.25, 15], [0.30, 24], [0.35, 41], [0.40, 89], [0.45, 340]],
+};
+if (typeof module === 'object' && module.exports) module.exports = { REAL, ZMAX, ruinNumeric, catchUp, charPoly, lambdaOf, poisPmf, nbPmf, mixtureSum, attackerPoisson, attackerExact, nbMean, zFor, simulateRace, PAPER };
+</script>
+<script>
+// ============================ PAGE: sources, the lines, plots, steps (REPLACE) ============================
+const { fmt } = IE, { sci } = IE.derivation;
+const { math, inline, sub, sup, frac, paren, term, sum, cases, text, sp } = IE.mml;
+IE.sources({   // every number or step the page takes from the source gets an entry; cite with cite('id')
+  ruin: { title: 'S. Nakamoto, Bitcoin: A Peer-to-Peer Electronic Cash System (2008)', url: 'https://bitcoin.org/bitcoin.pdf', where: '§11 Calculations',
+    quote: 'The probability of an attacker catching up from a given deficit is analogous to a Gambler\'s Ruin problem.' },
+  drop: { title: 'Nakamoto (2008)', url: 'https://bitcoin.org/bitcoin.pdf', where: '§11, after the formula for q_z',
+    quote: 'Given our assumption that p > q, the probability drops exponentially as the number of blocks the attacker has to catch up with increases.' },
+  poisson: { title: 'Nakamoto (2008)', url: 'https://bitcoin.org/bitcoin.pdf', where: '§11, the Poisson step',
+    quote: 'Assuming the honest blocks took the average expected time per block, the attacker\'s potential progress will be a Poisson distribution with expected value:' },
+  mix: { title: 'Nakamoto (2008)', url: 'https://bitcoin.org/bitcoin.pdf', where: '§11, the mixture',
+    quote: 'To get the probability the attacker could still catch up now, we multiply the Poisson density for each amount of progress he could have made by the probability he could catch up from that point:' },
+  table: { title: 'Nakamoto (2008)', url: 'https://bitcoin.org/bitcoin.pdf', where: '§11, results tables (q = 0.1, q = 0.3, and z for P < 0.1%)',
+    quote: 'Running some results, we can see the probability drop off exponentially with z.' },
+  exact: { title: 'C. Grunspan, R. Pérez-Marco, Double spend races (2017): the exact race uses a negative binomial, not a Poisson, head start', url: 'https://arxiv.org/abs/1702.02867', where: 'the exact probability' },
+});
+
+// ---- memo for the numerical solution of the recursion (one per q)
+const RUIN = new Map(); const ruin = q => { const k = q.toFixed(4); if (!RUIN.has(k)) RUIN.set(k, ruinNumeric(q)); return RUIN.get(k); };
+const pOf = P => 1 - P.q, rTest = 0.7;
+const zs = IE.range(0, ZMAX, ZMAX + 1);
+const setZ = x => app.set({ z: IE.clamp(Math.round(x), 1, ZMAX) });
+
+// ---- plots: the quantity each line is about (REPLACE with your source's quantities)
+const plotQz = (closed, ratio) => P => { const Q = ruin(P.q), z = P.z;
+  return { title: ratio ? `On a log scale q<sub>z</sub> (line 1 by numbers) is a straight line: every block behind multiplies it by the same r = q<sub>${z + 1}</sub>/q<sub>${z}</sub> = <b>${fmt.num(Q[z + 1] / Q[z], 3)}</b>`
+      : `Catch-up chance q<sub>z</sub> against blocks behind z, at q = ${fmt.num(P.q, 2)}: q<sub>${z}</sub> = <b>${sci(Q[z], 3)}</b>`,
+    summary: `q_${z} = ${sci(Q[z], 3)}`, x: { min: 0, max: ZMAX, ticks: [0, 5, 10, 15, 20], label: 'blocks behind, z' }, y: { log: true },
+    exact: { label: 'line 1 by numbers', points: zs.map(k => [k, Q[k]]) },
+    series: closed ? [{ id: 'closed', label: '(q/p)^z', color: 's1', points: zs.map(k => [k, catchUp(P.q, k)]), dash: '2 5', width: 3.2 }] : [],
+    marks: [{ x: z, y: Q[z], color: 's1' }], cursor: z, onPick: setZ };
+};
+const rs = IE.range(0.02, 1.3, 130);
+const plotPoly = P => { const p = pOf(P), r0 = P.q / p;
+  return { title: `p r² − r + q as r varies: zero at r = q/p = <b>${fmt.num(r0, 3)}</b> and at r = 1`,
+    x: { min: 0, max: 1.3, label: 'ratio r', fmt: v => fmt.num(v, 1) }, y: { min: -0.3, max: 0.5, fmt: v => fmt.num(v, 1) },
+    series: [{ id: 'f', label: 'p r² − r + q', color: 's3', points: rs.map(r => [r, charPoly(r, P.q)]) }],
+    marks: [{ x: r0, y: 0, color: 's3' }, { x: 1, y: 0, color: 's3' }], cursor: rTest };
+};
+const ks = P => { const lam = lambdaOf(P.q, P.z), K = Math.max(6, Math.ceil(lam + 4 * Math.sqrt(P.z * P.q) / pOf(P))); return IE.range(0, K, K + 1); };   // mean + 4 s.d.
+const plotPmf = withPois => P => { const lam = lambdaOf(P.q, P.z), k = ks(P);
+  return { title: `The attacker's progress k while the honest chain finds z = ${P.z} blocks (mean λ = <b>${fmt.num(lam, 2)}</b>)`,
+    x: { min: 0, max: k[k.length - 1], label: 'attacker blocks found, k', fmt: v => fmt.num(v, 0) }, xName: 'k', y: { fmt: v => fmt.num(v, 2) },
+    exact: { label: 'exact (neg. binomial)', points: k.map(i => [i, nbPmf(i, P.z, P.q)]) },
+    approx: withPois ? { label: 'Poisson', points: k.map(i => [i, poisPmf(i, lam)]) } : null,
+    cursor: lam, legend: withPois ? undefined : false };
+};
+const plotP = P => { const marks = (P.q === 0.1 ? PAPER.q10 : P.q === 0.3 ? PAPER.q30 : []).filter(([z]) => z <= ZMAX).map(([z, v]) => ({ x: z, y: v, color: 'ink', r: 3 }));
+  return { title: `Attacker success P against blocks waited z, at q = ${fmt.num(P.q, 2)}: paper <b>${sci(attackerPoisson(P.q, P.z), 3)}</b>, exact <b>${sci(attackerExact(P.q, P.z), 3)}</b> at z = ${P.z}`,
+    x: { min: 0, max: ZMAX, ticks: [0, 5, 10, 15, 20], label: 'blocks waited, z' }, xName: 'z', y: { log: true },
+    exact: { label: 'exact race', points: zs.map(z => [z, attackerExact(P.q, z)]) },
+    approx: { label: 'paper (Poisson)', points: zs.map(z => [z, attackerPoisson(P.q, z)]) },
+    marks: [...marks, { x: P.z, y: attackerPoisson(P.q, P.z), color: 's2' }], cursor: P.z, onPick: setZ,
+    note: marks.length ? 'Dots: the paper\'s own table.' : '' };
+};
+
+// ---- the derivation (REPLACE): MathML via IE.mml; term(name, …) colours a term and marks it when it changes
+const qz = (...s) => term('qz', sub('q', s.length ? s : 'z'));
+const R = e => term('r', e == null ? 'r' : sup('r', e));
+const LAM = () => term('lam', 'λ');
+const qOverP = (e) => term('qz', sup(paren(frac('q', 'p')), e));
+const LINES = [
+  { part: 'A · Why (q/p)<sup>z</sup>: the gambler\'s ruin', math: math(qz(), '=', 'q', '·', qz('z', '−', '1'), '+', 'p', '·', qz('z', '+', '1'), sp(1), sub('q', '0'), '=', '1'),
+    rule: 'Condition on who finds the next block.', gloss: 'With probability q the attacker finds the next block and the gap shrinks by one; with probability p = 1 − q the honest chain extends it. Level (z = 0) counts as caught up.',
+    check: P => { const Q = ruin(P.q); return { lhs: Q[P.z], rhs: P.q * Q[P.z - 1] + pOf(P) * Q[P.z + 1], note: 'q<sub>z</sub> from the recursion solved by numbers' }; }, plot: plotQz(false) },
+  { math: math(qz(), '=', R('z'), sp(0.8), '⇒', sp(0.8), R('z'), '=', 'q', R(['z', '−', '1']), '+', 'p', R(['z', '+', '1'])),
+    rule: 'Guess a geometric answer: every extra block behind multiplies the chance by the same factor r.', gloss: 'Put q<sub>z</sub> = r<sup>z</sup> into line 1. The guess works for the values of r that make both sides equal.',
+    check: P => { const r = P.q / pOf(P), z = P.z; return { lhs: Math.pow(r, z), rhs: P.q * Math.pow(r, z - 1) + pOf(P) * Math.pow(r, z + 1), note: 'with r = q/p from line 4' }; }, plot: plotQz(false, true) },
+  { math: math('0', '=', 'p', R('2'), '−', R(), '+', 'q'),
+    rule: `Divide both sides by r<sup>z−1</sup> and move everything to one side.`, gloss: 'z has dropped out: the factor r does not depend on how far behind the attacker is.',
+    check: P => { const r = rTest, z = P.z; return { lhs: (P.q * Math.pow(r, z - 1) + pOf(P) * Math.pow(r, z + 1) - Math.pow(r, z)) / Math.pow(r, z - 1), rhs: charPoly(r, P.q), note: `both sides at a test value r = ${rTest}` }; }, plot: plotPoly },
+  { math: math('p', R('2'), '−', R(), '+', 'q', '=', paren(R(), '−', '1'), paren('p', R(), '−', 'q'), sp(0.8), '⇒', sp(0.8), R(), '=', '1', sp(0.4), text('or'), sp(0.4), R(), '=', frac('q', 'p')),
+    rule: 'Factor, using p + q = 1.', gloss: 'Multiply out: p r² − pr − qr + q = p r² − r + q, because p + q = 1. So there are exactly two geometric answers.',
+    check: P => ({ lhs: charPoly(rTest, P.q), rhs: (rTest - 1) * (pOf(P) * rTest - P.q), note: `at r = ${rTest}` }), plot: plotPoly },
+  { math: math(qz(), '=', 'A', '+', 'B', qOverP('z')),
+    rule: 'Any mix of the two answers also solves line 1 (it is linear).', gloss: 'r = 1 gives the constant A; r = q/p gives B (q/p)<sup>z</sup>. The two ends of the problem fix A and B.',
+    check: P => { const r = P.q / pOf(P), z = P.z, f = k => 0.3 + 0.7 * Math.pow(r, k); return { lhs: f(z), rhs: P.q * f(z - 1) + pOf(P) * f(z + 1), note: 'test weights A = 0.3, B = 0.7' }; }, plot: plotQz(true) },
+  { math: math(qz(), '=', qOverP('z'), sp(1), text('(when p > q)')),
+    rule: 'Fit the ends: q<sub>0</sub> = 1, and q<sub>z</sub> → 0 far behind when p > q, so A = 0 and B = 1.', gloss: 'Each block behind multiplies the attacker\'s chance by q/p. With p ≤ q the chance stays 1: he always catches up eventually.',
+    check: P => { const Q = ruin(P.q); return { lhs: Q[P.z], rhs: catchUp(P.q, P.z), note: 'left: line 1 solved by numbers' }; }, plot: plotQz(true) },
+  { part: 'B · The head start is random: the Poisson mixture', math: math(LAM(), '=', 'z', '·', frac('q', 'p')),
+    rule: 'Expected attacker blocks while the honest chain finds z: q/p per honest block.', gloss: 'The merchant waits for z honest blocks. Meanwhile the attacker mines too; on average he finds q/p blocks for every honest one.',
+    check: P => ({ lhs: nbMean(P.q, P.z), rhs: lambdaOf(P.q, P.z), note: 'left: mean of the exact count, summed term by term' }), plot: plotPmf(false) },
+  { math: math(term('pois', 'Pr', paren('k')), sp(0.3), '≈', sp(0.3), frac([sup(LAM(), 'k'), sp(0.1), sup('e', ['−', LAM()])], ['k', '!'])), approx: true, tol: 0.1,
+    rule: 'Approximate: pretend the z honest blocks took exactly their average time, so the attacker\'s progress is Poisson.',
+    gloss: 'Exactly, k is negative binomial, C(z+k−1, k) p<sup>z</sup> q<sup>k</sup>: the honest blocks can come fast or slow. The check compares the chance that the attacker found nothing yet (k = 0).',
+    check: P => ({ lhs: Math.pow(pOf(P), P.z), rhs: Math.exp(-lambdaOf(P.q, P.z)), note: 'k = 0: exact p<sup>z</sup> vs Poisson e<sup>−λ</sup>' }), plot: plotPmf(true) },
+  { math: math(term('P', 'P'), '=', sum(['k', '=', '0'], '∞', term('pois', 'Pr', paren('k')), '·', cases([[qOverP(['z', '−', 'k']), [text('if'), sp(0.3), 'k', '≤', 'z']], ['1', [text('if'), sp(0.3), 'k', '>', 'z']]]))),
+    rule: 'Average the catch-up chance over every head start k; past z the attacker is already ahead.', gloss: 'Line 6 with z − k blocks still to make up, weighted by the chance of each k from line 8.',
+    check: P => { const lam = lambdaOf(P.q, P.z); let head = 0, mass = 0; for (let k = 0; k <= P.z; k++){ const w = poisPmf(k, lam); head += w * catchUp(P.q, P.z - k); mass += w; }
+      return { lhs: mixtureSum(P.q, P.z), rhs: head + (1 - mass), note: 'left: summed to k = z + 600; right: the k > z part as 1 minus the rest' }; }, plot: plotP },
+  { math: math(term('P', 'P'), '=', '1', '−', sum(['k', '=', '0'], 'z', term('pois', frac([sup(LAM(), 'k'), sp(0.1), sup('e', ['−', LAM()])], ['k', '!'])), paren('1', '−', qOverP(['z', '−', 'k'])))),
+    rule: 'Rearrange to avoid summing the infinite tail: subtract the shortfall of each k ≤ z from 1.', gloss: 'This is the formula the paper evaluates with its short C program; its tables come from this line.',
+    check: P => ({ lhs: mixtureSum(P.q, P.z), rhs: attackerPoisson(P.q, P.z), note: 'left: line 9 summed directly' }), plot: plotP },
+];
+const TERMS = { qz: { color: 's1', label: 'catch-up chance q<sub>z</sub>' }, r: { color: 's3', label: 'factor r' }, lam: { color: 's7', label: 'mean head start λ' }, pois: { color: 's2', label: 'chance of head start k' } };
+
+let der = null;
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'q', label: 'Attacker share of hash power, q', min: 0.01, max: 0.45, step: 0.01, fmt: v => fmt.pct(v, 0) },
+    { id: 'z', label: 'Blocks the merchant waits, z', min: 1, max: ZMAX, step: 1, fmt: v => fmt.int(v) },
+  ],
+  options: [{ id: 'breaks', label: 'Show where the approximation breaks (off by more than 10%)', value: false }],
+  whatIf: [{ key: 'q10', label: 'q = 10%', set: { q: 0.1 } }, { key: 'q30', label: 'q = 30%', set: { q: 0.3 } }, { key: 'q45', label: 'q = 45%', set: { q: 0.45 } }],
+  sel: { label: 'Line', min: 0, max: LINES.length - 1, step: 1, unit: 1, value: 0, fmt: v => `line ${Math.round(v) + 1} of ${LINES.length}`, play: { rate: 0.6 }, keyHint: 'one line' },
+  steps: [
+    { title: '1 · One merchant, one attacker', sel: 0,
+      html: () => `<p>A merchant accepts a payment once it is z = ${D('z')} blocks deep. An attacker with q = ${D('q')} of the hash power secretly mines a rival chain${cite('ruin')}. Line 1 is the only physics: who finds the next block decides whether the gap shrinks or grows.</p>
+        <p>The plot solves line 1 by plain numbers: at z = ${D('z')} the chance is ${D('qz')}. <button data-set="z=1">z = 1</button> <button data-set="z=10">z = 10</button></p>` },
+    { title: '2 · Guess, divide, factor', sel: 2,
+      html: () => `<p>Lines 2–4 guess a geometric answer r<sup>z</sup>, divide out r<sup>z−1</sup>, and factor. Press <kbd>→</kbd> to step. The plot shows p r² − r + q crossing zero at r = 1 and r = q/p = ${D('qp')}.</p>
+        <p><button data-set="q=0.3">Make the attacker stronger</button> and watch the second root move toward 1.</p>` },
+    { title: '3 · Why (q/p)^z', sel: 5,
+      html: () => `<p>The ends fix the mix: certain when level, hopeless far behind. So q<sub>z</sub> = (q/p)<sup>z</sup>: each block behind multiplies the chance by ${D('qp')}${cite('drop')}. The dotted curve sits exactly on the numerical solution; the check on line 6 agrees to ${D('res6')}.</p>` },
+    { title: '4 · The head start is random', sel: 7,
+      html: () => `<p>While the merchant waits, the attacker mines too: on average λ = ${D('lam')} blocks. The paper treats his progress as Poisson, "assuming the honest blocks took the average expected time"${cite('poisson')}. That is line 8, the only approximation.</p>
+        <p>Exactly, the count is negative binomial. Here they differ by ${D('apx')} at k = 0; the shaded area is the error.</p>` },
+    { title: '5 · The paper\'s formula', sel: 9,
+      html: () => `<p>Average the catch-up chance over the head start${cite('mix')} and rearrange: P = ${D('Ppaper')} at q = ${D('q')}, z = ${D('z')}. The dots on the plot are the paper's own table${cite('table')}; the model hits all of them.</p>
+        <p><button data-set="q=0.3; z=10">q = 30%, z = 10</button> <button data-set="q=0.1; z=5">back to q = 10%, z = 5</button></p>` },
+    { title: '6 · Where the approximation breaks', sel: 8, params: { q: 0.3, breaks: true },
+      html: () => `<p>Across every wait from 0 to 20 blocks, the exact race (solid) sits above the paper's Poisson numbers (dashed)${cite('exact')}. At q = ${D('q')} and z = ${D('z')}: paper ${D('Ppaper')}, exact ${D('Pexact')}, ${D('ratio')} as likely.</p>
+        <p>The grey band marks where the paper is off by more than 10%. The Poisson head start has too thin a tail, and the attacker wins in the tail. <button data-set="q=0.1">Try q = 10%</button></p>` },
+  ],
+  recompute(P){ if (!der) der = IE.derivation('deriv', { lines: LINES, terms: TERMS, plotHost: 'plot', plotHeight: 300, onPick: i => { app.pause(); app.setSel(i); },
+    paramText: P => `q = ${fmt.num(P.q, 2)}, z = ${P.z}` }); },
+  render({ P, sel }){
+    der.set({ sel, P: { q: P.q, z: P.z }, breaks: P.breaks });
+    document.getElementById('check').innerHTML = der.checkHtml(Math.round(sel), { q: P.q, z: P.z });
+    valid.render();
+  },
+  dyn({ P }){ const pp = attackerPoisson(P.q, P.z), pe = attackerExact(P.q, P.z), r = der.results({ q: P.q, z: P.z });
+    return { q: fmt.pct(P.q, 0), z: String(P.z), qp: fmt.num(P.q / (1 - P.q), 3), lam: fmt.num(lambdaOf(P.q, P.z), 2), qz: sci(catchUp(P.q, P.z), 3),
+      Ppaper: sci(pp, 3), Pexact: sci(pe, 3), ratio: fmt.num(pe / pp, 2) + '×', zNeed: (z => isFinite(z) ? z + ' blocks' : 'never')(zFor(P.q)),
+      res6: sci(r[5].rel, 1), apx: fmt.pct(r[7].rel, 1) }; },
+  readout({ P, sel }){ const i = Math.round(sel), L = LINES[i];
+    return `Line <b>${i + 1}</b> of ${LINES.length}${L.approx ? ' (approximation)' : ''} · ${L.rule} · ${der.summary({ q: P.q, z: P.z }).pass} of ${LINES.length} lines check out at q = ${fmt.num(P.q, 2)}, z = ${P.z}`; },
+});
+
+// ---- validation (REPLACE): every number in the source, plus the derivation's own consistency
+const SIM = { v: null }; const sim = () => SIM.v || (SIM.v = simulateRace(0.3, 5, 100000, 7));
+const paperRow = (q, z, v) => ({ claim: `P at q = ${q}, z = ${z}`, source: 'table', target: v.toFixed(7), model: () => attackerPoisson(q, z).toFixed(7), ok: () => attackerPoisson(q, z).toFixed(7) === v.toFixed(7) });
+const valid = IE.validation('valid', [
+  paperRow(0.1, 1, 0.2045873), paperRow(0.1, 5, 0.0009137), paperRow(0.3, 10, 0.0416605), paperRow(0.3, 50, 0.0000006),
+  { claim: 'Every row of both result tables', source: 'table', target: `${PAPER.q10.length + PAPER.q30.length} rows`,
+    model: () => `${[...PAPER.q10.map(r => [0.1, ...r]), ...PAPER.q30.map(r => [0.3, ...r])].filter(([q, z, v]) => attackerPoisson(q, z).toFixed(7) === v.toFixed(7)).length} match to 7 decimals`,
+    ok: () => [...PAPER.q10.map(r => [0.1, ...r]), ...PAPER.q30.map(r => [0.3, ...r])].every(([q, z, v]) => attackerPoisson(q, z).toFixed(7) === v.toFixed(7)) },
+  { claim: 'Blocks to wait for P < 0.1%, q = 10% … 45%', source: 'table', target: PAPER.below.map(r => r[1]).join(', '), model: () => PAPER.below.map(r => zFor(r[0])).join(', '), ok: () => PAPER.below.every(r => zFor(r[0]) === r[1]) },
+  { claim: '(q/p)<sup>z</sup> equals line 1 solved by numbers (z ≤ 20, q = 1% … 45%)', source: 'ruin', target: 'equal',
+    model: () => 'max rel. diff ' + sci(Math.max(...[0.01, 0.1, 0.2, 0.3, 0.45].flatMap(q => zs.map(z => Math.abs(ruin(q)[z] - catchUp(q, z)) / catchUp(q, z)))), 1),
+    ok: () => [0.01, 0.1, 0.2, 0.3, 0.45].every(q => zs.every(z => Math.abs(ruin(q)[z] - catchUp(q, z)) <= 1e-9 * catchUp(q, z))) },
+  { claim: 'Every line\'s numeric check passes at the paper\'s q = 10%, z = 5', source: 'derivation', target: `${LINES.length} of ${LINES.length}`,
+    model: () => `${der.summary(REAL).pass} of ${der.summary(REAL).total}`, ok: () => der.summary(REAL).pass === LINES.length },
+  { claim: 'Exact race: 100 000 simulated races (q = 30%, z = 5) vs the negative-binomial formula', source: 'exact', target: 'within 3 standard errors',
+    model: () => `${sim().P.toFixed(4)} ± ${sim().se.toFixed(4)} vs ${attackerExact(0.3, 5).toFixed(4)}`, ok: () => Math.abs(sim().P - attackerExact(0.3, 5)) < 3 * sim().se },
+  { claim: '… and the paper\'s Poisson value is too low', source: 'exact', target: 'lower by > 3 s.e.',
+    model: () => `${attackerPoisson(0.3, 5).toFixed(4)}: ${fmt.num((sim().P - attackerPoisson(0.3, 5)) / sim().se, 0)} s.e. lower`, ok: () => sim().P - attackerPoisson(0.3, 5) > 3 * sim().se },
+]);
+</script>
+</body>
+</html>

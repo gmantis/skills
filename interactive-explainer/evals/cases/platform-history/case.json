@@ -1,0 +1,12 @@
+{
+  "id": "platform-history",
+  "tier": "Explainer",
+  "prompt": "/interactive-explainer tell the story in source.md",
+  "expect_shapes": ["timeline"],
+  "targets": [
+    { "label": "19 events pickable", "expr": "document.querySelectorAll('[data-pick]').length >= 19" },
+    { "label": "era counts 5/8/6", "expr": "/\\b5\\b/.test(document.body.innerText) && /\\b8\\b/.test(document.body.innerText) && /\\b6\\b/.test(document.body.innerText) && /pilot/i.test(document.body.innerText) && /scale-?out/i.test(document.body.innerText) && /cloud/i.test(document.body.innerText)" },
+    { "label": "validation all pass", "expr": "document.querySelectorAll('.ok').length >= 3 && !document.querySelector('.fail')" }
+  ],
+  "budget": { "minutes": 12, "output_tokens": 120000 }
+}

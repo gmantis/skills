@@ -1,0 +1,28 @@
+/* interactive-explainer runtime: uncertainty.css (IE.uncertainty views). Include with <style data-ie="uncertainty"></style>. */
+.ie-icons{display:flex;flex-direction:column;gap:6px}
+.ie-iconsvg{background:var(--panel2)}
+.ie-icgrp{transition:opacity .2s}
+.ie-icgrp.off{opacity:.3}
+.ie-icgrp[data-pick]{cursor:pointer}
+.ie-icgrp:focus{outline:none} .ie-icgrp:focus-visible{outline:2px solid var(--focus)}
+.ie-ulegend{display:flex;flex-wrap:wrap;gap:6px}
+.ie-ulegend button{font:inherit;font-size:.8rem;display:inline-flex;align-items:center;gap:6px;background:var(--btn);border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink);cursor:pointer;font-variant-numeric:tabular-nums}
+.ie-ulegend button:disabled{opacity:1;cursor:default}
+.ie-ulegend button[aria-pressed="true"]{border-color:var(--ink);background:var(--btn-on)}
+.ie-ulegend button span{white-space:nowrap} .ie-ulegend button span.g{color:var(--ink2);white-space:normal}
+.ie-ulegend i{width:11px;height:11px;border-radius:3px;display:inline-block;flex-shrink:0}
+.ie-hist .hbar{transition:opacity .2s} .ie-hist .hbar.off{opacity:.35}
+.ie-hist path.exact{stroke:var(--ink);stroke-width:1.4;opacity:.75}
+.ie-hist circle.exactdot{fill:var(--panel2);stroke:var(--ink);stroke-width:1.4}
+.ie-hist line.qline{stroke:var(--ink2);stroke-width:1.2;stroke-dasharray:4 3}
+.ie-hist line.mline{stroke:var(--accent);stroke-width:1.6}
+.ie-forest .frow .fbg{fill:transparent}
+.ie-forest .frow.on .fbg{fill:var(--hl)}
+.ie-forest .frow[data-pick]{cursor:pointer}
+.ie-forest .frow[data-pick]:hover .fbg{fill:var(--btn)}
+.ie-forest .frow.on:hover .fbg{fill:var(--hl)}
+.ie-forest .frow:focus{outline:none} .ie-forest .frow:focus-visible .fbg{stroke:var(--focus);stroke-width:2}
+.ie-forest line.fexact{stroke-width:9;opacity:.22;stroke-linecap:round}
+.ie-pick{flex-wrap:wrap}
+.ie-again{white-space:nowrap}
+.ptop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}

@@ -29,7 +29,7 @@ IE.fmt = {
   sgn: (v, d = 1) => (v < 0 ? '−' : '+') + nf(d).format(Math.abs(v)),
   pct: (v, d = 0) => !isFinite(v) ? '–' : nf(d).format(v * 100).replace('-', '−') + '%',
   si: (v, d = 1) => { const a = Math.abs(v); for (const [m, s] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']]) if (a >= m) return IE.fmt.num(v / m, d) + s; return IE.fmt.num(v, a < 10 && v % 1 ? d : 0); },
-  money: (v, cur = 'USD', d = 0) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: d, minimumFractionDigits: d }).format(v),
+  money: (v, cur = 'USD', d = 0) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol', maximumFractionDigits: d, minimumFractionDigits: d }).format(v),
   dur: s => !isFinite(s) ? 'never' : s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : s < 172800 ? IE.fmt.num(s / 3600, 1) + ' h' : IE.fmt.num(s / 86400, 1) + ' days',
 };
 
@@ -38,7 +38,7 @@ let colorCache = {};
 IE.color = name => { if (colorCache[name]) return colorCache[name];
   const v = getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim(); return (colorCache[name] = v || name); };
 IE.series = i => 's' + ((i % 8) + 1);                 // slot name; IE.color(IE.series(i)) for canvas, `var(--${IE.series(i)})` for svg/css
-IE.cssColor = c => !c ? 'var(--ink)' : /^(#|rgb|hsl|var\()/.test(c) ? c : `var(--${c})`;   // 's2' | 'ink' | '#hex' -> css
+IE.cssColor = c => !c ? 'var(--ink)' : /^(#|[a-z-]+\()/i.test(c) ? c : `var(--${c})`;   // 's2' | 'ink' | '#hex' -> css
 const themeCbs = [];
 IE.theme = {
   get(){ return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); },
@@ -178,21 +178,24 @@ IE.lineChart = (host, spec) => {
     if (S.x.label) IE.svg('text', { class: 'tick', x: pad.l + pw / 2, y: H - 6, 'text-anchor': 'middle', text: S.x.label }, base);
     if (S.y.label) IE.svg('text', { class: 'tick', x: pad.l, y: pad.t - 3, text: S.y.label }, base);
     for (const h of S.hlines || []){ IE.svg('line', { class: 'axis', x1: pad.l, x2: pad.l + pw, y1: Y(h.y), y2: Y(h.y), 'stroke-dasharray': '4 4' }, base);
-      if (h.label) IE.svg('text', { class: 'note lbl', x: pad.l + 6, y: Y(h.y) - 5, text: h.label }, base); }
+      if (h.label) IE.svg('text', { class: 'note lbl', x: pad.l + pw - 4, y: Y(h.y) - 5, 'text-anchor': 'end', text: h.label }, base); }
     const clip = 'c' + Math.random().toString(36).slice(2, 8);
     const cp = IE.svg('clipPath', { id: clip }, base); IE.svg('rect', { x: pad.l, y: pad.t - 2, width: pw, height: ph + 4 }, cp);
     const g = IE.svg('g', { 'clip-path': `url(#${clip})` }, base);
     for (const s of S.series){
-      const pts = s.points.map(([x, y]) => [X(x), (ly && y <= 0) ? NaN : Y(y)]), col = IE.cssColor(s.color);
+      const col = IE.cssColor(s.color), pts = (s.points || []).map(([x, y]) => [X(x), (ly && y <= 0) ? NaN : Y(y)]);
+      if (s.band){ const up = s.band.map(([x, lo, hi]) => [X(x), Y(hi)]), dn = s.band.map(([x, lo]) => [X(x), Y(lo)]).reverse();   // [[x, lo, hi]]: a shaded range
+        IE.svg('path', { d: pathD(up) + 'L' + pathD(dn).slice(1) + 'Z', fill: col, opacity: s.bandOpacity ?? 0.15, stroke: 'none' }, g); if (!s.points) continue; }
       if (s.area){ const fin = pts.filter(p => isFinite(p[1])); if (fin.length) IE.svg('path', { d: pathD(fin) + `L${fin[fin.length - 1][0]},${pad.t + ph}L${fin[0][0]},${pad.t + ph}Z`, fill: col, opacity: 0.12 }, g); }
       IE.svg('path', { d: pathD(pts), fill: 'none', stroke: col, 'stroke-width': s.width || (s.ghost ? 1.6 : 2.2), 'stroke-dasharray': s.dash || (s.ghost ? '5 4' : null), opacity: s.ghost ? 0.7 : 1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'data-series': s.id }, g);
     }
     // end labels: right gutter, de-overlapped
-    const ends = S.series.filter(s => !s.ghost && s.label && s.endLabel !== false).map(s => { const p = [...s.points].reverse().find(p => isFinite(p[1]) && (!ly || p[1] > 0)); return p ? { s, y: Y(p[1]) } : null; }).filter(Boolean);
+    const ends = S.series.filter(s => !s.ghost && s.label && s.endLabel !== false && s.points).map(s => { const p = [...s.points].reverse().find(p => isFinite(p[1]) && (!ly || p[1] > 0)); return p ? { s, y: Y(p[1]) } : null; }).filter(Boolean);
     IE.spread(ends, 14, pad.t + 6, pad.t + ph);
     for (const e of ends){ const col = IE.cssColor(e.s.color);
       IE.svg('text', { class: 'end lbl', x: pad.l + pw + 6, y: e.ly + 4, fill: col, style: `fill:${col}`, text: e.s.label + (e.s.endText ? '  ' + e.s.endText : '') }, base); }
     for (const n of S.notes || []) IE.svg('text', { class: 'note lbl', x: X(n.x), y: Y(n.y), 'text-anchor': n.anchor || 'start', text: n.text }, base);
+    S.afterBuild && S.afterBuild(geo, root);   // hook for modules that add their own layers after a rebuild (resize, theme)
   };
   const overlay = () => {
     over.replaceChildren(); if (!geo) return; const { X, Y, pad, ph } = geo;
@@ -201,7 +204,7 @@ IE.lineChart = (host, spec) => {
         IE.svg('rect', { x, y: pad.t + 1, width: w, height: 17, rx: 4, fill: 'var(--backing)' }, over); IE.svg('text', { class: 'note lbl', x: x + 4, y: pad.t + 13, text: S.cursorLabel }, over); } }
     for (const m of S.marks || []){ if (!isFinite(m.y)) continue; const col = IE.cssColor(m.color || 'ink');
       IE.svg('circle', { cx: X(m.x), cy: Y(m.y), r: m.r || 4.5, fill: col, stroke: 'var(--panel2)', 'stroke-width': 1.5 }, over);
-      if (m.label) IE.svg('text', { class: 'note lbl', x: X(m.x) + 7, y: Y(m.y) - 7, text: m.label }, over); }
+      if (m.label){ const an = m.anchor || (X(m.x) > geo.pad.l + geo.pw * 0.8 ? 'end' : 'start'); IE.svg('text', { class: 'note lbl', x: X(m.x) + (an === 'end' ? -7 : 7), y: Y(m.y) - 7, 'text-anchor': an, text: m.label }, over); } }
   };
   ch.set = patch => {
     S = { ...(S || {}), ...patch }; ch.spec = S;
@@ -210,7 +213,7 @@ IE.lineChart = (host, spec) => {
     if (structural || key !== lastKey){ lastKey = key; build(); }
     overlay(); return ch;
   };
-  if (spec.onPick) IE.onPickX(root, spec.onPick);
+  IE.onPickX(root, x => S && S.onPick && S.onPick(x));   // reads the current spec, so set({ onPick }) works
   new ResizeObserver(() => { if (S && host.clientWidth && String(host.clientWidth) !== lastKey.split('|')[0]) ch.set({}); }).observe(host);
   IE.theme.onChange(() => S && ch.set({}));
   ch.set(spec);
@@ -227,7 +230,7 @@ IE.barChart = (host, spec) => {
     const labW = Math.min(W * 0.34, 12 + Math.max(...S.rows.map(r => IE.textWidth(r.label, 12)))), valW = 12 + Math.max(...S.rows.map(r => IE.textWidth((S.fmt || String)(r.value) + (r.note ? '  ' + r.note : ''), 12, 'bold')));
     const lo = Math.min(0, S.min ?? Math.min(...S.rows.map(r => r.value))), hi = S.max ?? Math.max(...S.rows.map(r => r.value)), x0 = labW, pw = Math.max(40, W - labW - valW - 8);
     const X = v => x0 + (v - lo) / ((hi - lo) || 1) * pw;
-    root.setAttribute('viewBox', `0 0 ${W} ${H}`); root.setAttribute('width', W); root.setAttribute('height', H);
+    root.setAttribute('viewBox', `0 0 ${W} ${H}`); root.setAttribute('width', W); root.setAttribute('height', H); root.setAttribute('role', S.onPick ? 'group' : 'img');
     title.textContent = (S.title || 'Bar chart') + ': ' + S.rows.map(r => `${r.label} ${(S.fmt || String)(r.value)}`).join(', '); root.setAttribute('aria-label', title.textContent);
     g.replaceChildren();
     S.rows.forEach((r, i) => { const y = 6 + i * rowH, gg = IE.svg('g', { class: 'bar' + (S.highlight === r.id ? ' on' : ''), 'data-pick': S.onPick ? r.id : null, tabindex: S.onPick ? 0 : null, role: S.onPick ? 'button' : null, 'aria-label': `${r.label}: ${(S.fmt || String)(r.value)}` }, g);
@@ -244,10 +247,14 @@ IE.barChart = (host, spec) => {
 };
 
 /* Table: IE.table(host, { columns:[{key,label,num,fmt}], rows:[{...}], highlight: rowIndex|fn, caption }) */
-IE.table = (host, spec) => {
+IE.table = (host, spec) => {   // spec.pick(r, i) -> id gives rows data-pick; with spec.onPick(id) they are also keyboard buttons
   const cols = spec.columns, hl = spec.highlight;
+  if (spec.onPick && !host._iePick){ host._iePick = true;
+    const go = e => { const tr = e.target.closest('tr[data-pick]'); if (tr && host.contains(tr)) host._ieOnPick(tr.dataset.pick); };
+    host.addEventListener('click', go); host.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(e); } }); }
+  host._ieOnPick = spec.onPick;
   host.innerHTML = `<div class="tablewrap"><table class="ie-table">${spec.caption ? `<caption class="sr-only">${IE.esc(spec.caption)}</caption>` : ''}<thead><tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}" scope="col">${c.label}</th>`).join('')}</tr></thead><tbody>${
-    spec.rows.map((r, i) => `<tr class="${(typeof hl === 'function' ? hl(r, i) : hl === i) ? 'on' : ''}"${spec.pick ? ` data-pick="${IE.esc(spec.pick(r, i))}"` : ''}>${cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : IE.esc(r[c.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    spec.rows.map((r, i) => `<tr class="${(typeof hl === 'function' ? hl(r, i) : hl === i) ? 'on' : ''}"${spec.pick ? ` data-pick="${IE.esc(spec.pick(r, i))}"` : ''}${spec.pick && spec.onPick ? ' tabindex="0" role="button"' : ''}>${cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : IE.esc(r[c.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 };
 
 // ---------------------------------------------------------------- sources, citations and the validation table
@@ -269,7 +276,8 @@ IE.validation = (host, rows) => {
     let pass = 0, total = 0;
     const body = rows.map(r => { let m = '', ok = null; try { m = r.model ? r.model() : ''; ok = r.ok ? r.ok() : null; } catch (e) { m = 'error: ' + e.message; ok = false; }
       if (ok !== null){ total++; if (ok) pass++; }
-      return `<tr><td>${r.claim}</td><td class="src">${r.source ? (SRC[r.source] ? IE.cite(r.source) + ' ' + IE.esc(SRC[r.source].where || '') : IE.esc(r.source)) : ''}</td><td class="num">${r.target ?? ''}</td><td class="num">${m}</td><td>${ok === null ? '' : ok ? '<span class="ok" aria-label="matches">✓</span>' : '<span class="fail" aria-label="does not match">✗</span>'}</td></tr>`; }).join('');
+      const tg = typeof r.target === 'function' ? r.target() : r.target;
+      return `<tr><td>${r.claim}</td><td class="src">${r.source ? (SRC[r.source] ? IE.cite(r.source) + ' ' + IE.esc(SRC[r.source].where || '') : IE.esc(r.source)) : ''}</td><td class="num">${tg ?? ''}</td><td class="num">${m}</td><td>${ok === null ? '' : ok ? '<span class="ok" aria-label="matches">✓</span>' : '<span class="fail" aria-label="does not match">✗</span>'}</td></tr>`; }).join('');
     host.innerHTML = `<div class="tablewrap"><table class="ie-table"><thead><tr><th>Claim</th><th>Source</th><th class="num">Source says</th><th class="num">Model gives</th><th><span class="sr-only">Match</span></th></tr></thead><tbody>${body}</tbody></table></div><p class="sub">${pass} of ${total} checks match, recomputed live from the model.</p>`;
     v.pass = pass; v.total = total; return v; } };
   return v.render();
@@ -295,6 +303,9 @@ IE.app = cfg => {
   let sel = numericSel ? selCfg.value ?? selCfg.min : null, STEP = 0, dirty = true, playing = false, last = null, hashTimer = 0, loading = true;
   const app = { P, cfg, get sel(){ return sel; }, get step(){ return STEP; }, get playing(){ return playing; } };
 
+  // ids of params/toggles/options become element ids: refuse ones the page or the runtime already uses
+  const RESERVED = ['prev', 'next', 'dots', 'stepTitle', 'stepText', 'whatSeg', 'sel', 'sel_o', 'play', 'reset', 'params', 'tour', 'whatif', 'controls', 'readout', 'valid', 'sources'];
+  for (const x of [...params, ...toggles, ...options]) if (RESERVED.includes(x.id) || $(x.id)) console.error(`IE.app: id "${x.id}" is already used on the page or by the runtime; rename the parameter`);
   // ---- build the standard cards (only into containers that exist)
   const tour = $('tour');
   if (tour) tour.innerHTML = `<div class="stepnav"><button id="prev" type="button" aria-label="Previous topic (Ctrl+←)">‹</button><div class="dots" id="dots"></div><button id="next" type="button" aria-label="Next topic (Ctrl+→)">›</button></div>
@@ -325,8 +336,11 @@ IE.app = cfg => {
   app.setSel = v => { if (!numericSel){ sel = v; dirty = true; saveHash(); return app; }
     sel = selCfg.cyclic ? (((v - selCfg.min) % (selCfg.max - selCfg.min)) + (selCfg.max - selCfg.min)) % (selCfg.max - selCfg.min) + selCfg.min : IE.clamp(v, selCfg.min, selCfg.max); dirty = true; saveHash(); return app; };
   app.redraw = dirtyNow;
+  // numeric selection whose range depends on the model (trace length, rounds): update bounds and the slider
+  app.setSelRange = (min, max) => { if (!numericSel) return app; selCfg.min = min; selCfg.max = max; const el = $('sel'); if (el){ el.min = min; el.max = max; }
+    sel = IE.clamp(sel, min, max); dirty = true; return app; };
   app.pause = () => { if (playing){ playing = false; const b = $('play'); if (b) b.textContent = '▶ Play'; } };
-  app.play = () => { playing = true; const b = $('play'); if (b) b.textContent = '❚❚ Pause'; };
+  app.play = () => { if (numericSel && !selCfg.cyclic && sel >= selCfg.max) sel = selCfg.min; playing = true; const b = $('play'); if (b) b.textContent = '❚❚ Pause'; };
   const stepSel = dir => { app.pause(); if (selCfg && selCfg.stepBy) selCfg.stepBy(dir, app); else if (numericSel) app.setSel(sel + dir * (selCfg.unit || selCfg.step || (selCfg.max - selCfg.min) / 100)); dirty = true; };
   app.stepSel = stepSel;
   app.goStep = (i, opts = {}) => {
@@ -362,7 +376,7 @@ IE.app = cfg => {
     for (const [k, v] of q){ if (k === 's' || k === 't') continue; if (!(k in P)) continue;
       o[k] = typeof P[k] === 'boolean' ? v === '1' : typeof P[k] === 'number' ? +v : decodeURIComponent(v); }
     if (Object.keys(o).length) app.set(o, { silent: true });
-    if (q.has('t')){ const t = q.get('t'); if (numericSel) app.setSel(+t); else sel = isNaN(+t) ? decodeURIComponent(t) : +t; }
+    if (q.has('t')){ const t = q.get('t'); if (numericSel) app.setSel(+t); else sel = selCfg && selCfg.parse ? selCfg.parse(t) : typeof sel === 'number' ? +t : t; }   // ids stay strings unless sel.parse says otherwise
     return true;
   };
 
@@ -385,7 +399,7 @@ IE.app = cfg => {
     const b = ev.target.closest('button[data-set]'); if (!b) return; const o = {};
     b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('=').map(x => x.trim()); if (!k) return;
       if (k === 'sel'){ app.setSel(isNaN(+v) ? v : +v); return; }
-      o[k] = v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; });
+      o[k] = typeof P[k] === 'boolean' ? (v === 'true' || v === '1') : v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; });
     if (Object.keys(o).length) app.set(o);
   });
   IE.qsa('#whatSeg button').forEach(b => b.onclick = () => app.set({ ...cfg.whatIf.find(w => w.key === b.dataset.w).set }));
@@ -417,7 +431,9 @@ IE.app = cfg => {
     if (!loadHash()) app.goStep(0, { silent: true });
     loading = false;
     const frame = now => {
-      if (playing && numericSel){ if (last !== null){ const rate = (selCfg.play && selCfg.play.rate) || (selCfg.max - selCfg.min) / 20; let v = sel + (now - last) / 1000 * rate;
+      if (playing && !numericSel && selCfg && selCfg.stepBy){   // play through a non-numeric selection: one step every play.ms
+        if (last === null || now - last > ((selCfg.play && selCfg.play.ms) || 750)){ const before = JSON.stringify(sel); selCfg.stepBy(1, app); if (JSON.stringify(sel) === before) app.pause(); last = now; dirty = true; } }
+      else if (playing && numericSel){ if (last !== null){ const rate = (selCfg.play && selCfg.play.rate) || (selCfg.max - selCfg.min) / 20; let v = sel + (now - last) / 1000 * rate;
           if (!selCfg.cyclic && v >= selCfg.max){ v = selCfg.max; app.pause(); } app.setSel(v); } last = now; } else last = null;
       if (dirty){ dirty = false; try { render(); } catch (e) { console.error(e); } }
       requestAnimationFrame(frame);

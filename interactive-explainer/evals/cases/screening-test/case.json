@@ -1,0 +1,13 @@
+{
+  "id": "screening-test",
+  "tier": "Sketch",
+  "prompt": "make a quick interactive-explainer style page from source.md so I can see why a positive test isn't so bad",
+  "expect_shapes": ["uncertainty"],
+  "targets": [
+    { "label": "9 true and 89 false positives of 1000", "expr": "/\\b9\\b[^.]{0,80}\\b1000\\b|\\b9 of (the )?98\\b/.test(document.body.innerText) && /\\b89\\b/.test(document.body.innerText)" },
+    { "label": "PPV about 9%", "expr": "/\\b9(\\.2)?\\s*%/.test(document.body.innerText)" },
+    { "label": "1-in-10 case about 53%", "expr": "/\\b5[23](\\.\\d)?\\s*%/.test(document.body.innerText) || [...document.querySelectorAll('button[data-set], [data-w]')].length > 0" },
+    { "label": "natural frequencies shown", "expr": "/of\\s+1[ ,.]?000/.test(document.body.innerText)" }
+  ],
+  "budget": { "minutes": 6, "output_tokens": 60000 }
+}

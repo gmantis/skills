@@ -1,0 +1,30 @@
+/* interactive-explainer runtime: derivation.css (the derivation stepper, IE.derivation). Needs core.css. */
+.ie-deriv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+.ie-deriv .part{font-size:.74rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink2);font-weight:650;margin:10px 0 2px 4px}
+.ie-deriv .part:first-child{margin-top:0}
+.ie-deriv .dl{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:0 10px;align-items:center;padding:5px 10px 6px 8px;
+  border:1px solid transparent;border-left:3px solid transparent;border-radius:8px;cursor:pointer}
+.ie-deriv .dl:hover{border-color:var(--line)}
+.ie-deriv .dl.on{background:var(--panel2);border-color:var(--line);border-left-color:var(--accent)}
+.ie-deriv .dn{color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums}
+.ie-deriv .dl.on .dn{color:var(--accent);font-weight:700}
+.ie-deriv .dm{min-width:0;overflow-x:auto;overflow-y:hidden;padding:3px 0}
+.ie-deriv math{font-size:1.12rem;color:var(--ink)}
+.ie-deriv .dl:not(.on) math{color:var(--ink2)}
+.ie-deriv .mi,.ie-m .mi{font-style:italic}
+.ie-deriv [data-term]{border-radius:3px;transition:background-color .25s}
+.ie-deriv .dl.on [data-term].chg{background:var(--hl);outline:1.5px solid color-mix(in srgb,var(--s4) 70%,transparent);outline-offset:1px}
+.ie-deriv .dc{font-size:.76rem;white-space:nowrap;font-variant-numeric:tabular-nums;justify-self:end}
+.ie-deriv .dc.ok{color:var(--good-ink)} .ie-deriv .dc.bad{color:var(--bad-ink);font-weight:650}
+.ie-deriv .dr{grid-column:2/4;font-size:.8rem;color:var(--muted);line-height:1.35}
+.ie-deriv .dl.on .dr{color:var(--ink2)}
+.ie-deriv .dg{grid-column:2/4;font-size:.88rem;color:var(--ink);margin-top:3px;line-height:1.45}
+.ie-deriv .dl:not(.on) .dg{display:none}
+.ie-deriv .apxtag{display:inline-block;font-size:.7rem;padding:0 6px;border-radius:999px;border:1px solid var(--s2);color:var(--ink2)}
+.ie-terms{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:.8rem;color:var(--ink2);margin:0 0 8px}
+.ie-terms i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.ie-deriv-side{position:sticky;top:10px;align-self:start}
+@media (max-width:1000px){.ie-deriv-side{position:static}}
+@media (max-width:600px){.ie-deriv .dl{grid-template-columns:20px minmax(0,1fr)} .ie-deriv .dc{grid-column:2;justify-self:start} .ie-deriv .dr,.ie-deriv .dg{grid-column:2} .ie-deriv math{font-size:1rem}}
+.ie-dplot-t{margin:0 0 4px} .ie-dplot-n{margin:6px 0 0}
+.ie-dplot-t math,.ie-dplot-n math{font-size:1em}

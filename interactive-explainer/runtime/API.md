@@ -31,6 +31,9 @@ validation run. Return `Infinity` for unreachable values and say it in words in 
 
 ## IE.app(cfg) — the tour, controls, selection, keys and URL state
 
+Parameter, toggle and option ids become element ids, so they must not clash with the runtime's (`prev`, `next`,
+`sel`, `play`, `reset`, `params`, `readout`, `valid`, `sources`…) or the page's; the runtime logs an error if they do.
+
 ```js
 const app = IE.app({
   real: { ampA: 7.7 },                                   // real parameter values; Reset returns here
@@ -39,7 +42,8 @@ const app = IE.app({
   options: [{ id: 'ghosts', label: '…', value: true }],        // view-only switches; kept when the step changes
   whatIf:  [{ key: 'noA', label: 'No A', set: { offA: true, offB: false } }],   // pressed when P matches set
   sel: { label, min, max, step, unit, value, cyclic, fmt, play: { rate } | false, keyHint },   // numeric selection
-    // or sel: { stepBy(dir, app) } for a non-numeric selection (node, record, option); keep it in your own state
+    // or sel: { stepBy(dir, app), parse?(t) } for a non-numeric selection (node, record, option): app.setSel(id) / app.sel;
+    // ids come back from the URL as strings unless parse() converts them
   steps: [{ title, params: { offB: true }, sel: 0.3 | (app => …), html: app => `…${D('key')}…`, enter(app) }],
   recompute(P, app),           // params changed: rerun the model, rebuild static views
   render({ P, sel, step, app }), // draw every view for the current selection (called once per dirty frame)
@@ -52,6 +56,9 @@ const app = IE.app({
   back always restores the same state. Options (view switches) keep the reader's choice.
 - `app.set({k: v})`, `app.setSel(v)`, `app.goStep(i)`, `app.redraw()`, `app.pause()`, `app.play()`, `app.stepSel(dir)`,
   `app.P`, `app.sel`, `app.step`, `app.afterRender.push(fn)`.
+- A numeric `sel` may also have `stepBy` (it wins for ← →), e.g. to jump between events on a time axis. A
+  non-numeric selection plays with `sel.play: { ms }` (one `stepBy(1)` per tick; stops when it no longer moves).
+- Easing: call `app.redraw()` inside `render()` to ask for another frame until the motion settles.
 - Inline experiment buttons anywhere: `<button data-set="ampA=15; offB=true">` and `<button data-set="sel=0.62">`.
 - Keys: ← → move the selection one `unit` (or call `sel.stepBy`) and pause play; Ctrl/⌘ + ← → change topic. Typing
   fields, focused sliders and Alt are left alone. The slider gets `data-time` so `check.js` tests the keys.
@@ -60,20 +67,22 @@ const app = IE.app({
 ## Prose helpers
 `D('key')` live number (no wrap), `DW('key')` live text that may wrap. `cite('id')` superscript link to a source.
 `IE.sources({ id: { title, url, where: 'p. 4, Table 2', quote: 'exact words' } })` renders `#sources` with each quote.
-`IE.validation('valid', [{ claim, source: 'id', target: 'source value', model: () => 'text', ok: () => bool }])` renders a
+`IE.validation('valid', [{ claim, source: 'id', target: 'source value' | () => 'text', model: () => 'text', ok: () => bool }])` renders a
 live check table; call `.render()` in `render()` when its numbers depend on the settings.
 
 ## Views
 - `IE.lineChart(host, spec)` → `chart.set(patch)`. SVG, themed, accessible, lintable by `check.js`.
   spec: `{ title, summary, height, x: { min, max, fmt, ticks, label }, y: { min, max, fmt, ticks, label, log },
-  series: [{ id, label, color: 's1'…'s8' | 'total' | 'ink' | '#hex', points: [[x, y]], width, dash, ghost, area, endLabel, endText }],
+  series: [{ id, label, color: 's1'…'s8' | 'total' | 'ink' | '#hex', points: [[x, y]], width, dash, ghost, area, endLabel, endText,
+  band: [[x, lo, hi]] (a shaded range, e.g. 10–90% of repeated runs) }],
   cursor, cursorLabel, marks: [{ x, y, label, color, r }], bands: [{ x0, x1, label }], hlines: [{ y, label }],
-  notes: [{ x, y, text, anchor }], onPick: x => …, legend: false }`.
+  notes: [{ x, y, text, anchor }], onPick: x => …, legend: false, afterBuild: (geo, svg) => … }`. Marks take `anchor`.
   Patching only `cursor`/`cursorLabel`/`marks` redraws the overlay, so it is cheap per frame. End labels are
   de-overlapped in a right gutter; dashed series get a legend above the chart.
 - `IE.barChart(host, { title, rows: [{ id, label, value, color, note, ghost }], fmt, min, max, highlight, onPick })`:
   horizontal bars; with `onPick` each bar is a keyboard-focusable `data-pick` button.
-- `IE.table(host, { columns: [{ key, label, num, fmt }], rows, highlight, pick: (r, i) => id, caption })`.
+- `IE.table(host, { columns: [{ key, label, num, fmt }], rows, highlight, pick: (r, i) => id, onPick: id => …, caption })`:
+  with `onPick`, rows are keyboard buttons.
 - Canvas (dense marks, 3D, per-pixel): `IE.setupCanvas(cv)` (logical height in `data-h`), `IE.chartFrame(cv, { x0, x1, y0, y1, fmtX, fmtY })`
   → `{ ctx, X, Y, line(pts, color, w, dash) }`, `IE.onPickX(cv, x => …)`, `IE.txt`, `IE.disc`, `IE.placeLabel(ctx, placed, lines, cands, o)`.
   Canvas has no lintable text, so prefer SVG below a few thousand marks.

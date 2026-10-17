@@ -1,0 +1,36 @@
+/* interactive-explainer runtime: timeline.css (IE.timeline). Inlined by build.js via <style data-ie="timeline"></style>. */
+.ie-tl svg.tl-main{display:block}
+.tl-era rect{fill:var(--btn);stroke:var(--line)} .tl-era.alt rect{fill:var(--grid)}
+.tl-era.on rect{fill:var(--btn-on);stroke:var(--accent)} .tl-era.ghost{opacity:.45}
+.ie-chart .tl-era text{fill:var(--ink);font-size:11.5px;font-weight:600}
+.tl-era:focus{outline:none} .tl-era:focus-visible rect{stroke:var(--focus);stroke-width:2.5}
+.tl-eraBg{fill:var(--ink);opacity:0} .tl-eraBg.alt{opacity:.035}
+.tl-eraEdge{stroke:var(--axis);stroke-dasharray:3 4}
+.ie-chart .grid.minor{opacity:.55}
+.tl-lane{stroke:var(--grid)}
+.ie-chart text.tl-laneLbl{fill:var(--ink);font-weight:600} .ie-chart text.tl-laneN{fill:var(--muted);font-size:11px}
+.tl-ev .mk{fill:var(--c);stroke:var(--panel2);stroke-width:1.5}
+.tl-ev.span .mk{fill:var(--c);fill-opacity:.28;stroke:var(--c);stroke-width:1.2}
+.tl-ev .hit{fill:transparent;stroke:none}
+.ie-chart .tl-ev text{fill:var(--ink);font-size:12px}
+.tl-ev:hover .mk{stroke:var(--ink);stroke-width:2}
+.tl-ev:focus{outline:none} .tl-ev:focus-visible .mk{stroke:var(--focus);stroke-width:3}
+.tl-ev.on .mk{stroke:var(--ink);stroke-width:2.6} .tl-ev.span.on .mk{stroke-width:2} .ie-chart .tl-ev.on text{font-weight:700}
+.tl-selband{fill:var(--accent);opacity:.09}
+.tl-cur rect{fill:var(--panel);stroke:var(--accent);stroke-width:1} .ie-chart .tl-cur text{fill:var(--ink);font-size:11.5px;font-weight:600}
+.tl-link{fill:none;stroke:var(--ink2);stroke-width:1.6;opacity:.85} .tl-link.prev{stroke-dasharray:4 3}
+.tl-arrow{fill:var(--ink2)}
+.tl-bin rect{fill:var(--c);opacity:.8} .tl-bin:hover rect,.tl-bin:focus-visible rect{opacity:1;stroke:var(--ink)} .tl-bin:focus{outline:none}
+.ie-chart .tl-bin text{fill:var(--ink2);font-size:10.5px;font-variant-numeric:tabular-nums}
+svg.tl-ov{margin-top:6px;cursor:crosshair;touch-action:none;user-select:none}
+.tl-ovEra{fill:var(--btn)} .tl-ovEra.alt{fill:var(--grid)}
+.tl-ovEv.off{opacity:.22}
+.tl-brush{fill:var(--accent);fill-opacity:.13;stroke:var(--accent);stroke-width:1.5;cursor:grab}
+.tl-handle{fill:var(--accent);cursor:ew-resize}
+.tl-cnt{cursor:pointer} .tl-cntBg{fill:transparent} .tl-cnt.on .tl-cntBg{fill:var(--hl)} .tl-cnt.ghost{opacity:.4}
+.tl-cnt:focus{outline:none} .tl-cnt:focus-visible .tl-cntBg{stroke:var(--focus);stroke-width:2}
+.legend .off{opacity:.45;text-decoration:line-through}
+.tl-card p{margin:0 0 8px} .tl-card .tl-title{font-weight:650;font-size:1rem}
+.tl-chip{display:inline-flex;align-items:center;gap:4px;font-size:.8rem;color:var(--ink2)}
+.tl-chip i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c)}
+.tl-jump{margin:2px 4px 2px 0}

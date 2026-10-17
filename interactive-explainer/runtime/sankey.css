@@ -1,0 +1,25 @@
+/* interactive-explainer runtime: sankey.css (IE.sankey). Inlined by build.js via <style data-ie="sankey"></style>. */
+.sk-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.ie-sk svg.sk{display:block;width:auto;max-width:none}   /* real pixel width: narrow hosts scroll instead of shrinking the text */
+.sk-link{fill:var(--c);opacity:.34;transition:opacity .15s}
+.sk-link.loss{opacity:.28}
+.sk-link:hover{opacity:.55}
+.sk-link:focus{outline:none} .sk-link:focus-visible{opacity:.7;stroke:var(--focus);stroke-width:2}
+.sk-link.on{opacity:.62}
+svg.sk.has-sel .sk-link{opacity:.12} svg.sk.has-sel .sk-link.on{opacity:.3}
+.sk-ov{fill:var(--c);opacity:.78;pointer-events:none}
+.sk-ov.loss{opacity:.6} .sk-ov.mixed{opacity:.42}
+.sk-node rect{fill:var(--c)} .sk-node rect.hit{fill:transparent}
+.sk-node:focus{outline:none} .sk-node:focus-visible rect:first-child{stroke:var(--focus);stroke-width:3}
+.sk-node:hover rect:first-child{stroke:var(--ink);stroke-width:1.5}
+svg.sk.has-sel .sk-node:not(.hl){opacity:.35}
+.sk-node.on rect:first-child{stroke:var(--ink);stroke-width:2.5}
+.sk-labels{pointer-events:none}
+.ie-chart .sk-lbl text{paint-order:stroke;stroke:var(--panel2);stroke-width:3.5px;stroke-linejoin:round}
+.ie-chart .sk-lbl .sk-name{fill:var(--ink);font-weight:600;font-size:12px}
+.ie-chart .sk-lbl .sk-val{fill:var(--ink2);font-size:11px;font-variant-numeric:tabular-nums}
+.ie-chart .sk-lbl.loss .sk-name{fill:var(--bad-ink)}
+.sk-lbl.fade{opacity:.4}
+.sk-dot{fill:var(--ink);stroke:var(--panel2);stroke-width:.8;pointer-events:none}
+.sk-head{margin:0 0 6px} .sk-list{list-style:none;margin:0 0 8px;padding:0;columns:2;column-gap:16px;font-size:.88rem}
+.sk-list li{break-inside:avoid;padding:1px 0} .sk-list i{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--c);margin-right:6px}

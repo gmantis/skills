@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which air purifier costs least? — interactive explainer</title>
+<!--
+  SKELETON (decision shape) for the interactive-explainer skill. Build: node scripts/build.js <this file> [--from <dir with model.js>]
+  Demo: three ways to get an air purifier, costed over the years you keep it under your own numbers; break-even points
+  checked against closed forms, the tornado against partial derivatives. Replace everything marked REPLACE.
+  The runtime (core + decision) is inlined by build.js; never edit inside data-ie blocks. Guide: shapes/decision.md.
+-->
+<style data-ie="core"></style>
+<style data-ie="decision"></style>
+<style>/* page-only styles (usually none) */</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>Which air purifier costs least? (REPLACE)</h1>
+  <p class="lede">A cheap unit, an efficient one, or a rental: which costs least depends on how much you run it and how long you keep it. Put in your own numbers under <i>Your numbers</i>; the tour shows where the answer flips and which numbers matter. Click any option, bar or branch to follow it. (REPLACE)</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer:</b> <span data-dyn="rec"></span></p>
+  <div class="stat"><b data-dyn="bestName"></b><span>cheapest for you</span></div>
+  <div class="stat"><b data-dyn="margin"></b><span>less than the next best</span></div>
+  <div class="stat"><b data-dyn="flipAt"></b><span data-dyn="flipWhat"></span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="ask"><h4>Your numbers</h4></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Option to follow</h4><div id="pick"></div></div>
+</aside>
+<main>
+  <div class="grid2">
+    <section class="panel"><h3>What each option costs you</h3><p class="sub">Expected total over the years you keep it, split by what the money pays for. Click an option to follow it.</p>
+      <div id="bars"></div></section>
+    <section class="panel"><h3>The decision as a tree</h3><p class="sub">Square: your choice. Circle: chance (an owned unit may need replacing). Triangle: what you end up paying. Blue path: the option you follow; green outline: the cheapest.</p>
+      <div id="tree"></div></section>
+  </div>
+  <div class="grid2">
+    <section class="panel"><h3 id="beTitle">Break-even</h3><p class="sub">Each option's total as one input changes, everything else at your numbers. Dots: where the cheapest option changes. Shaded: where the option you follow is cheapest. Click to set your value.</p>
+      <div id="be"></div></section>
+    <section class="panel"><h3 id="tnTitle">What matters most</h3><p class="sub">How far the cost gap moves when each input runs over a plausible range. A bar that crosses the dashed line can flip the choice on its own. Click a bar to sweep that input in the break-even chart.</p>
+      <div id="tornado"></div></section>
+  </div>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model reproduce the source?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>Each option's expected cost over the years you keep it = price + filters + electricity (hours a night × nights a year × years × watts ÷ 1000 × price per kWh) + expected replacements (years × yearly chance of a breakdown × price), or the rental fee, which includes filters and repairs. Every cost is a straight line in each input, so each break-even point has a closed form, and each tornado bar is exactly the slope times the range. Prices, power draws and breakdown chances are illustrative <span class="badge illustrative">illustrative</span> (REPLACE with the source's numbers).</p>
+    <p>The tree is the same sum written as a decision: for an owned unit, two outcomes (it lasts, or it needs replacing once) weighted by their chances give the expected cost. Expected value is the right yardstick when the stakes are small next to your budget; if one breakdown would really hurt, weigh the worst branch too.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="decision"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, and build with --from "$TEMP/<name>".
+     The demo model below is the inlined copy; build.js keeps it until a model.js file is found. -->
+<script data-ie-file="model.js">
+// DEMO MODEL (REPLACE): which air purifier? Expected total cost of each option over the years you keep it, under
+// your own numbers. Illustrative prices and power draws (source: the product sheet, REPLACE). Pure, no DOM.
+const REAL = { hours: 8, nights: 300, kwh: 0.30, years: 3, priceA: 90, priceB: 220, filterA: 50, filterB: 30, rent: 12 };
+const SPEC = { A: { watts: 60, fail: 0.10 }, B: { watts: 20, fail: 0.02 }, C: { watts: 30 } };   // fail: chance a year that it needs replacing
+const PARTS = [
+  { key: 'upfront', label: 'Price', color: 's1' }, { key: 'filters', label: 'Filters', color: 's3' },
+  { key: 'power', label: 'Electricity', color: 's4' }, { key: 'repairs', label: 'Expected replacement', color: 's8' },
+  { key: 'rent', label: 'Rental fee', color: 's7' },
+];
+function energyKWh(watts, p){ return p.years * p.nights * p.hours * watts / 1000; }
+// expected cost parts over the horizon; repairs = expected replacements (years × yearly chance) × price
+function costParts(id, p){
+  if (id === 'A') return { upfront: p.priceA, filters: p.years * p.filterA, power: energyKWh(SPEC.A.watts, p) * p.kwh, repairs: p.years * SPEC.A.fail * p.priceA, rent: 0 };
+  if (id === 'B') return { upfront: p.priceB, filters: p.years * p.filterB, power: energyKWh(SPEC.B.watts, p) * p.kwh, repairs: p.years * SPEC.B.fail * p.priceB, rent: 0 };
+  return { upfront: 0, filters: 0, power: energyKWh(SPEC.C.watts, p) * p.kwh, repairs: 0, rent: p.years * 12 * p.rent };   // C: filters and replacements included
+}
+const OPTIONS = [
+  { id: 'A', label: 'Budget unit', short: 'Budget', noun: 'the budget unit', color: 's2', cost: p => costParts('A', p) },
+  { id: 'B', label: 'Efficient unit', short: 'Efficient', noun: 'the efficient unit', color: 's1', cost: p => costParts('B', p) },
+  { id: 'C', label: 'Rental with filters', short: 'Rental', noun: 'renting', color: 's6', cost: p => costParts('C', p) },
+];
+function total(id, p){ const c = costParts(id, p); return c.upfront + c.filters + c.power + c.repairs + c.rent; }
+// Closed forms, derived by hand (not from total): cost = a + b·x for x = hours or years.
+function linearIn(id, key, p){
+  const w = SPEC[id].watts, perHourYear = p.nights * w / 1000 * p.kwh;   // $ per (hour a night) per year
+  const price = id === 'A' ? p.priceA : id === 'B' ? p.priceB : 0, filt = id === 'A' ? p.filterA : id === 'B' ? p.filterB : 0;
+  const fail = SPEC[id].fail || 0, rent = id === 'C' ? 12 * p.rent : 0;
+  if (key === 'hours') return { a: price + p.years * (filt + fail * price + rent), b: p.years * perHourYear };
+  if (key === 'years') return { a: price, b: filt + fail * price + rent + p.hours * perHourYear };
+  throw new Error('no closed form for ' + key);
+}
+function breakEvenExact(i, j, key, p){ const A = linearIn(i, key, p), B = linearIn(j, key, p); return A.b === B.b ? null : (B.a - A.a) / (A.b - B.b); }
+// the chance node: an owned unit lasts or needs replacing (expected replacements = years × yearly chance, at most 1 here)
+function outcomes(id, p){
+  const c = costParts(id, p), base = c.upfront + c.filters + c.power + c.rent;
+  if (id === 'C') return [{ id: id + 'x', label: 'Fee covers repairs', prob: 1, cost: base }];
+  const q = Math.min(1, p.years * SPEC[id].fail), price = id === 'A' ? p.priceA : p.priceB;
+  return [{ id: id + 'ok', label: 'Lasts', prob: 1 - q, cost: base }, { id: id + 'br', label: 'Needs replacing', prob: q, cost: base + price }];
+}
+// inputs the reader may be unsure about, with plausible ranges (tornado and the flip condition)
+const usd = v => '$' + Math.round(v);
+const INPUTS = [
+  { id: 'hours', label: 'Hours a night', lo: 2, hi: 12, fmt: v => v.toFixed(1) + ' h', phrase: (d, x) => `you run it ${d < 0 ? 'less' : 'more'} than ${x} a night` },
+  { id: 'years', label: 'Years you keep it', lo: 1, hi: 6, fmt: v => v.toFixed(1) + ' yr', phrase: (d, x) => `you keep it ${d < 0 ? 'less' : 'more'} than ${x.replace(' yr', ' years')}` },
+  { id: 'kwh', label: 'Electricity price', lo: 0.10, hi: 0.60, fmt: v => '$' + v.toFixed(2), phrase: (d, x) => `electricity costs ${d < 0 ? 'less' : 'more'} than ${x} a kWh` },
+  { id: 'nights', label: 'Nights a year', lo: 120, hi: 365, fmt: v => String(Math.round(v)), phrase: (d, x) => `you use it on ${d < 0 ? 'fewer' : 'more'} than ${x} nights a year` },
+  { id: 'priceA', label: 'Budget unit price', lo: 50, hi: 150, fmt: usd, phrase: (d, x) => `the budget unit costs ${d < 0 ? 'less' : 'more'} than ${x}` },
+  { id: 'priceB', label: 'Efficient unit price', lo: 150, hi: 350, fmt: usd, phrase: (d, x) => `the efficient unit costs ${d < 0 ? 'less' : 'more'} than ${x}` },
+  { id: 'filterA', label: 'Budget filters a year', lo: 20, hi: 80, fmt: usd, phrase: (d, x) => `budget filters cost ${d < 0 ? 'less' : 'more'} than ${x} a year` },
+  { id: 'filterB', label: 'Efficient filters a year', lo: 15, hi: 60, fmt: usd, phrase: (d, x) => `efficient filters cost ${d < 0 ? 'less' : 'more'} than ${x} a year` },
+  { id: 'rent', label: 'Rental fee a month', lo: 8, hi: 25, fmt: usd, phrase: (d, x) => `the rental costs ${d < 0 ? 'less' : 'more'} than ${x} a month` },
+];
+if (typeof module === 'object' && module.exports) module.exports = { REAL, SPEC, PARTS, OPTIONS, INPUTS, costParts, total, linearIn, breakEvenExact, outcomes, energyKWh };
+</script>
+<script>
+// ============================ PAGE: sources, questions, steps, views (REPLACE) ============================
+const { fmt } = IE, DE = IE.decision, $ = IE.$, money = v => (v < 0 ? '−$' : '$') + fmt.int(Math.abs(v)), money2 = v => (v < 0 ? '−$' : '$') + fmt.num(Math.abs(v), 2);   // REPLACE currency
+IE.sources({   // every number the page quotes from the source gets an entry; cite with cite('id')
+  sheet: { title: 'Product sheets for the two units and the rental offer (REPLACE)', url: 'https://example.org', where: 'spec tables (REPLACE)',
+    quote: 'Budget unit: 60 W, filters about $50 a year. Efficient unit: 20 W, filters about $30 a year. Rental: $12 a month, filters and repairs included (REPLACE).' },
+});
+const OPT = id => OPTIONS.find(o => o.id === id) || OPTIONS[1], INP = id => INPUTS.find(i => i.id === id), yrs = v => `${fmt.num(v, v % 1 ? 1 : 0)} years`;
+let REC = null, TOR = [], COMP = null, KEY = 'years', bars, tree, be, tornado, picker;
+
+const app = IE.app({
+  real: { ...REAL, sweep: 'auto' },   // sweep: the input on the break-even chart ('auto' = the tornado's top bar); kept in the URL
+  whatIf: [
+    { key: 'real', label: 'Your numbers', set: { kwh: REAL.kwh, hours: REAL.hours, priceB: REAL.priceB } },
+    { key: 'power', label: 'Power ×2', set: { kwh: REAL.kwh * 2, hours: REAL.hours, priceB: REAL.priceB } },
+    { key: 'half', label: 'Use it half as much', set: { kwh: REAL.kwh, hours: REAL.hours / 2, priceB: REAL.priceB } },
+    { key: 'price', label: 'Efficient ×2 price', set: { kwh: REAL.kwh, hours: REAL.hours, priceB: REAL.priceB * 2 } },
+  ],
+  // the shared selection: the option you follow (← → cycle through the options)
+  sel: { stepBy(dir, app){ const i = OPTIONS.findIndex(o => o.id === app.sel); app.setSel(OPTIONS[(i + dir + OPTIONS.length) % OPTIONS.length].id); }, keyHint: 'next / previous option' },
+  steps: [
+    { title: '1 · Your situation', sel: 'B',
+      html: () => `<p>You run a purifier ${D('hours')} a night on ${D('nights')} nights a year, pay ${D('kwh')} per kWh, and expect to keep it ${D('years')}.</p><p><span data-dyn="rec"></span></p>` },
+    { title: '2 · Where the money goes', sel: 'A',
+      html: () => `<p>The budget unit is cheap to buy (${D('priceA')}), but over ${D('years')} its filters cost ${D('filtA')} and its electricity ${D('powA')}, against ${D('powB')} for the efficient unit${cite('sheet')}.</p>` },
+    { title: '3 · Chance: a unit may break', sel: 'A',
+      html: () => `<p>Cheap units break more often: assume 10% a year for the budget unit and 2% for the efficient one. Over ${D('years')} that is a ${D('qA')} chance of buying the budget unit again. The tree weighs both outcomes by their chances: expected cost ${D('evA')}.</p>` },
+    { title: '4 · The break-even point', sel: 'B', params: { sweep: 'hours' },
+      html: () => `<p>Run it less than ${D('beHours')} a night and the budget unit wins; run it more, and the efficient unit's lower power bill pays back its higher price.</p>
+        <p><button data-set="hours=4">Try 4 h a night</button> <button data-set="hours=8">Back to 8 h</button></p>` },
+    { title: '5 · What matters most', sel: 'B',
+      html: () => `<p>Each input swings over a plausible range while the others stay put. ${DW('top')} moves the gap most. Inputs that can flip the choice on their own: ${DW('flips')}.</p>` },
+    { title: '6 · A short stay: rent', sel: 'C', params: { years: 1 },
+      html: () => `<p>Need it for a year only? Renting costs ${D('totC')}, against ${D('totA')} for the budget unit: there is no purchase to pay off.</p>` },
+    { title: '7 · Step up: every horizon', sel: 'B', params: { sweep: 'years' },
+      html: () => `<p>Across 1 to 6 years: renting is cheapest up to ${D('beCA')}, the budget unit up to ${D('beAB')}, and the efficient unit after that.</p>` },
+  ],
+  recompute(P){ REC = DE.recommend(OPTIONS, P, INPUTS, { horizon: 'over ' + yrs(P.years), fmt: money }); },
+  render({ P, sel }){
+    const s = OPT(sel);
+    COMP = DE.best(OPTIONS.filter(o => o.id !== s.id), P).best.o;   // the rival: the cheapest other option
+    const gap = q => DE.total(s, q) - DE.total(COMP, q);
+    TOR = DE.sensitivity(gap, P, INPUTS).filter(r => r.swing > 1e-9);
+    KEY = P.sweep !== 'auto' && INP(P.sweep) ? P.sweep : TOR[0].id;
+    const k = INP(KEY), rk = DE.rank(OPTIONS, P);
+    bars.set({ rows: rk.map(r => ({ id: r.id, label: r.o.label, parts: DE.parts(r.o, P), note: r.id === rk[0].id ? 'cheapest' : '+' + money(r.total - rk[0].total) })), highlight: s.id });
+    tree.set({ root: treeOf(P), highlight: ['root', s.id, ...outcomes(s.id, P).map(x => x.id)], best: REC.best.id });
+    be.set({ P, key: KEY, lo: k.lo, hi: k.hi, highlight: s.id, fmtX: k.fmt, xLabel: k.label.toLowerCase(), title: `Total cost as ${k.label.toLowerCase()} changes` });
+    tornado.set({ rows: TOR, base: gap(P), highlight: KEY, title: `${s.short} minus ${COMP.short}`, baseLabel: v => `now ${money(v)}`,
+      x: { label: `${s.short.toLowerCase()} minus ${COMP.short.toLowerCase()}: below 0, ${s.short.toLowerCase()} is cheaper` } });
+    picker.set(s.id);
+    $('beTitle').textContent = `Break-even: ${k.label.toLowerCase()}`;
+    $('tnTitle').textContent = `What matters most: ${s.short} vs ${COMP.short}`;
+    valid.render();
+  },
+  dyn({ P }){
+    const c = id => DE.parts(OPT(id), P), be1 = (i, j, key) => { const x = breakEvenExact(i, j, key, P); return x == null ? 'never' : INP(key).fmt(x); };
+    const fl = REC.flip, flips = TOR.filter(r => r.zero != null).map(r => `${r.label.toLowerCase()} (at ${r.fmt(r.zero)})`);
+    return { rec: REC.text, bestName: REC.best.o.short, margin: money(REC.margin),
+      flipAt: fl ? fl.input.fmt(fl.at) : 'none', flipWhat: fl ? `${fl.input.label.toLowerCase()} where ${fl.winner.short.toLowerCase()} takes over` : 'no single input flips it',
+      hours: INP('hours').fmt(P.hours), nights: fmt.int(P.nights), kwh: '$' + P.kwh.toFixed(2), years: yrs(P.years), priceA: money(P.priceA),
+      filtA: money(c('A').filters), powA: money(c('A').power), powB: money(c('B').power), qA: fmt.pct(Math.min(1, P.years * SPEC.A.fail)), evA: money(DE.total(OPT('A'), P)),
+      beHours: be1('A', 'B', 'hours'), beCA: be1('C', 'A', 'years'), beAB: be1('A', 'B', 'years'), totA: money(DE.total(OPT('A'), P)), totC: money(DE.total(OPT('C'), P)),
+      top: TOR.length ? `${TOR[0].label} (${TOR[0].fmt(TOR[0].lo)} to ${TOR[0].fmt(TOR[0].hi)})` : 'Nothing', flips: flips.length ? flips.join(', ') : 'none' };
+  },
+  readout({ P, sel }){ const s = OPT(sel), p = DE.parts(s, P), t = DE.total(s, P), best = REC.best;
+    return `<b>${s.label}</b>: <b>${money(t)}</b> over ${yrs(P.years)} = ` + PARTS.filter(x => p[x.key] > 0.005).map(x => `${x.label.toLowerCase()} ${money(p[x.key])}`).join(' + ') +
+      (best.id === s.id ? ' · <b>cheapest</b>' : ` · <b>${money(t - best.total)}</b> more than ${best.o.noun}`); },
+});
+
+// ---- views (built once; render() feeds them)
+DE.questions($('ask'), app, [
+  { id: 'hours', q: 'How many hours a night will it run?', unit: 'h', min: 1, max: 16, step: 0.5 },
+  { id: 'nights', q: 'On how many nights a year?', unit: 'nights', min: 30, max: 365, step: 5 },
+  { id: 'kwh', q: 'What do you pay for electricity?', unit: '$ / kWh', min: 0.05, max: 1, step: 0.01 },
+  { id: 'years', q: 'How long will you keep it?', unit: 'years', min: 1, max: 8, step: 0.5 },
+  { id: 'priceA', q: 'Budget unit price', unit: '$', min: 30, max: 300, step: 5, group: 'more' },
+  { id: 'priceB', q: 'Efficient unit price', unit: '$', min: 80, max: 600, step: 5, group: 'more' },
+  { id: 'filterA', q: 'Budget unit filters a year', unit: '$', min: 0, max: 150, step: 5, group: 'more' },
+  { id: 'filterB', q: 'Efficient unit filters a year', unit: '$', min: 0, max: 150, step: 5, group: 'more' },
+  { id: 'rent', q: 'Rental fee a month', unit: '$', min: 4, max: 40, step: 1, group: 'more' },
+], { more: 'Prices you were quoted' });
+$('ask').insertAdjacentHTML('beforeend', '<button class="btn" id="askReset" type="button" style="margin-top:10px">Back to the example numbers</button>');
+$('askReset').onclick = () => app.set({ ...REAL });
+picker = DE.picker($('pick'), OPTIONS, id => app.setSel(id), { label: 'Option to follow' });
+bars = DE.stackedBars($('bars'), { title: 'Expected cost per option', rows: [], parts: PARTS, fmt: money, onPick: id => app.setSel(id) });
+tree = DE.tree($('tree'), { title: 'Decision tree', root: { id: 'root', label: '…' }, onPick: id => app.setSel(id) });
+be = DE.breakEvenChart($('be'), { options: OPTIONS, P: REAL, key: 'hours', lo: 2, hi: 12, fmtY: money, height: 290, highlight: 'B',
+  onPick: x => { const st = KEY === 'nights' ? 5 : KEY === 'kwh' ? 0.01 : KEY.startsWith('price') || KEY.startsWith('filter') || KEY === 'rent' ? 1 : 0.1; app.set({ [KEY]: +(Math.round(x / st) * st).toFixed(2) }); } });
+tornado = DE.tornado($('tornado'), { rows: [], base: 0, fmt: money, onPick: id => app.set({ sweep: id }) });
+function treeOf(P){
+  return { id: 'root', kind: 'decision', label: 'Which purifier?', value: `cheapest: ${REC.best.o.short.toLowerCase()}`, children: OPTIONS.map(o => ({
+    id: o.id, kind: 'chance', label: o.label, value: `expected ${money(DE.total(o, P))}`, pick: o.id,
+    children: outcomes(o.id, P).map(x => ({ id: x.id, kind: 'leaf', label: x.prob < 1 ? `${fmt.pct(x.prob)} · ${x.label}` : x.label, value: money(x.cost) })) })) };
+}
+
+// ---- validation: source numbers at the example values, exact checks at the current numbers (REPLACE)
+const near = (a, b, t) => Math.abs(a - b) <= t;
+function crossAB(){ const c = DE.crossings([OPT('A'), OPT('B')], app.P, 'hours', 2, 12)[0]; return c ? c.x : null; }   // the pair alone, even where a third option is cheaper
+function tornadoCheck(){ const o1 = TOR.map(r => r.id).join(), o2 = [...TOR].sort((a, b) => Math.abs(b.deriv) * (b.hi - b.lo) - Math.abs(a.deriv) * (a.hi - a.lo)).map(r => r.id).join();
+  return { same: o1 === o2, err: Math.max(0, ...TOR.map(r => Math.abs(r.swing - Math.abs(r.deriv) * (r.hi - r.lo)) / (1 + r.swing))) }; }
+const tieGap = () => Math.max(0, ...be.crossings.map(c => Math.abs(DE.total(OPT(c.from), DE.at(app.P, KEY, c.x)) - DE.total(OPT(c.to), DE.at(app.P, KEY, c.x)))));
+const flipSides = () => { const f = REC.flip, e = 1e-6 * (f.input.hi - f.input.lo); return [DE.best(OPTIONS, DE.at(app.P, f.id, f.at - f.dir * e)).best, DE.best(OPTIONS, DE.at(app.P, f.id, f.at + f.dir * e)).best]; };
+const valid = IE.validation('valid', [   // rows are read live: getters keep claim/target in step with the settings
+  { claim: 'Budget unit (60 W) at 8 h a night, 300 nights a year, for 3 years: energy used', source: 'sheet', target: '432 kWh',
+    model: () => fmt.num(energyKWh(SPEC.A.watts, REAL), 0) + ' kWh', ok: () => near(energyKWh(SPEC.A.watts, REAL), 432, 1e-9) },
+  { claim: 'Hours break-even, budget vs efficient: closed form = crossing found on the chart', source: 'exact',
+    get target(){ const x = breakEvenExact('A', 'B', 'hours', app.P); return x == null ? 'never' : x.toFixed(4) + ' h'; },
+    model: () => { const x = crossAB(); return x == null ? 'not between 2 and 12 h' : x.toFixed(4) + ' h'; },
+    ok: () => { const x = crossAB(), e = breakEvenExact('A', 'B', 'hours', app.P); return x == null ? (e == null || e < 2 || e > 12) : near(x, e, 1e-6); } },
+  { claim: 'Years: every crossing on the chart = its closed-form break-even', source: 'exact',
+    get target(){ return DE.crossings(OPTIONS, app.P, 'years', 1, 6).map(c => breakEvenExact(c.from, c.to, 'years', app.P).toFixed(3)).join(', ') || 'none'; },
+    model: () => DE.crossings(OPTIONS, app.P, 'years', 1, 6).map(c => c.x.toFixed(3)).join(', ') || 'none',
+    ok: () => DE.crossings(OPTIONS, app.P, 'years', 1, 6).every(c => near(c.x, breakEvenExact(c.from, c.to, 'years', app.P), 1e-6)) },
+  { get claim(){ return `Break-even chart (${INP(KEY).label.toLowerCase()}): the two options tie at every marked crossing`; }, source: 'exact', target: '$0.00', model: () => money2(tieGap()), ok: () => tieGap() < 1e-6 },
+  { claim: 'Tornado order = order of |∂gap/∂input| × range', source: 'exact', target: 'same order', model: () => tornadoCheck().same ? 'same order' : 'differs', ok: () => tornadoCheck().same },
+  { claim: 'Each tornado bar = |∂gap/∂input| × range (the gap is a straight line in each input)', source: 'exact', target: '0', model: () => tornadoCheck().err.toExponential(1), ok: () => tornadoCheck().err < 1e-6 },
+  { claim: 'Tree: expected cost = Σ chance × outcome, for every option', source: 'exact', get target(){ return OPTIONS.map(o => money2(total(o.id, app.P))).join(' / '); },
+    model: () => OPTIONS.map(o => money2(outcomes(o.id, app.P).reduce((s, x) => s + x.prob * x.cost, 0))).join(' / '),
+    ok: () => OPTIONS.every(o => near(outcomes(o.id, app.P).reduce((s, x) => s + x.prob * x.cost, 0), total(o.id, app.P), 1e-9)) },
+  { claim: 'The cost parts add up to each option’s total', source: 'conservation', get target(){ return OPTIONS.map(o => money2(total(o.id, app.P))).join(' / '); },
+    model: () => OPTIONS.map(o => money2(DE.total(o, app.P))).join(' / '), ok: () => OPTIONS.every(o => near(DE.total(o, app.P), total(o.id, app.P), 1e-9)) },
+  { claim: 'The recommendation changes exactly at the stated flip point', source: 'exact',
+    get target(){ return REC && REC.flip ? `${REC.flip.winner.short} past ${REC.flip.input.fmt(REC.flip.at)}` : 'no flip in range'; },
+    model: () => { if (!REC.flip) return 'no flip in range'; const [a, b] = flipSides(); return `${a.o.short} → ${b.o.short}`; },
+    ok: () => { if (!REC.flip) return true; const [a, b] = flipSides(); return a.id === REC.best.id && b.id === REC.flip.winner.id; } },
+]);
+</script>
+</body>
+</html>

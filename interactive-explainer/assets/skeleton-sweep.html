@@ -5,152 +5,104 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TITLE — interactive explainer</title>
 <!--
-  SWEEP SKELETON for the interactive-explainer skill (shape: parameter sweep / small multiples — "it depends on k",
-  thresholds, tipping points, dose–response; see shapes/SHAPES.md). Everything marked REPLACE is placeholder.
-  Demo model: a single queue. Outcome = mean waiting time Wq against utilisation ρ = λ/(cμ). Exact formulas:
-  M/M/1 (Wq = ρ/(μ−λ)), M/D/1 (Pollaczek–Khinchine, half of that), M/M/2 (Erlang C). Two servers with non-random
-  service use the Allen–Cunneen approximation and say so. ρ ≥ 1 has no average: "grows without limit".
-  A seeded discrete-event simulation (mulberry32) gives the small multiples and checks the formulas live.
-  Selection state = the parameter value P.rho. Ladder of abstraction: one run's customer (down), the curve (middle),
-  small multiples of whole runs at fixed values (up).
-  Keep the structure: MODEL (pure) -> SIMULATION (pure) -> VALIDATION -> STATE -> STEPS -> chart helpers ->
-  renderers -> main loop. Same engine contract as skeleton.html: STEPS + goStep, [data-w] what-ifs, [data-dyn] live
-  numbers, data-set buttons, canvases sized with setupCanvas/data-h, [data-pick] on every small multiple.
+  SKELETON (parameter-sweep shape) for the interactive-explainer skill. Guide: shapes/sweep.md. API: runtime/API.md.
+  Demo: mean queue wait against utilisation ρ for M/M/1, M/D/1 and M/M/2, validated live against exact formulas and a
+  seeded simulation. The selection is the swept value ρ (slider, ← →, click the curve, click a small multiple).
+  Ladder of abstraction: one customer of one run (down), the curve (middle), whole runs at six values (up).
+  Build: node scripts/build.js <this file> --from "$TEMP/<name>" (fills the data-ie blocks and model.js). Replace REPLACE.
 -->
-<style>
-  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
-    --cur:#ffd84d; --ghostA:#c9a0ff; --ghostB:#6fe3cf; --you:#ff7aa8; --ok:#6fe3cf; --bad:#ff7aa8; --accent:#5aa9ff; }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
-  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600;overflow-wrap:anywhere}
-  code{overflow-wrap:anywhere}
-  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
-  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
-  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
-  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
-  .stepnav{display:flex;align-items:center;gap:8px}
-  .stepnav button,.btn,#stepText button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
-  .stepnav button:disabled,.btn:disabled{opacity:.35;cursor:default}
-  .dots{display:flex;gap:5px;flex:1;justify-content:center}
-  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
-  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
-  .keys{margin:6px 0 0;font-size:.72rem;color:var(--muted)} .keys kbd{font:inherit;background:#1b2640;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink)}
-  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--cur)}
-  #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
-  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
-  .ctl{margin-bottom:9px} .ctl .lab{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted)}
-  .ctl .lab output{color:var(--ink);font-weight:600;white-space:nowrap} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
-  .ctl.overridden{opacity:.45}
-  .seg{display:flex;flex-wrap:wrap;margin-bottom:8px} .seg button{flex:1;border-radius:0;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px;font-size:.75rem;cursor:pointer}
-  .seg button:first-child{border-radius:6px 0 0 6px} .seg button:last-child{border-radius:0 6px 6px 0} .seg button.on{background:#2b4a7a;border-color:var(--accent)}
-  .chk{display:flex;gap:7px;font-size:.78rem;color:var(--muted);margin-bottom:6px}
-  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
-  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
-  canvas{display:block;width:100%;border-radius:6px;background:var(--panel2)} canvas.chart{cursor:crosshair}
-  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2>*{min-width:0}
-  /* small multiples: as many columns as fit at >= 300 px (setupCanvas draws at least 280 px wide) */
-  .sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:10px}
-  .sm{background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:4px 6px 6px;cursor:pointer;min-width:0}
-  .sm:hover{border-color:#33476e} .sm.on{border-color:var(--cur)}
-  .sm .cap{font-size:.75rem;color:var(--muted);margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sm .cap b{color:var(--ink)}
-  .sm canvas{background:transparent;pointer-events:auto}
-  /* concrete case + validation */
-  .kv{width:100%;border-collapse:collapse;font-size:.8rem} .kv td{padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
-  .kv td:first-child{color:var(--muted);width:46%} .kv td:last-child{font-weight:600}
-  #oneRun p{margin:0 0 8px;font-size:.84rem}
-  .tablewrap{overflow-x:auto} .val{width:100%;min-width:560px;border-collapse:collapse;font-size:.78rem}
-  .val th{color:var(--muted);text-align:left;font-weight:500} .val td,.val th{padding:3px 6px;border-bottom:1px solid var(--line)}
-  .val td.n{white-space:nowrap;text-align:right} .val td.ok{color:var(--ok);font-weight:700} .val td.bad{color:var(--bad);font-weight:700}
-  .val td.src{color:var(--muted);min-width:180px}
-  .formula{font-size:.82rem;color:var(--muted);margin:4px 0 8px} .formula math{color:var(--ink);font-size:1.05em} .formula mi{font-style:italic}
-  @media (max-width:1000px){.layout{flex-direction:column}aside{width:100%;position:static;max-height:none}.grid2{grid-template-columns:1fr}}
+<style data-ie="core"></style>
+<style data-ie="sweep"></style>
+<style>/* page-only styles */
+  .kv{width:100%;border-collapse:collapse;font-size:.86rem} .kv td{padding:3px 6px;border-bottom:1px solid var(--grid);vertical-align:top}
+  .kv td:first-child{color:var(--ink2);width:46%} .kv td:last-child{font-weight:600;font-variant-numeric:tabular-nums}
+  #oneRun p{margin:8px 0;font-size:.9rem}
+  .formula{font-size:.9rem;color:var(--ink2);margin:4px 0 10px} .formula math{color:var(--ink);font-size:1.1em} .formula mi{font-style:italic}
 </style>
 </head>
 <body>
-<header>
-  <h1>TITLE (REPLACE): why does "a bit busier" make the queue so much longer?</h1>
-  <p>One-paragraph framing of the question from the source (REPLACE). Say what the reader can do: follow the tour, click or drag the curve to pick a value, switch an assumption off and see it across the whole range, click a small panel to jump to that value.</p>
-</header>
+<header class="ie-head"><div class="ttl">
+  <h1>Why does "a bit busier" make the queue so much longer? (REPLACE)</h1>
+  <p class="lede">One or two sentences of the puzzle from the source, in the reader's words (REPLACE). Follow the tour, drag on the curve to pick how busy the server is, switch an assumption under <i>What if?</i> and see it across the whole range, or click a small panel to jump to that value.</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> the wait grows like ρ/(1−ρ), because the spare capacity 1−ρ sits in the denominator. Going from 80% to 90% busy multiplies the wait by <span class="dyn" data-dyn="r8090"></span>; past 100% there is no average at all, the queue just grows.</p>
+  <div class="stat"><b data-dyn="wq"></b><span>average wait at <span data-dyn="rho"></span> busy</span></div>
+  <div class="stat"><b data-dyn="knee"></b><span>the knee: past it, load gets expensive</span></div>
+  <div class="stat"><b data-dyn="youWq"></b><span>your desk at <span data-dyn="you"></span> (REPLACE)</span></div>
+</div>
+
 <div class="layout">
 <aside>
-  <div class="card">
-    <div class="stepnav"><button id="prev" title="Previous topic (Ctrl+←)">‹</button><div class="dots" id="dots"></div><button id="next" title="Next topic (Ctrl+→)">›</button></div>
-    <h2 id="stepTitle"></h2><div id="stepText"></div>
-    <p class="keys">Keys: <kbd>←</kbd> <kbd>→</kbd> move the swept value · <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>←</kbd> <kbd>→</kbd> previous / next topic</p>
-  </div>
-  <div class="card">
-    <h4>What if?</h4>
-    <div class="seg" id="whatSeg"><button data-w="mm1" class="on">Random service</button><button data-w="md1">Constant service</button><button data-w="mm2">Two servers</button><button data-w="md2">Two, constant</button></div>
-    <label class="chk"><input type="checkbox" id="two"><span>Two servers share one queue</span></label>
-    <label class="chk"><input type="checkbox" id="ghosts" checked><span>Draw each alternative across the whole range (dashed)</span></label>
-  </div>
-  <div class="card">
-    <h4>Parameter being swept</h4>
-    <div id="sweepCtl"></div>
-    <button class="btn" id="play">▶ Sweep</button>
-    <h4 style="margin-top:12px">Other parameters</h4>
-    <div id="params"></div>
-    <label class="chk"><input type="checkbox" id="showYou"><span>Mark your own value on the chart</span></label>
-    <button class="btn" id="reset">Reset to real values</button>
-  </div>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>The swept value</h4></div>
 </aside>
 <main>
   <section class="panel"><h3>Average wait vs how busy the server is (REPLACE)</h3>
-    <p class="sub">Gold = the current assumption; dashed = the same sweep with one assumption changed. The gold line marks the current value: click or drag anywhere on the chart to move it.</p>
-    <canvas id="sweep" class="chart" data-h="360"></canvas></section>
+    <p class="sub">Solid: the current assumption. Dashed: the same sweep with one assumption changed. Click or drag anywhere on the chart to move the selected value; the shaded band is where no average exists.</p>
+    <div id="sweep"></div></section>
   <section class="panel"><h3>The same queue at six values, one run each</h3>
-    <p class="sub">People waiting over time in one simulated run per utilisation, same random arrivals, <b>same scale</b>. Dashed gold = the formula's average; dashed pink = the expected growth when demand exceeds capacity. Click a panel to jump there.</p>
-    <div class="sm-grid" id="smGrid"></div></section>
-  <div class="grid2">
-    <section class="panel"><h3>One run at this value</h3><p class="sub">A single concrete customer, then the run's averages beside the formula.</p><div id="oneRun"></div></section>
-    <section class="panel"><h3>Validation</h3>
-      <p class="formula"><math><msub><mi mathvariant="normal">W</mi><mi mathvariant="normal">q</mi></msub><mo>=</mo><mfrac><mrow><mn>1</mn><mo>+</mo><msubsup><mi mathvariant="normal">c</mi><mi mathvariant="normal">s</mi><mn>2</mn></msubsup></mrow><mn>2</mn></mfrac><mo>·</mo><mfrac><mrow><mi mathvariant="normal">C</mi><mo>(</mo><mi mathvariant="normal">c</mi><mo>,</mo><mi mathvariant="normal">a</mi><mo>)</mo></mrow><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">μ</mi><mo>−</mo><mi mathvariant="normal">λ</mi></mrow></mfrac></math>
-        : the wait = (how uneven service is) × (chance of having to wait ÷ spare capacity). Exact for one server (Pollaczek–Khinchine) and for random service (Erlang C).</p>
-      <div class="tablewrap"><table class="val" id="valTable"></table></div></section>
-  </div>
-  <div id="readout"></div>
+    <p class="sub">People waiting over one simulated run per utilisation, same random arrivals, <b>same scale</b>. Dashed line: the formula's average; dashed red: the expected growth when demand exceeds capacity. Click a panel to jump there.</p>
+    <div id="multiples"></div></section>
+  <section class="panel"><h3>One run at this value</h3><p class="sub">A single concrete customer, then the run's averages beside the formula.</p><div id="oneRun"></div></section>
+  <div id="readout" aria-live="polite"></div>
 </main>
 </div>
 
-<script>
-// ============================ MODEL (pure functions, no DOM) — REPLACE ============================
-// p = { rho: utilisation per server (the swept parameter), s: mean service time (min), cs2: squared coefficient of
-//       variation of service time (0 constant, 1 exponential), c: number of servers, you: the reader's own value }.
-const REAL = { rho: 0.8, s: 2, cs2: 1, c: 1, you: 0.85, showYou: true };
-const SWEEP = { key: 'rho', lo: 0, hi: 1.2, min: 0.02, max: 1.18, cap: 1 };     // x range; cap = where the outcome stops existing
-const PANELS = [0.5, 0.7, 0.8, 0.9, 0.95, 1.05];                                  // small-multiple values (4–6)
-// Erlang C: probability an arrival has to wait, c servers, offered load a = λ/μ (needs a < c). Via the Erlang B recursion.
+<div class="wide">
+  <section><h2>Does the model reproduce the known values?</h2>
+    <p class="formula"><math><msub><mi mathvariant="normal">W</mi><mi mathvariant="normal">q</mi></msub><mo>=</mo><mfrac><mrow><mn>1</mn><mo>+</mo><msubsup><mi mathvariant="normal">c</mi><mi mathvariant="normal">s</mi><mn>2</mn></msubsup></mrow><mn>2</mn></mfrac><mo>·</mo><mfrac><mrow><mi mathvariant="normal">C</mi><mo>(</mo><mi mathvariant="normal">c</mi><mo>,</mo><mi mathvariant="normal">a</mi><mo>)</mo></mrow><mrow><mi mathvariant="normal">c</mi><mi mathvariant="normal">μ</mi><mo>−</mo><mi mathvariant="normal">λ</mi></mrow></mfrac></math>:
+      the wait = (how uneven service is) × (chance of having to wait ÷ spare capacity). Exact for one server (Pollaczek–Khinchine) and for random service (Erlang C); two servers with constant service use it as an approximation.</p>
+    <div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>REPLACE: λ customers per minute arrive at random (a Poisson stream) and c servers each take s minutes on average, with variability cs² (0 = every service takes exactly s, 1 = exponential). Utilisation ρ = λ/(c/s). Below ρ = 1 the queue settles to a steady state with the average wait above; at or above 1 it has no steady state and grows by about c(ρ−1) people per service time, so the page says "grows without limit" instead of a number.</p>
+    <p>The six panels and "one run" are a seeded discrete-event simulation (the same random arrivals for every value), so they differ from the formula by chance; the validation table checks 200 000 customers against it. The knee is a page convention (the first load where +10 points adds more than one service time) <span class="badge illustrative">illustrative</span>.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="sweep"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, build with --from "$TEMP/<name>".
+     The demo model below is the inlined copy; build.js keeps it until a model.js file is found. -->
+<script data-ie-file="model.js">
+// Demo model (REPLACE): one queue. Outcome = mean wait Wq against utilisation ρ = λ/(cμ) per server.
+// p = { s: mean service time (min), cs2: squared coefficient of variation of service (0 constant, 1 exponential),
+//       c: servers }. ρ is the swept parameter (the page's selection), not part of p.
+const REAL = { s: 2, cs2: 1, two: false, you: 0.85 };
+const SWEEP = { min: 0.02, max: 1.18, cap: 1 };                 // x range; cap = where the outcome stops existing
+const PANELS = [0.5, 0.7, 0.8, 0.9, 0.95, 1.05];                  // small-multiple values (4-6)
+const servers = p => p.c || (p.two ? 2 : 1);
+// Erlang C: chance an arrival has to wait, c servers, offered load a = λ/μ (needs a < c), via the Erlang B recursion.
 function erlangC(c, a){ if (a <= 0) return 0; let B = 1; for (let k = 1; k <= c; k++) B = a * B / (k + a * B); return B / (1 - (a / c) * (1 - B)); }
-// The outcome at one parameter value. Infinity = no steady state (shown in words, never as a number).
+// The outcome at one value. Infinity = no steady state (say it in words, never as a number).
 function queueAt(rho, p){
-  const c = p.c, mu = 1 / p.s, lam = rho * c * mu, exact = c === 1 || p.cs2 === 1;
+  const c = servers(p), mu = 1 / p.s, lam = rho * c * mu, exact = c === 1 || p.cs2 === 1;
   if (!(rho < 1)) return { rho, lam, wq: Infinity, lq: Infinity, pw: 1, exact, stable: false };
-  const pw = erlangC(c, rho * c), wq = (1 + p.cs2) / 2 * pw / (c * mu - lam);   // P–K factor × Erlang C wait
+  const pw = erlangC(c, rho * c), wq = (1 + p.cs2) / 2 * pw / (c * mu - lam);   // Pollaczek-Khinchine factor x Erlang C wait
   return { rho, lam, wq, lq: lam * wq, pw, exact, stable: true };
 }
-const sweepCurve = (p, n = 480) => { const o = []; for (let i = 0; i <= n; i++){ const r = SWEEP.lo + (Math.min(SWEEP.cap, SWEEP.hi) - SWEEP.lo) * i / n; o.push([r, queueAt(r, p).wq]); } return o; };
-// Tipping point (REPLACE with the source's named threshold): the first value where +10 points of utilisation adds more
-// than one mean service time of waiting. Scale-free, so it depends only on c and cs2.
-function kneeOf(p){ for (let r = 0; r < 0.9; r += 0.001){ const a = queueAt(r, p).wq, b = queueAt(r + 0.1, p).wq; if (b - a > p.s) return r; } return 0.9; }
-// The alternatives drawn as ghosts: the same sweep with one assumption flipped.
-const nameOf = v => `${v.c === 1 ? 'one server' : 'two servers'}, ${v.cs2 === 0 ? 'constant' : v.cs2 === 1 ? 'random' : 'cs² ' + v.cs2.toFixed(1)} service`;
-const codeOf = v => (v.cs2 === 0 ? 'M/D/' : v.cs2 === 1 ? 'M/M/' : 'M/G/') + v.c;
-const ghostsOf = p => [{ ...p, cs2: p.cs2 === 1 ? 0 : 1, tag: 'A' }, { ...p, c: 3 - p.c, tag: 'B' }];
+// Named threshold (REPLACE with the source's): the first ρ where +10 points of load adds more than one service time.
+function kneeOf(p){ for (let r = 0; r < 0.9; r += 0.001){ if (queueAt(r + 0.1, p).wq - queueAt(r, p).wq > p.s) return r; } return 0.9; }
+const nameOf = p => `${servers(p) === 1 ? 'one server' : 'two servers'}, ${p.cs2 === 0 ? 'constant' : p.cs2 === 1 ? 'random' : 'cs² ' + p.cs2.toFixed(1)} service`;
+const codeOf = p => (p.cs2 === 0 ? 'M/D/' : p.cs2 === 1 ? 'M/M/' : 'M/G/') + servers(p);
+// The ghosts: the same sweep with one assumption flipped.
+const ghostsOf = p => [{ ...p, c: servers(p), cs2: p.cs2 === 1 ? 0 : 1, tag: 's7' }, { ...p, c: 3 - servers(p), tag: 's3' }];
 
-// ============================ SIMULATION (pure, seeded) — REPLACE ============================
-// Discrete-event FCFS queue in service-time units (s = 1); callers scale times by p.s. Arrivals and service draw from
-// separate seeded streams, so every panel sees the same random pattern and only the load differs.
-const SEED = 11, HORIZON = 1000;                                                  // run length in mean service times
+// Seeded discrete-event FCFS queue in service-time units (s = 1); callers scale by p.s. Arrivals and service use
+// separate streams, so every panel sees the same random pattern and only the load differs.
+const SEED = 11, HORIZON = 1000;
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function serviceSampler(cs2, rnd){   // mean 1 and the requested cs²: constant / shifted exponential / balanced hyperexponential
+function serviceSampler(cs2, rnd){   // mean 1 with the requested cs²: constant / shifted exponential / balanced hyperexponential
   if (cs2 <= 0) return () => 1;
   if (cs2 <= 1){ const w = Math.sqrt(cs2); return () => (1 - w) + w * -Math.log(1 - rnd()); }
   const p1 = (1 + Math.sqrt((cs2 - 1) / (cs2 + 1))) / 2;
   return () => rnd() < p1 ? -Math.log(1 - rnd()) / (2 * p1) : -Math.log(1 - rnd()) / (2 * (1 - p1));
 }
-function simulate(rho, p, opt){   // → { arr, start, svc } sorted by arrival; FCFS start times are non-decreasing too
-  const c = p.c, lam = rho * c, ra = mulberry32(opt.seed), rs = mulberry32(opt.seed * 7919 + 13), draw = serviceSampler(p.cs2, rs);
+function simulate(rho, p, opt){      // -> { arr, start, svc } in arrival order
+  const c = servers(p), lam = rho * c, ra = mulberry32(opt.seed), rs = mulberry32(opt.seed * 7919 + 13), draw = serviceSampler(p.cs2, rs);
   const free = new Array(c).fill(0), arr = [], start = [], svc = []; let t = 0;
   if (!(lam > 0)) return { arr, start, svc };
   for (let n = 0; n < (opt.maxN || 5e6); n++){
@@ -161,328 +113,149 @@ function simulate(rho, p, opt){   // → { arr, start, svc } sorted by arrival; 
   return { arr, start, svc };
 }
 const countBelow = (a, x) => { let lo = 0, hi = a.length; while (lo < hi){ const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; };
-function runStats(run, H, c, bins = 220){   // queue length path, time-average queue, busy fraction, final queue
+function runStats(run, H, c, bins = 200){   // queue-length path, time-average queue, busy fraction, final queue
   const { arr, start, svc } = run, path = []; let j = 0, k = 0, area = 0, busy = 0;
   for (let b = 0; b <= bins; b++){ const t = H * b / bins; while (j < arr.length && arr[j] <= t) j++; while (k < start.length && start[k] <= t) k++; path.push(j - k); }
   for (let i = 0; i < arr.length; i++){ area += Math.min(start[i], H) - arr[i]; if (start[i] < H) busy += Math.min(start[i] + svc[i], H) - start[i]; }
   return { path, avgQ: area / H, busy: busy / (c * H), endQ: path[path.length - 1], n: arr.length, max: Math.max(0, ...path) };
 }
 function meanWait(rho, p, n, burn){ const r = simulate(rho, p, { seed: SEED, maxN: n }); let w = 0; for (let i = burn; i < r.arr.length; i++) w += r.start[i] - r.arr[i]; return w / Math.max(1, r.arr.length - burn); }
-
-// ============================ VALIDATION (known exact values; recomputed live) — REPLACE ============================
-const unit = (c, cs2) => ({ c, cs2, s: 1 });
-const KNOWN = [   // model value vs a textbook value; tol = relative tolerance
-  { claim: 'M/M/1, λ = 0.8, μ = 1: mean wait W<sub>q</sub>', model: () => queueAt(0.8, unit(1, 1)).wq, known: 4, src: 'ρ/(μ−λ) = 0.8/0.2' },
-  { claim: 'M/D/1, λ = 0.8, μ = 1: W<sub>q</sub>', model: () => queueAt(0.8, unit(1, 0)).wq, known: 2, src: 'Pollaczek–Khinchine: ρ/(2(μ−λ))' },
-  { claim: 'M/M/2, λ = 1.5, μ = 1: P(wait)', model: () => queueAt(0.75, unit(2, 1)).pw, known: 9 / 14, src: 'Erlang C for 2 servers = a²/(2+a), a = 1.5' },
-  { claim: 'M/M/2, λ = 1.5, μ = 1: W<sub>q</sub>', model: () => queueAt(0.75, unit(2, 1)).wq, known: 9 / 7, src: 'C/(2μ−λ) = (9/14)/0.5' },
-  { claim: 'M/M/2, λ = 1.5, μ = 1: L<sub>q</sub> (people waiting)', model: () => queueAt(0.75, unit(2, 1)).lq, known: 27 / 14, src: 'λ·W<sub>q</sub>; the often-quoted 1.929 is this, not W<sub>q</sub>' },
-  { claim: 'Erlang C, 2 servers, a = 1', model: () => erlangC(2, 1), known: 1 / 3, src: 'a²/(2+a) = 1/3' },
-  { claim: 'M/G/1, cs² = 3, ρ = 0.5, μ = 1: W<sub>q</sub>', model: () => queueAt(0.5, { c: 1, cs2: 3, s: 1 }).wq, known: 2, src: 'P–K: (1+cs²)/2 · ρ/(μ−λ)' },
-  { claim: 'M/M/1: wait at 90% ÷ wait at 80%', model: () => queueAt(0.9, unit(1, 1)).wq / queueAt(0.8, unit(1, 1)).wq, known: 2.25, src: '(0.9/0.1) ÷ (0.8/0.2)' },
-];
-const SIM_N = 200000, SIM_BURN = 2000, SIM_AT = [0.5, 0.8, 0.9], TOL_EXACT = 0.08, TOL_APPROX = 0.15;
-function validate(p){   // pure: the fixed rows plus simulation-vs-formula rows for the current assumption
-  const rows = KNOWN.map(r => { const m = r.model(); return { claim: r.claim, model: m, known: r.known, ok: Math.abs(m / r.known - 1) < 1e-6, src: r.src }; });
-  const v = { c: p.c, cs2: p.cs2, s: 1 }, exact = queueAt(0.5, v).exact, tol = exact ? TOL_EXACT : TOL_APPROX;
-  for (const r of SIM_AT){ const sim = meanWait(r, v, SIM_N, SIM_BURN), f = queueAt(r, v).wq;
-    rows.push({ claim: `Simulation, ${nameOf(v)}, ρ = ${Math.round(r * 100)}%: W<sub>q</sub>`, model: sim, known: f, ok: Math.abs(sim / f - 1) < tol,
-      src: `${SIM_N / 1000}k seeded customers vs ${exact ? 'the exact formula' : 'the Allen–Cunneen approximation'}, within ±${Math.round(tol * 100)}%` }); }
-  return rows;
-}
-
-// ============================ STATE ============================
-const $ = id => document.getElementById(id);
-const pct = v => Math.round(v * 100) + '%';
-const fmtMin = v => !Number.isFinite(v) ? 'grows without limit' : v < 1 ? Math.round(v * 60) + ' s' : v < 100 ? v.toFixed(1) + ' min' : (v / 60).toFixed(1) + ' h';
+if (typeof module === 'object' && module.exports) module.exports = { REAL, SWEEP, PANELS, SEED, HORIZON, servers, erlangC, queueAt, kneeOf, nameOf, codeOf, ghostsOf, simulate, runStats, meanWait, countBelow };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE;
+IE.sources({   // every number the page quotes from the source gets an entry; cite with cite('id')
+  formulas: { title: 'Standard queueing results (REPLACE with your source)', where: 'M/M/1, Pollaczek–Khinchine, Erlang C' },
+  approx: { title: 'Allen–Cunneen approximation for multi-server queues (REPLACE)', where: 'Wq ≈ (1 + cs²)/2 · Wq(M/M/c)' },
+  sim: { title: 'Seeded discrete-event simulation of the same queue (this page)', where: '200 000 customers' },
+});
+const pct = v => fmt.pct(v), M = P => ({ s: P.s, cs2: P.cs2, c: P.two ? 2 : 1 });
+const fmtMin = v => !isFinite(v) ? 'grows without limit' : v < 1 ? Math.round(v * 60) + ' s' : v < 100 ? fmt.num(v, 1) + ' min' : fmt.num(v / 60, 1) + ' h';
 const fmtDur = m => m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + ' h ' + String(Math.round(m % 60)).padStart(2, '0') + ' min';
-const SWEEP_SPEC = { id: 'rho', label: 'Utilisation ρ: how busy each server is', min: SWEEP.min, max: SWEEP.max, step: 0.005, fmt: pct };
-const KEY_STEP = 0.01;   // REPLACE: one ← / → press moves the swept parameter by this much (clamped to the range)
-const SPEC = [   // REPLACE: every other meaningful parameter
-  { id: 's', label: 'Mean service time', min: 0.5, max: 10, step: 0.5, fmt: v => v.toFixed(1) + ' min' },
-  { id: 'cs2', label: 'How uneven service is (cs²: 0 constant, 1 random)', min: 0, max: 3, step: 0.1, fmt: v => v.toFixed(1) },
-  { id: 'you', label: 'Your own desk (REPLACE: from the reader\'s notes)', min: 0.1, max: 1.15, step: 0.01, fmt: pct, off: 'showYou' },
-];
-const BOOLS = ['showYou'];
-const WHAT = { mm1: { c: 1, cs2: 1 }, md1: { c: 1, cs2: 0 }, mm2: { c: 2, cs2: 1 }, md2: { c: 2, cs2: 0 } };
-const WHAT_KEYS = [...new Set(Object.values(WHAT).flatMap(Object.keys))];
-const P = { ...REAL };
-let NOW = null, KNEE = 0, CURVES = null, PANELRUNS = [], ONE = null, VALID = [], STEP = 0, playing = false, dirty = true;
-const SIMCACHE = new Map(), VALCACHE = new Map();
-function cachedRun(rho, p){
-  const key = `${rho}|${p.c}|${p.cs2}`; if (SIMCACHE.has(key)) return SIMCACHE.get(key);
-  if (SIMCACHE.size > 80) SIMCACHE.clear();
-  const run = simulate(rho, p, { seed: SEED, horizon: HORIZON }), r = { run, st: runStats(run, HORIZON, p.c) }; SIMCACHE.set(key, r); return r;
-}
-function recompute(){
-  NOW = queueAt(P.rho, P); KNEE = kneeOf(P);
-  CURVES = { main: sweepCurve(P), ghosts: ghostsOf(P).map(g => ({ g, pts: sweepCurve(g) })) };
-  PANELRUNS = PANELS.map(r => ({ rho: r, ...cachedRun(r, P), f: queueAt(r, P) }));
-  ONE = cachedRun(P.rho, P);
-  const vk = P.c + '|' + P.cs2; if (!VALCACHE.has(vk)) VALCACHE.set(vk, validate(P)); VALID = VALCACHE.get(vk);
-  dirty = true;
-}
-const at = (rho, o) => queueAt(rho, { ...P, ...o });
+let KNEE = 0, sw = null, sm = null, shownKey = '';
+const SIMS = new Map();                   // seeded runs, cached by value and assumption
+const runAt = (rho, p) => { const k = `${rho.toFixed(4)}|${p.c}|${p.cs2}`; if (!SIMS.has(k)){ if (SIMS.size > 120) SIMS.clear();
+  const run = simulate(rho, p, { seed: SEED, horizon: HORIZON }); SIMS.set(k, { run, st: runStats(run, HORIZON, p.c) }); } return SIMS.get(k); };
 
-// ============================ STEPS (guided tour) — REPLACE ============================
-// Each step: title, full params on entry (going back restores state), html with D('key') live numbers.
-const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
-const STEPS = [
-  { title: '1 · The question', params: { ...REAL, rho: 0.8 },
-    html: () => `<p>A barista takes ${D('s')} per coffee on average and is busy ${D('rho')} of the time. The average wait before being served: ${D('wq')}.</p>
-      <p>Make her a little busier, 90%, and the wait becomes ${D('wq90')}: more than double. Why? <button data-set="rho=0.9">Try 90%</button></p>` },
-  { title: '2 · One concrete moment', params: { ...REAL, rho: 0.8 },
-    html: () => `<p>In one simulated run, customer #${D('cust')} arrives after ${D('cArr')}, finds ${D('cFound')} waiting, and waits ${D('cWait')}.</p>
-      <p>The server is idle ${D('idle')} of the time, yet people still queue: arrivals bunch up at random, and idle minutes can't be saved for later. See <b>One run at this value</b>.</p>` },
-  { title: '3 · The whole curve', params: { ...REAL, rho: 0.5 },
-    html: () => `<p>Each point on the gold curve is the average wait at one utilisation. At ${D('rho')} it is only ${D('wq')}. The left half is almost flat.</p>
-      <p>Click or drag the chart to move along it. <button data-set="rho=0.3">30%</button> <button data-set="rho=0.7">70%</button></p>` },
-  { title: '4 · The knee', params: { ...REAL, rho: 0.9 },
-    html: () => `<p>From 80% to 90% the wait goes from ${D('wq80')} to ${D('wq90')}, ×${D('r8090')}. In the formula W<sub>q</sub> = s·ρ/(1−ρ) the spare capacity 1−ρ sits in the denominator: halving it from 20% to 10% doubles the wait.</p>
-      <p>The knee at ${D('knee')} marks where each extra 10 points adds more than one service time. <button data-set="rho=0.95">95%</button> <button data-set="rho=0.99">99%</button></p>` },
-  { title: '5 · Constant vs random service', params: { ...REAL, rho: 0.9, cs2: 0 },
-    html: () => `<p>If every coffee takes exactly ${D('s')}, the wait at ${D('rho')} is ${D('wq')} instead of ${D('wqMM1')}: exactly half, at every utilisation (the purple dashed curve). The wait scales with (1 + cs²)/2.</p>
-      <p>Uneven service makes queues, not just load. <button data-set="cs2=3">Very uneven service</button> <button data-set="cs2=0">Constant again</button></p>` },
-  { title: '6 · Two servers, one queue', params: { ...REAL, rho: 0.9, c: 2 },
-    html: () => `<p>Two baristas, twice the customers, each busy ${D('rho')}: the wait is ${D('wq')}, against ${D('wqMM1')} with one. A free server takes whoever is next, so idle minutes are wasted less often. P(wait) = ${D('pw')}.</p>
-      <p><button data-set="cs2=0">Constant service too</button> (two servers with constant service use an approximation; see Validation).</p>` },
-  { title: '7 · Above 100%', params: { ...REAL, rho: 1.05 },
-    html: () => `<p>Now more customers arrive than can be served. There is no average wait: it ${D('wq')}. The line grows by about ${D('drift')}.</p>
-      <p>Step up from the curve to whole runs: in the six panels (same scale) the 105% run climbs while the others hover. <button data-set="rho=0.95">Back to 95%</button></p>` },
-];
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 's', label: 'Mean service time', min: 0.5, max: 10, step: 0.5, fmt: v => fmt.num(v, 1) + ' min' },
+    { id: 'cs2', label: 'How uneven service is (cs²: 0 constant, 1 random)', min: 0, max: 3, step: 0.1, fmt: v => fmt.num(v, 1) },
+    { id: 'you', label: 'Your own desk (REPLACE: from the reader\'s notes)', min: 0.1, max: 1.15, step: 0.01, fmt: pct },
+  ],
+  toggles: [{ id: 'two', label: 'Two servers share one queue' }],
+  options: [{ id: 'ghosts', label: 'Draw each alternative across the whole range (dashed)', value: true }, { id: 'showYou', label: 'Mark your own value on the chart', value: true }],
+  whatIf: [
+    { key: 'mm1', label: 'Random service', set: { two: false, cs2: 1 } }, { key: 'md1', label: 'Constant', set: { two: false, cs2: 0 } },
+    { key: 'mm2', label: 'Two servers', set: { two: true, cs2: 1 } }, { key: 'md2', label: 'Two, constant', set: { two: true, cs2: 0 } },
+  ],
+  sel: { label: 'Utilisation ρ (how busy each server is)', min: SWEEP.min, max: SWEEP.max, step: 0.005, unit: 0.01, value: 0.8, fmt: pct, play: { rate: 0.08 }, keyHint: 'one point of utilisation' },
+  steps: [   // params list only what differs from REAL (toggles default off); sel = the swept value on entry
+    { title: '1 · The question', sel: 0.8,
+      html: () => `<p>A barista takes ${D('s')} per coffee on average and is busy ${D('rho')} of the time. The average wait before being served: ${D('wq')}${cite('formulas')}.</p>
+        <p>Make her a little busier, 90%, and the wait becomes ${D('wq90')}: more than double. Why? <button data-set="sel=0.9">Try 90%</button></p>` },
+    { title: '2 · One concrete moment', sel: 0.8,
+      html: () => `<p>In one simulated run, customer #${D('cust')} arrives after ${D('cArr')}, finds ${D('cFound')} waiting, and waits ${D('cWait')}.</p>
+        <p>The server is idle ${D('idle')} of the time, yet people still queue: arrivals bunch up at random, and idle minutes can't be saved for later. See <b>One run at this value</b>.</p>` },
+    { title: '3 · The whole curve', sel: 0.5,
+      html: () => `<p>Each point on the solid curve is the average wait at one utilisation. At ${D('rho')} it is only ${D('wq')}; the left half is almost flat.</p>
+        <p>Click or drag the chart, or press ← →, to move along it. <button data-set="sel=0.3">30%</button> <button data-set="sel=0.7">70%</button></p>` },
+    { title: '4 · The knee', sel: 0.9,
+      html: () => `<p>From 80% to 90% the wait goes from ${D('wq80')} to ${D('wq90')}, ×${D('r8090')}. In W<sub>q</sub> = s·ρ/(1−ρ) the spare capacity 1−ρ is in the denominator: halving it from 20% to 10% more than doubles the wait.</p>
+        <p>The knee at ${D('knee')} marks where each extra 10 points adds more than one service time. <button data-set="sel=0.95">95%</button> <button data-set="sel=0.99">99%</button></p>` },
+    { title: '5 · Constant vs random service', params: { cs2: 0 }, sel: 0.9,
+      html: () => `<p>If every coffee takes exactly ${D('s')}, the wait at ${D('rho')} is ${D('wq')} instead of ${D('wqMM1')}: exactly half, at every utilisation (compare the dashed curve). The wait scales with (1 + cs²)/2.</p>
+        <p>Uneven service makes queues, not just load. <button data-set="cs2=3">Very uneven service</button> <button data-set="cs2=0">Constant again</button></p>` },
+    { title: '6 · Two servers, one queue', params: { two: true }, sel: 0.9,
+      html: () => `<p>Two baristas, twice the customers, each busy ${D('rho')}: the wait is ${D('wq')}, against ${D('wqMM1')} with one. A free server takes whoever is next, so idle minutes are wasted less often. P(wait) = ${D('pw')}.</p>
+        <p><button data-set="cs2=0">Constant service too</button> (two servers with constant service use an approximation${cite('approx')}).</p>` },
+    { title: '7 · Above 100%: whole runs', sel: 1.05,
+      html: () => `<p>Now more customers arrive than can be served. There is no average wait: the queue ${D('wq')}, by about ${D('drift')}.</p>
+        <p>Step up from the curve to whole runs: in the six panels (same scale) the 105% run climbs while the others hover. <button data-set="sel=0.95">Back to 95%</button></p>` },
+  ],
+  recompute(P, app){
+    const p = M(P); KNEE = kneeOf(p);
+    const yMax = IE.niceMax(queueAt(0.95, { ...p, c: 1, cs2: Math.max(1, p.cs2) }).wq);   // stable across the what-ifs
+    const curve = q => IE.sweep.curve(r => queueAt(r, q).wq, 0, SWEEP.max, 472), lab = q => `${nameOf(q)} (${codeOf(q)}${queueAt(0.5, q).exact ? '' : ', approx.'})`;
+    const yq = queueAt(P.you, p);
+    const spec = { title: 'Average wait vs utilisation', summary: `knee at ${pct(KNEE)}; no average past 100%`, height: 360,
+      x: { min: 0, max: 1.2, fmt: pct, ticks: [0, 0.2, 0.4, 0.6, 0.8, 1, 1.2], label: 'utilisation ρ (how busy each server is)' },
+      y: { min: 0, max: yMax, fmt: v => v ? fmtMin(v) : '0' },
+      series: [...(P.ghosts ? ghostsOf(p).map(g => ({ id: g.tag, label: lab(g), color: g.tag, points: curve(g), ghost: true })) : []),
+        { id: 'main', label: lab(p), color: 'total', points: curve(p), width: 2.8 }],
+      limit: { from: SWEEP.cap, to: 1.2, text: ['queue grows', 'without limit'], short: 'no average past 100%' },
+      thresholds: [{ x: KNEE, y: queueAt(KNEE, p).wq, title: `knee ≈ ${pct(KNEE)}`, text: ['each +10 points now adds', `more than ${fmtMin(p.s)} of waiting`] }],
+      you: P.showYou ? { x: P.you, y: yq.wq, label: `you: ${pct(P.you)}, ${yq.stable ? fmtMin(yq.wq) : 'no limit'}` } : null,
+      current: current(app.sel, p) };
+    sw ? sw.set(spec) : (sw = IE.sweep(document.getElementById('sweep'), { ...spec, onPick: x => { app.pause(); app.setSel(Math.round(x * 200) / 200); } }));
+    // small multiples: one seeded run per value, shared axes
+    const runs = PANELS.map(r => ({ rho: r, ...runAt(r, p), f: queueAt(r, p) })), H = HORIZON * p.s, sMax = IE.niceMax(Math.max(1, ...runs.filter(r => r.f.stable).map(r => r.st.max)));   // over-capacity runs leave the top: same scale, readable
+    const panels = runs.map(r => ({ x: r.rho,
+      caption: `<b>ρ ${pct(r.rho)}</b> · ` + (r.f.stable ? `avg queue ${fmt.num(r.st.avgQ, 1)} (formula ${fmt.num(r.f.lq, 1)})` : `${r.st.endQ} waiting at the end${r.st.endQ > sMax ? " (off the top)" : ""}, still growing`),
+      series: [{ points: r.st.path.map((v, k, a) => [H * k / (a.length - 1), v]), color: 's1', area: true },
+        r.f.stable ? { points: [[0, r.f.lq], [H, r.f.lq]], color: 'total', dash: '5 4', width: 1.4 } : { points: [[0, 0], [H, p.c * (r.rho - 1) * HORIZON]], color: 'bad', dash: '5 4', width: 1.4 }] }));
+    const smSpec = { panels, x: { min: 0, max: H, fmt: v => v ? fmtDur(v) : '0' }, y: { min: 0, max: sMax, fmt: String }, height: 100, selected: app.sel };
+    sm ? sm.set(smSpec) : (sm = IE.sweep.multiples(document.getElementById('multiples'), { ...smSpec, onPick: x => { app.pause(); app.setSel(x); } }));
+  },
+  render({ P, sel }){
+    const p = M(P);
+    sw.set({ current: current(sel, p) }); sm.set({ selected: sel });
+    renderOneRun(sel, p);
+    const key = p.c + '|' + p.cs2; if (key !== shownKey){ shownKey = key; valid.render(); }
+  },
+  dyn({ P, sel }){
+    const p = M(P), q = queueAt(sel, p), { run, st } = runAt(sel, p), k = Math.min(49, run.arr.length - 1), w8 = queueAt(0.8, p).wq, w9 = queueAt(0.9, p).wq, yq = queueAt(P.you, p);
+    return { s: fmtMin(p.s), rho: pct(sel), wq: fmtMin(q.wq), pw: q.stable ? pct(q.pw) : '100%', knee: pct(KNEE), wq80: fmtMin(w8), wq90: fmtMin(w9), r8090: fmt.num(w9 / w8, 2),
+      wqMM1: fmtMin(queueAt(sel, { ...p, c: 1, cs2: 1 }).wq), you: pct(P.you), youWq: yq.stable ? fmtMin(yq.wq) : 'no limit',
+      cust: String(k + 1), cArr: k >= 0 ? fmtDur(run.arr[k] * p.s) : 'never (no arrivals)', cFound: k >= 0 ? String(k - countBelow(run.start, run.arr[k])) : '0',
+      cWait: k >= 0 ? (run.start[k] - run.arr[k] < 1e-9 ? 'nothing' : fmtMin((run.start[k] - run.arr[k]) * p.s)) : 'nothing', idle: pct(Math.max(0, 1 - st.busy)),
+      drift: q.stable ? 'nothing: below 100% it settles' : fmt.num(p.c * (sel - 1) * 60 / p.s, 1) + ' people per hour' };
+  },
+  readout({ P, sel }){ const p = M(P), q = queueAt(sel, p);
+    return `ρ <b>${pct(sel)}</b> · arrivals <b>${fmt.num(q.lam * 60, 1)}/h</b> · average wait <b>${fmtMin(q.wq)}</b> · ` +
+      (q.stable ? `people waiting <b>${fmt.num(q.lq, 1)}</b> · P(wait) <b>${pct(q.pw)}</b> · ` : '') + `knee <b>${pct(KNEE)}</b> · ` +
+      (sel < KNEE ? 'below the knee: extra load is cheap' : q.stable ? '<b>past the knee</b>: every extra point of load costs more wait' : '<b>over capacity</b>: no average') +
+      ` · model: ${nameOf(p)} (${codeOf(p)}, ${q.exact ? 'exact' : 'approximation'})`; },
+});
 
-// ============================ CHART HELPERS ============================
-function setupCanvas(cv){
-  const dpr = window.devicePixelRatio || 1, W = Math.max(280, Math.floor(cv.clientWidth)), H = +cv.dataset.h;
-  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
-  cv.style.height = H + 'px';
-  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  return { ctx, W, H, dpr };
-}
-// Text with a dark backing box, clamped inside the canvas so labels never get cut off.
-function txt(ctx, s, x, y, o = {}){
-  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif'; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'middle';
-  const w = ctx.measureText(s).width, CW = ctx.canvas.clientWidth || 9999;
-  let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
-  const nbx = Math.max(4, Math.min(CW - w - 4, bx)); x += nbx - bx; bx = nbx;
-  if (o.bg !== false){ ctx.fillStyle = 'rgba(10,15,28,0.78)'; ctx.fillRect(bx - 3, y - 7, w + 6, 14); }
-  ctx.fillStyle = o.color || '#dfe6f2'; ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(s, x, y); ctx.globalAlpha = 1;
-}
-function disc(ctx, x, y, r, fill, stroke, lw = 1.5){ ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); if (fill){ ctx.fillStyle = fill; ctx.fill(); } if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
-const niceStep = (span, target) => { const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; };
-const niceCeil = v => { const st = niceStep(v, 5); return Math.ceil(v / st - 1e-9) * st; };
-// Label placement: try candidate anchors in order; take the first block that stays inside `bounds`, misses every
-// placed box and every data polyline in `avoid` (arrays of [x, y] pixels). Multi-line blocks. Returns the box used.
-// Place the most important labels first; later ones move around them.
-function placeLabel(ctx, placed, lines, cands, o){
-  ctx.font = o.font || '11px Segoe UI, system-ui, sans-serif';
-  const w = Math.max(...lines.map(s => ctx.measureText(s).width)) + 6, h = lines.length * 14, B = o.bounds;
-  const boxOf = ([x, y, al]) => { const l = al === 'center' ? x - w / 2 : al === 'right' ? x - w : x; return { l: l - 3, t: y - 7, r: l - 3 + w, b: y - 7 + h, x: l, y }; };
-  const hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
-  const onData = b => (o.avoid || []).some(pts => pts.some(([x, y]) => x > b.l - 2 && x < b.r + 2 && y > b.t - 2 && y < b.b + 2));
-  const ok = (b, strict) => b.l >= B.l && b.r <= B.r && b.t >= B.t && b.b <= B.b && !placed.some(q => hit(q, b)) && (!strict || !onData(b));
-  let box = null;   // pass 1: off the data; pass 2: may cross a line but never another label; else the first candidate, clamped
-  for (const strict of [true, false]){ for (const c of cands){ const b = boxOf(c); if (ok(b, strict)){ box = b; break; } } if (box) break; }
-  if (!box){ box = boxOf(cands[0]); box.l = Math.max(B.l, Math.min(B.r - w, box.l)); box.r = box.l + w; box.x = box.l + 3; }
-  ctx.fillStyle = 'rgba(10,15,28,0.82)'; ctx.fillRect(box.l, box.t, w, h);
-  lines.forEach((s, i) => txt(ctx, s, box.x, box.y + i * 14, { bg: false, color: (o.colors && o.colors[i]) || o.color, font: i === 0 && o.boldFirst ? 'bold ' + (o.font || '11px Segoe UI') : o.font }));
-  placed.push(box); return box;
-}
-
-// ============================ RENDERERS — REPLACE the views ============================
-const COL = { main: '#ffd84d', A: '#c9a0ff', B: '#6fe3cf', you: '#ff7aa8', muted: '#8e9ab2' };
-function drawSweep(){
-  const cv = $('sweep'), { ctx, W, H } = setupCanvas(cv), pad = { l: 54, r: 12, t: 26, b: 38 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
-  const yMax = niceCeil(queueAt(0.95, { ...P, c: 1, cs2: Math.max(1, P.cs2) }).wq);   // stable across what-ifs
-  const X = r => pad.l + (r - SWEEP.lo) / (SWEEP.hi - SWEEP.lo) * pw, Y = v => pad.t + ph - Math.min(v, 1e6) / yMax * ph;
-  const bounds = { l: pad.l + 2, r: pad.l + pw - 2, t: pad.t + 2, b: pad.t + ph - 2 }, band = { l: pad.l, r: pad.l + pw, t: 1, b: pad.t - 1 };   // band = tags above the frame
-  ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
-  const stY = niceStep(yMax, 5);
-  ctx.strokeStyle = 'rgba(140,160,200,0.12)'; ctx.lineWidth = 1;
-  for (let v = 0; v <= yMax + 1e-9; v += stY){ ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(pad.l + pw, Y(v)); ctx.stroke(); txt(ctx, v === 0 ? '0' : fmtMin(v), pad.l - 5, Y(v), { align: 'right', bg: false, color: COL.muted, font: '10px Segoe UI' }); }
-  for (let r = 0; r <= SWEEP.hi + 1e-9; r += 0.2){ ctx.beginPath(); ctx.moveTo(X(r), pad.t); ctx.lineTo(X(r), pad.t + ph); ctx.stroke(); txt(ctx, pct(r), X(r), pad.t + ph + 11, { align: 'center', bg: false, color: COL.muted, font: '10px Segoe UI' }); }
-  txt(ctx, 'utilisation ρ (how busy each server is) →', pad.l + pw, H - 8, { align: 'right', bg: false, color: COL.muted, font: '10.5px Segoe UI' });
-  const vline = (x, color, dash, w = 1.2) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke(); ctx.setLineDash([]);
-    const o = []; for (let y = pad.t; y <= pad.t + ph; y += 4) o.push([x, y]); return o; };   // returned as an obstacle for labels
-  // beyond capacity: no steady state, shaded and said in words
-  const xc = X(SWEEP.cap), avoid = [];
-  ctx.fillStyle = 'rgba(255,122,168,0.08)'; ctx.fillRect(xc, pad.t, pad.l + pw - xc, ph);
-  avoid.push(vline(xc, 'rgba(255,122,168,0.6)', [4, 4], 1));
-  ['queue', 'grows', 'without', 'limit'].forEach((s, i) => txt(ctx, s, (xc + pad.l + pw) / 2, pad.t + ph * 0.55 + i * 13, { align: 'center', bg: false, color: COL.you, font: '10.5px Segoe UI' }));
-  // curves (clipped to the frame); keep their pixels so labels can avoid them
-  const pix = pts => pts.filter(([, v]) => Number.isFinite(v) && v <= yMax * 1.02).map(([r, v]) => [X(r), Y(v)]);
-  const line = (px, color, w, dash = []) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); px.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.setLineDash([]); };
-  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
-  const ghostsOn = $('ghosts').checked;
-  if (ghostsOn) CURVES.ghosts.forEach(({ g, pts }) => { const px = pix(pts); avoid.push(px); line(px, COL[g.tag], 1.7, [6, 5]); });
-  const mainPx = pix(CURVES.main); avoid.push(mainPx); line(mainPx, COL.main, 2.6);
-  ctx.restore();
-  // all lines and markers first, labels last (so no line runs through a label)
-  const kx = X(KNEE), ky = Y(queueAt(KNEE, P).wq), yx = X(P.you), yw = queueAt(P.you, P).wq, cx = X(P.rho);
-  if (P.showYou){ avoid.push(vline(yx, COL.you, [2, 3], 1.4)); if (Number.isFinite(yw) && yw <= yMax) disc(ctx, yx, Y(yw), 4, COL.you); }
-  avoid.push(vline(cx, 'rgba(255,216,77,0.7)', []));
-  const off = !NOW.stable || NOW.wq > yMax, cy = off ? pad.t + 6 : Y(NOW.wq);
-  if (off){ ctx.fillStyle = COL.main; ctx.beginPath(); ctx.moveTo(cx, pad.t + 1); ctx.lineTo(cx - 6, pad.t + 11); ctx.lineTo(cx + 6, pad.t + 11); ctx.fill(); }
-  else disc(ctx, cx, cy, 5, COL.main);
-  const placed = [];
-  // legend: top-left, the region a rising curve leaves empty; codes only when the full names would reach the curves
-  const gs = ghostsOn ? CURVES.ghosts.map(({ g }) => g) : [];
-  ctx.font = '11px Segoe UI, system-ui, sans-serif';
-  let leg = [`${nameOf(P)} (${codeOf(P)})${NOW.exact ? '' : ' approx.'}`, ...gs.map(g => `- - ${nameOf(g)}${queueAt(0.5, g).exact ? '' : ' (approx.)'}`)];
-  if (pad.l + 16 + Math.max(...leg.map(s => ctx.measureText(s).width)) > X(0.82)) leg = [`${codeOf(P)} (this)${NOW.exact ? '' : ' approx.'}`, ...gs.map(g => `- - ${codeOf(g)}`)];
-  placeLabel(ctx, placed, leg, [[pad.l + 8, pad.t + 12, 'left']], { bounds, colors: [COL.main, ...gs.map(g => COL[g.tag])] });
-  // tags in the band above the frame: the reader's own value, and the current value when it is off the top
-  if (P.showYou) placeLabel(ctx, placed, [`you: ${pct(P.you)}, ${fmtMin(yw)}`], [[yx, 12, 'center'], [yx + 4, 12, 'left'], [yx - 4, 12, 'right']], { bounds: band, color: COL.you });
-  const cs = `${pct(P.rho)}: ${NOW.stable ? 'wait ' + fmtMin(NOW.wq) : 'grows without limit'}${off && NOW.stable ? ' (off the top)' : ''}`;
-  const cands = off ? [[cx, 12, 'center'], [cx + 4, 12, 'left'], [cx - 4, 12, 'right']] : [];
-  for (const dy of [-14, 16, -34, 36]) cands.push([cx - 10, cy + dy, 'right'], [cx + 10, cy + dy, 'left']);
-  for (const f of [0.15, 0.35, 0.75]) cands.push([cx - 10, pad.t + ph * f, 'right'], [cx + 10, pad.t + ph * f, 'left']);
-  placeLabel(ctx, placed, [cs], cands, { bounds: off ? { ...bounds, t: band.t } : bounds, avoid, color: COL.main, font: 'bold 11px Segoe UI' });
-  // the named threshold: annotation in empty space above-left of the point, leader line to it
-  const kc = []; for (const dy of [70, 100, 130, 160]) kc.push([kx - 20, ky - dy, 'right']);
-  for (const f of [0.42, 0.3, 0.55, 0.2]) kc.push([pad.l + 8, pad.t + ph * f, 'left']);
-  const kt = pw < 480 ? [`knee ≈ ${pct(KNEE)}`, `+10 points adds > ${fmtMin(P.s)}`] : [`knee ≈ ${pct(KNEE)}`, `each +10 points now adds`, `more than ${fmtMin(P.s)} of waiting`];
-  const kb = placeLabel(ctx, placed, kt, kc, { bounds, avoid, boldFirst: true, color: '#dfe6f2' });
-  ctx.strokeStyle = 'rgba(223,230,242,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
-  ctx.moveTo(Math.min(Math.max(kx, kb.l), kb.r), kb.b); ctx.lineTo(kx, ky - 5); ctx.stroke(); disc(ctx, kx, ky, 4, null, '#dfe6f2');
-  cv._geo = { pad, pw, X };
-}
-function buildPanels(){
-  $('smGrid').innerHTML = PANELS.map((r, i) => `<div class="sm" data-pick="rho:${r}"><p class="cap lbl" id="cap${i}"></p><canvas id="sm${i}" data-h="96"></canvas></div>`).join('');
-}
-function drawPanels(){
-  const sMax = niceCeil(Math.max(1, ...PANELRUNS.map(pr => pr.st.max))), near = PANELS.reduce((b, r, i) => Math.abs(r - P.rho) < Math.abs(PANELS[b] - P.rho) ? i : b, 0);
-  PANELRUNS.forEach((pr, i) => {
-    const cv = $('sm' + i), { ctx, W, H } = setupCanvas(cv), pad = { l: 30, r: 6, t: 6, b: 16 }, pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
-    const X = f => pad.l + f * pw, Y = v => pad.t + ph - Math.min(v, sMax) / sMax * ph, n = pr.st.path.length - 1;
-    ctx.fillStyle = '#0c1323'; ctx.fillRect(pad.l, pad.t, pw, ph);
-    txt(ctx, String(sMax), pad.l - 4, pad.t + 4, { align: 'right', bg: false, color: COL.muted, font: '10px Segoe UI' });
-    txt(ctx, '0', pad.l - 4, pad.t + ph, { align: 'right', bg: false, color: COL.muted, font: '10px Segoe UI' });
-    txt(ctx, '0', pad.l, H - 6, { bg: false, color: COL.muted, font: '10px Segoe UI' });
-    txt(ctx, fmtDur(HORIZON * P.s), pad.l + pw, H - 6, { align: 'right', bg: false, color: COL.muted, font: '10px Segoe UI' });
-    ctx.beginPath(); ctx.moveTo(X(0), Y(0)); pr.st.path.forEach((v, k) => ctx.lineTo(X(k / n), Y(v))); ctx.lineTo(X(1), Y(0)); ctx.closePath();
-    ctx.fillStyle = 'rgba(90,169,255,0.28)'; ctx.fill();
-    ctx.strokeStyle = '#5aa9ff'; ctx.lineWidth = 1.2; ctx.beginPath(); pr.st.path.forEach((v, k) => k ? ctx.lineTo(X(k / n), Y(v)) : ctx.moveTo(X(0), Y(v))); ctx.stroke();
-    ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4;
-    if (pr.f.stable){ ctx.strokeStyle = COL.main; ctx.beginPath(); ctx.moveTo(X(0), Y(pr.f.lq)); ctx.lineTo(X(1), Y(pr.f.lq)); ctx.stroke(); }
-    else { const grow = P.c * (pr.rho - 1) * HORIZON; ctx.strokeStyle = COL.you; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(Math.min(1, sMax / grow)), Y(Math.min(grow, sMax))); ctx.stroke(); }
-    ctx.setLineDash([]);
-    $('cap' + i).innerHTML = `<b>ρ ${pct(pr.rho)}</b> · ` + (pr.f.stable ? `avg queue ${pr.st.avgQ.toFixed(1)} (formula ${pr.f.lq.toFixed(1)})` : `${pr.st.endQ} waiting at the end, still growing`);
-    cv.parentNode.classList.toggle('on', i === near);
-  });
-}
-function renderOneRun(){
-  const { run, st } = ONE, s = P.s, f = NOW;
-  let h = `<table class="kv"><tr><td>Arrivals</td><td>${f.lam > 0 ? (f.lam * 60).toFixed(1) + ' per hour (one every ' + fmtMin(1 / f.lam) + ')' : 'none'}</td></tr>
-    <tr><td>Service</td><td>${fmtMin(s)} on average, ${P.c === 1 ? 'one server' : P.c + ' servers'}</td></tr></table>`;
-  if (!run.arr.length) return $('oneRun').innerHTML = h + '<p style="margin-top:8px">No customers arrive in this run.</p>';
-  const k = Math.min(49, run.arr.length - 1), found = k - countBelow(run.start, run.arr[k]), w = (run.start[k] - run.arr[k]) * s;
-  h += `<p style="margin-top:8px">Customer <b>#${k + 1}</b> arrives after <b>${fmtDur(run.arr[k] * s)}</b>, finds <b>${found}</b> waiting and ${w < 1e-9 ? '<b>is served at once</b>' : 'waits <b>' + fmtMin(w) + '</b>'}.</p>`;
-  h += `<table class="kv"><tr><td>This run</td><td>${fmtDur(HORIZON * s)}, ${st.n} customers</td></tr>
+// ---- views
+function current(sel, p){ const q = queueAt(sel, p); return { x: sel, y: q.wq, label: `${pct(sel)}: ${q.stable ? 'wait ' + fmtMin(q.wq) : 'grows without limit'}` }; }
+function renderOneRun(sel, p){
+  const { run, st } = runAt(sel, p), f = queueAt(sel, p), el = document.getElementById('oneRun');
+  let h = `<table class="kv"><tr><td>Arrivals</td><td>${f.lam > 0 ? fmt.num(f.lam * 60, 1) + ' per hour (one every ' + fmtMin(1 / f.lam) + ')' : 'none'}</td></tr>
+    <tr><td>Service</td><td>${fmtMin(p.s)} on average, ${p.c === 1 ? 'one server' : p.c + ' servers'}</td></tr></table>`;
+  if (!run.arr.length){ el.innerHTML = h + '<p>No customers arrive in this run.</p>'; return; }
+  const k = Math.min(49, run.arr.length - 1), found = k - countBelow(run.start, run.arr[k]), w = (run.start[k] - run.arr[k]) * p.s;
+  h += `<p>Customer <b>#${k + 1}</b> arrives after <b>${fmtDur(run.arr[k] * p.s)}</b>, finds <b>${found}</b> waiting and ${w < 1e-9 ? '<b>is served at once</b>' : 'waits <b>' + fmtMin(w) + '</b>'}.</p>`;
+  h += `<table class="kv"><tr><td>This run</td><td>${fmtDur(HORIZON * p.s)}, ${st.n} customers</td></tr>
     <tr><td>Server busy</td><td>${pct(st.busy)} of the time</td></tr>
-    <tr><td>Average queue, this run</td><td>${st.avgQ.toFixed(1)} people</td></tr>
-    <tr><td>Average queue, formula</td><td>${f.stable ? f.lq.toFixed(1) + ' people' + (f.exact ? '' : ' (approx.)') : 'grows without limit'}</td></tr>
+    <tr><td>Average queue, this run</td><td>${fmt.num(st.avgQ, 1)} people</td></tr>
+    <tr><td>Average queue, formula</td><td>${f.stable ? fmt.num(f.lq, 1) + ' people' + (f.exact ? '' : ' (approx.)') : 'grows without limit'}</td></tr>
     <tr><td>Average wait, formula</td><td>${fmtMin(f.wq)}</td></tr>
-    <tr><td>Chance of waiting at all</td><td>${f.stable ? pct(f.pw) + (f.exact && P.cs2 === 1 || P.c === 1 ? '' : ' (approx.)') : 'nearly certain: the line never clears for long'}</td></tr>
     ${f.stable ? '' : `<tr><td>Queue at the end</td><td>${st.endQ} people, still growing</td></tr>`}</table>`;
-  $('oneRun').innerHTML = h;
+  if (el.innerHTML !== h) el.innerHTML = h;
 }
-function renderValid(){
-  const f = v => v >= 100 ? v.toFixed(1) : v.toFixed(4);
-  $('valTable').innerHTML = '<tr><th>Check</th><th>Model</th><th>Known</th><th></th><th>Source</th></tr>' +
-    VALID.map(r => `<tr><td>${r.claim}</td><td class="n">${f(r.model)}</td><td class="n">${f(r.known)}</td><td class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '✗'}</td><td class="src">${r.src}</td></tr>`).join('');
-}
-function dynValues(){   // every D('key') used in STEPS must have an entry here
-  const { run, st } = ONE, s = P.s, k = Math.min(49, run.arr.length - 1);
-  const w8 = at(0.8, {}).wq, w9 = at(0.9, {}).wq;
-  return { s: fmtMin(s), rho: pct(P.rho), wq: fmtMin(NOW.wq), pw: NOW.stable ? pct(NOW.pw) : '100%', knee: pct(KNEE),
-    wq80: fmtMin(w8), wq90: fmtMin(w9), r8090: (w9 / w8).toFixed(2),
-    wqMM1: fmtMin(at(P.rho, { c: 1, cs2: 1 }).wq),
-    cust: String(k + 1), cArr: k >= 0 ? fmtDur(run.arr[k] * s) : 'never (no arrivals)',
-    cFound: k >= 0 ? String(k - countBelow(run.start, run.arr[k])) : '0', cWait: k >= 0 ? (run.start[k] - run.arr[k] < 1e-9 ? 'nothing' : fmtMin((run.start[k] - run.arr[k]) * s)) : 'nothing',
-    idle: pct(Math.max(0, 1 - st.busy)),
-    drift: NOW.stable ? 'nothing: below 100% it settles' : (P.c * (P.rho - 1) * 60 / s).toFixed(1) + ' people per hour' };
-}
-
-// ============================ MAIN ============================
-let shownKey = '';
-function renderAll(){
-  drawSweep(); drawPanels();
-  const key = JSON.stringify(P); if (key !== shownKey){ shownKey = key; renderOneRun(); renderValid(); }
-  const dv = dynValues();
-  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
-  $('readout').innerHTML = `ρ <b>${dv.rho}</b> · arrivals <b>${(NOW.lam * 60).toFixed(1)}/h</b> · average wait <b>${dv.wq}</b> · ` +
-    (NOW.stable ? `people waiting <b>${NOW.lq.toFixed(1)}</b> · P(wait) <b>${dv.pw}</b> · ` : '') + `knee <b>${dv.knee}</b> · ` +
-    (P.rho < KNEE ? 'below the knee: extra load is cheap' : NOW.stable ? '<b>past the knee</b>: every extra point of load costs more wait' : '<b style="color:#ff7aa8">over capacity</b>') +
-    ` · model: ${nameOf(P)} (${codeOf(P)}, ${NOW.exact ? 'exact' : 'approximation'})`;
-  $('rho').value = P.rho; $('rho_o').textContent = pct(P.rho);
-}
-function syncUI(){
-  for (const s of [SWEEP_SPEC, ...SPEC]){ $(s.id).value = P[s.id]; $(s.id + '_o').textContent = s.fmt(P[s.id]); if (s.off) $(s.id).closest('.ctl').classList.toggle('overridden', !P[s.off]); }
-  for (const b of BOOLS) $(b).checked = !!P[b];
-  $('two').checked = P.c === 2;
-  document.querySelectorAll('#whatSeg button').forEach(b => { const w = WHAT[b.dataset.w]; b.classList.toggle('on', WHAT_KEYS.every(k => P[k] === w[k])); });
-}
-function setParams(o){ Object.assign(P, o); P.rho = Math.max(SWEEP.min, Math.min(SWEEP.max, P.rho)); syncUI(); recompute(); }
-// ← / → move the swept value one notch (clamped: a parameter range is not cyclic). Pauses the sweep.
-function stepTime(dir){
-  playing = false; $('play').textContent = '▶ Sweep';
-  setParams({ [SWEEP_SPEC.id]: Math.round((P[SWEEP_SPEC.id] + dir * KEY_STEP) / KEY_STEP) * KEY_STEP });
-}
-// Keyboard: ← → swept value, Ctrl/⌘ + ← → topic (tour step). Leaves typing fields alone, lets a focused slider keep its
-// own plain-arrow behaviour, and ignores Alt (browser back/forward on Windows).
-function onKey(e){
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-  if (e.altKey || e.defaultPrevented) return;
-  const el = e.target, tag = el && el.tagName, mod = e.ctrlKey || e.metaKey;
-  if (el && (el.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && el.type !== 'range' && el.type !== 'checkbox' && el.type !== 'radio'))) return;
-  if (!mod && tag === 'INPUT' && el.type === 'range') return;
-  const dir = e.key === 'ArrowRight' ? 1 : -1;
-  e.preventDefault();
-  if (mod) goStep(STEP + dir); else stepTime(dir);
-}
-function goStep(i){
-  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
-  if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params }); }
-  playing = false; $('play').textContent = '▶ Sweep';
-  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
-  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
-  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
-}
-function init(){
-  const mk = (s, host) => { const d = document.createElement('div'); d.className = 'ctl';
-    d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
-    $(host).appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); };
-  mk(SWEEP_SPEC, 'sweepCtl'); SPEC.forEach(s => mk(s, 'params'));
-  $(SWEEP_SPEC.id).setAttribute('data-time', '');   // check.js presses ← / → and expects this slider to move
-  for (const b of BOOLS) $(b).onchange = () => setParams({ [b]: $(b).checked });
-  $('two').onchange = () => setParams({ c: $('two').checked ? 2 : 1 });
-  $('ghosts').onchange = () => dirty = true;
-  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
-  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
-  $('stepText').addEventListener('click', ev => { const b = ev.target.closest('button[data-set]'); if (!b) return;
-    const o = {}; b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('=').map(s => s.trim()); o[k] = BOOLS.includes(k) ? v === '1' : parseFloat(v); }); setParams(o); });
-  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...WHAT[b.dataset.w] }));   // keeps the current value
-  $('reset').onclick = () => setParams({ ...REAL });
-  $('play').onclick = () => { playing = !playing; if (playing && P.rho >= SWEEP.max - 0.01) setParams({ rho: 0.3 }); $('play').textContent = playing ? '❚❚ Pause' : '▶ Sweep'; };
-  const cv = $('sweep'), pick = e => { const g = cv._geo; if (!g) return; playing = false; $('play').textContent = '▶ Sweep';
-    const r = SWEEP.lo + (e.clientX - cv.getBoundingClientRect().left - g.pad.l) / g.pw * (SWEEP.hi - SWEEP.lo); setParams({ rho: Math.round(r * 200) / 200 }); };
-  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pick(e); }); cv.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
-  buildPanels();
-  $('smGrid').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t){ playing = false; setParams({ rho: +t.dataset.pick.split(':')[1] }); } });
-  window.addEventListener('resize', () => dirty = true);
-  document.addEventListener('keydown', onKey);
-  syncUI(); goStep(0);
-  let last = null;
-  const frame = now => {
-    if (playing){ if (last !== null){ const r = P.rho + (now - last) / 1000 * 0.08;
-      if (r >= SWEEP.max){ playing = false; $('play').textContent = '▶ Sweep'; setParams({ rho: SWEEP.max }); } else setParams({ rho: r }); } last = now; } else last = null;
-    if (dirty){ dirty = false; renderAll(); }
-    requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
-}
-init();
+// ---- validation: textbook values (fixed) + the simulation against the formula for the current assumption (REPLACE)
+const unit = (c, cs2) => ({ c, cs2, s: 1 }), near = (a, b, tol = 1e-6) => Math.abs(a / b - 1) < tol, f4 = v => fmt.num(v, 4);
+const known = (claim, target, val, src = 'formulas') => ({ claim, source: src, target: f4(target), model: () => f4(val()), ok: () => near(val(), target) });
+const SIMV = new Map(), SIM_N = 200000, SIM_BURN = 2000;
+const simRow = r => { const cur = () => unit(M(app.P).c, M(app.P).cs2);
+  const sim = () => { const p = cur(), k = `${r}|${p.c}|${p.cs2}`; if (!SIMV.has(k)) SIMV.set(k, meanWait(r, p, SIM_N, SIM_BURN)); return SIMV.get(k); };
+  return { claim: `Simulation, current assumption, ρ = ${pct(r)}: W<sub>q</sub> (200k seeded customers; within 8% of an exact formula, 15% of an approximation)`, source: 'sim',
+    target: '', model: () => `${f4(sim())} vs ${f4(queueAt(r, cur()).wq)}`, ok: () => Math.abs(sim() / queueAt(r, cur()).wq - 1) < (queueAt(0.5, cur()).exact ? 0.08 : 0.15) }; };
+const valid = IE.validation('valid', [
+  known('M/M/1, λ = 0.8, μ = 1: mean wait W<sub>q</sub> = ρ/(μ−λ)', 4, () => queueAt(0.8, unit(1, 1)).wq),
+  known('M/D/1, λ = 0.8, μ = 1: W<sub>q</sub> (Pollaczek–Khinchine, half of M/M/1)', 2, () => queueAt(0.8, unit(1, 0)).wq),
+  known('M/M/2, λ = 1.5, μ = 1: P(wait) = a²/(2+a)', 9 / 14, () => queueAt(0.75, unit(2, 1)).pw),
+  known('M/M/2, λ = 1.5, μ = 1: W<sub>q</sub> = C/(2μ−λ)', 9 / 7, () => queueAt(0.75, unit(2, 1)).wq),
+  known('M/M/2, λ = 1.5, μ = 1: L<sub>q</sub> = λ·W<sub>q</sub>', 27 / 14, () => queueAt(0.75, unit(2, 1)).lq),
+  known('M/G/1, cs² = 3, ρ = 0.5, μ = 1: W<sub>q</sub>', 2, () => queueAt(0.5, { c: 1, cs2: 3, s: 1 }).wq),
+  known('M/M/1: wait at 90% ÷ wait at 80%', 2.25, () => queueAt(0.9, unit(1, 1)).wq / queueAt(0.8, unit(1, 1)).wq),
+  { claim: 'At ρ ≥ 100% the model gives no number', source: 'formulas', target: 'grows without limit', model: () => fmtMin(queueAt(1.05, unit(1, 1)).wq), ok: () => !isFinite(queueAt(1.05, unit(1, 1)).wq) },
+  ...[0.5, 0.8, 0.9].map(simRow),
+]);
 </script>
 </body>
 </html>

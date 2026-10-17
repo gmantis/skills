@@ -21,10 +21,10 @@ The current directory (or the folder of the source material) is the teaching wor
 | `GLOSSARY.md` | The canonical terms; every lesson uses them exactly | [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md) |
 | `learning-records/000N-slug.md` | Evidence of what the user knows, prior knowledge they stated, misconceptions corrected; used to find the zone of proximal development | [LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md) |
 | `lessons/000N-slug.html` | One combined lesson page per tight topic | below |
-| `assets/` | Reusable components: `course.css`, `quiz.js` (copy it from this skill's `assets/quiz.js`), shared model JS | reuse first |
+| `assets/` | Reusable parts of this course: shared model files (`model-*.js`), a small `course.css` for course-only touches | reuse first |
 | `NOTES.md` | User preferences (format, locale, tone), the lesson index, candidate next lessons | free-form |
 
-**Reuse is the default.** Read `assets/` before writing a lesson, and build from what is there. Anything a second lesson could use (styles, quiz, model functions, chart helpers) goes into `assets/`, not inline. Every lesson links `course.css`, so the course looks like one course. The page must still work offline from `file://`, so use plain `<script src>` and no modules or CDNs.
+**Reuse is the default.** Read `assets/` before writing a lesson, and build from what is there. The runtime already gives every lesson the same look, theme and controls (`../runtime/API.md`), so `course.css` holds only course-specific touches. Model code a second lesson could use goes into `assets/model-<topic>.js` and is pulled into each lesson with `<script data-ie-file="../assets/model-<topic>.js">`. The quiz is a runtime module: `<script data-ie="quiz"></script>`, then `Quiz.mount(el, questions, { lesson: '0003' })`. Build every lesson with `scripts/build.js`: the page stays one offline file that also works from `file://`.
 
 ## Start of every session
 1. Read `MISSION.md`, `NOTES.md`, `RESOURCES.md`, `GLOSSARY.md` and `learning-records/`. List `lessons/` and `assets/`. Check memory for who the reader is (location, preferences).
@@ -44,7 +44,7 @@ Build the explainer with `../SKILL.md` steps 1–5 (model, tour, what-ifs, chart
 4. **Evidence**: a claim / source / strength table. Keep what the sources show separate from what the model assumes.
 5. **Reference** (`#reference`): the compressed take-aways, routine or cheat sheet. This replaces teach's reference pages, so write it to be revisited: terse, scannable, printable. Add a "Print cheat sheet" button that prints only `#reference` and `#glossary` (via a `body.print-ref` class and `@media print` rules).
 6. **Glossary** (`#glossary`): the terms this lesson uses, worded exactly as in `GLOSSARY.md`. Tag terms that are new in this lesson.
-7. **Quiz** (`#quiz`): 5–8 retrieval questions from `assets/quiz.js`, including **1–2 spaced-review questions** from earlier lessons (`from: '0001'`), preferring items the records show were missed. Rules:
+7. **Quiz** (`#quiz`): 5–8 retrieval questions with the runtime's quiz module (`Quiz.mount`), including **1–2 spaced-review questions** from earlier lessons (`from: '0001'`), preferring items the records show were missed. Rules:
    - All options of a question have **exactly the same number of words**, and similar character length. The right answer is never the stand-out longest.
    - Vary the position of the right answer.
    - Distractors are real misconceptions, not jokes.

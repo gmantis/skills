@@ -1,0 +1,34 @@
+/* interactive-explainer runtime: graph.css (IE.graph diagram). Arrow colours: --gpos pushes up, --gneg pushes down. */
+.ie-graph{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none;-webkit-user-select:none;--gpos:var(--s1);--gneg:var(--s2);--gzero:var(--muted)}
+.ie-graph text{fill:var(--ink);font:12px var(--font);pointer-events:none}
+.ie-graph text.name{font-weight:650}
+.ie-graph text.val{fill:var(--ink2);font-size:11px;font-variant-numeric:tabular-nums}
+.ie-graph .node rect.box{fill:var(--panel);stroke:var(--axis);stroke-width:1.5}
+.ie-graph .node.input rect.box{fill:var(--btn)}
+.ie-graph .node.output rect.box{stroke:var(--total);stroke-width:2.2}
+.ie-graph .node.hot rect.box{stroke:var(--accent);stroke-width:2.5}
+.ie-graph .node.sel rect.box{fill:var(--hl);stroke:var(--ink);stroke-width:2.5}
+.ie-graph .node.off rect.box{stroke-dasharray:5 4;fill:var(--panel2)}
+.ie-graph .node.off text{fill:var(--muted)}
+.ie-graph .node.broken{opacity:.5} .ie-graph .node.broken rect.box{stroke-dasharray:3 3;fill:var(--panel2)}
+.ie-graph .node,.ie-graph .eg{cursor:pointer;outline:none}
+.ie-graph .node:focus-visible rect.box{stroke:var(--focus);stroke-width:3}
+.ie-graph .eg:focus-visible path.edge,.ie-graph .eg.sel path.edge{filter:drop-shadow(0 0 2px var(--focus))}
+.ie-graph .eg.sel .badge circle{stroke:var(--ink);stroke-width:2}
+.ie-graph .lvl.pos{fill:var(--gpos)} .ie-graph .lvl.neg{fill:var(--gneg)}
+.ie-graph path.edge{fill:none;stroke-linecap:round}
+.ie-graph path.edge.pos{stroke:var(--gpos)} .ie-graph path.edge.neg{stroke:var(--gneg)} .ie-graph path.edge.plain{stroke:var(--ink2)}
+.ie-graph path.edge.zero{stroke:var(--gzero);stroke-dasharray:3 5}
+.ie-graph path.edge.hot{stroke:var(--accent)}
+.ie-graph .mk.pos{fill:var(--gpos)} .ie-graph .mk.neg{fill:var(--gneg)} .ie-graph .mk.zero{fill:var(--gzero)} .ie-graph .mk.plain{fill:var(--ink2)}
+.ie-graph path.edge.flow{stroke-dasharray:7 5;animation:ie-flow 1s linear infinite}
+.ie-graph path.ehit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke}
+.ie-graph .badge circle{fill:var(--panel2);stroke:var(--axis);stroke-width:1}
+.ie-graph .badge.pos circle{stroke:var(--gpos)} .ie-graph .badge.neg circle{stroke:var(--gneg)}
+.ie-graph text.badge{font-weight:700;text-anchor:middle;dominant-baseline:central}
+.ie-graph .badge.pos text{fill:var(--gpos)} .ie-graph .badge.neg text{fill:var(--gneg)} .ie-graph .badge.zero text{fill:var(--gzero)}
+.ie-graph .elabel rect{fill:var(--panel2);stroke:var(--line)} .ie-graph text.elabel{fill:var(--ink2);font-size:11px}
+.ie-graph text.loop{font-size:11.5px;font-weight:700;fill:var(--ink2)}
+@keyframes ie-flow{to{stroke-dashoffset:-12}}
+@media (prefers-reduced-motion:reduce){.ie-graph path.edge.flow{animation:none}}
+@media print{.ie-graph path.edge.flow{animation:none;stroke-dasharray:none}}

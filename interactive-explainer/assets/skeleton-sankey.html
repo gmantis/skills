@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  SKELETON (sankey shape) for the interactive-explainer skill: where does it go? Flows between stages with conserved
+  totals. Demo: 10,000 records from three sources through validation, deduplication and approval.
+  Start a page: node scripts/build.js new sankey page.html. Replace everything marked REPLACE.
+  The runtime (core + sankey) is inlined by build.js; never edit inside data-ie blocks. API: runtime/API.md and shapes/sankey.md.
+-->
+<style data-ie="core"></style>
+<style data-ie="sankey"></style>
+<style>/* page-only styles */
+#fates tr[data-pick]{cursor:pointer} #fates tr[data-pick]:focus-visible td{outline:2px solid var(--focus);outline-offset:-2px}
+</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>Where do 10,000 records go? (REPLACE)</h1>
+  <p class="lede">REPLACE: the question in the reader's words. Every record that enters the pipeline ends somewhere: loaded, quarantined, rejected or removed as a duplicate. The tour follows them; click any stage or flow to trace it, and remove stages under <i>What if?</i></p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> <span class="dyn" data-dyn="loadedPct"></span> of the <span class="dyn" data-dyn="measureUnit"></span> are loaded. The biggest loss is <span class="dyn" data-dyn="bigLoss"></span>, not validation.</p>
+  <div class="stat"><b data-dyn="loaded"></b><span data-dyn="loadedLbl"></span></div>
+  <div class="stat"><b data-dyn="bigLossV"></b><span>biggest loss</span></div>
+  <div class="stat"><b data-dyn="total"></b><span data-dyn="totalLbl"></span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Selected</h4>
+    <div class="ctl"><div class="lab"><label for="pick">Stage (← → to step)</label></div><select id="pick" class="btn" style="width:100%"></select></div></div>
+</aside>
+<main>
+  <section class="panel"><h3>The flow, stage by stage</h3>
+    <p class="sub">Band widths are <span data-dyn="measureName"></span>. Red bands drop out as losses. On a phone, scroll the diagram sideways. Click a stage or a band: the part of every flow that passes through it lights up, and the dots follow single units along those routes.</p>
+    <div id="sankey"></div></section>
+  <div class="grid2">
+    <section class="panel"><h3>Selected</h3><div id="detail" aria-live="polite"></div></section>
+    <section class="panel"><h3>Where <span class="dyn wrap" data-dyn="endsOf"></span> end up</h3><p class="sub">Share of <span data-dyn="endsBase"></span>; click a bar to select that end.</p><div id="ends"></div></section>
+  </div>
+  <section class="panel"><h3>Every source at once</h3><p class="sub">Share of each source's <span data-dyn="measureUnit"></span> that ends in each place. Click a row to follow that source.</p><div id="fates"></div></section>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model reproduce the source?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>REPLACE: each source sends its records to Validate, which rejects a share that depends on the source (web forms fail more often). What passes goes to Deduplicate, which removes a share as duplicates; the rest is split between auto-approval and manual review, and review passes most of its records to Loaded and quarantines the rest. Each link carries two measures, records and megabytes (records × average size per source), so the same flow can be read either way.</p>
+    <p>Conservation is built in: every stage's inflow equals its outflow plus its losses, for both measures, and the validation table checks it live. Removing a stage either reroutes its inflow straight on to its normal outputs in the same ratios (its losses no longer happen) or drops it into a new loss; downstream stages keep their split ratios. "Follow" assumes a stage mixes what enters it and splits it in the same ratios, so the share of each flow that passes through a pick is exact. <span class="badge illustrative">fictional demo data</span></p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="sankey"></script>
+<!-- MODEL: pure, no DOM. Write it as model.js in $TEMP, test it in Node (require runtime/sankey.js for removeNode/balance/follow),
+     and build with --from "$TEMP/<name>". -->
+<script data-ie-file="model.js">
+// REPLACE: sources with their volumes, the stages, and the split ratios from the source document.
+const SOURCES = [
+  { id: 'web', label: 'Web forms', n: 5000, kb: 2 },
+  { id: 'files', label: 'Partner files', n: 3000, kb: 50 },
+  { id: 'api', label: 'API', n: 2000, kb: 1 },
+];
+const REAL = { webReject: 0.08, otherReject: 0.02, dupRate: 0.10, autoShare: 0.80, reviewPass: 0.80 };
+const TARGETS = { received: 10000, rejected: 500, duplicates: 950, loaded: 8208, quarantined: 342, mb: 162, noDedupeLoaded: 9120, noReviewDropped: 1710 };
+const NODES = [
+  ...SOURCES.map(s => ({ id: s.id, label: s.label, note: `${s.n.toLocaleString('en')} records a day, about ${s.kb} KB each.` })),
+  { id: 'validate', label: 'Validate', note: 'Checks every record against the schema and the business rules.' },
+  { id: 'rejected', label: 'Rejected', kind: 'loss', note: 'Failed validation; written to the reject file for the source team.' },
+  { id: 'dedupe', label: 'Deduplicate', note: 'Removes records already loaded on an earlier day.' },
+  { id: 'dupes', label: 'Duplicates removed', short: 'Duplicates', kind: 'loss' },
+  { id: 'auto', label: 'Auto-approve', note: 'Records that match every approval rule.' },
+  { id: 'review', label: 'Manual review', note: 'A person checks the rest.' },
+  { id: 'loaded', label: 'Loaded' },
+  { id: 'quarantine', label: 'Quarantine', color: 's4', note: 'Held back after review; not loaded.' },
+];
+// flows(p) -> { nodes, paths }: one path per route a source's records can take, with both measures (records, mb;
+// 1 MB = 1000 KB). Paths (not just link totals) because validation fails web records more often than the others, so
+// "where do web records end up" depends on the route, not only on the totals at each stage.
+function flows(p){
+  const paths = [], add = (s, route, share) => paths.push({ nodes: [s.id, ...route], values: { records: s.n * share, mb: s.n * s.kb / 1000 * share } });
+  for (const s of SOURCES){ const rej = s.id === 'web' ? p.webReject : p.otherReject, ok = 1 - rej, kept = ok * (1 - p.dupRate), manual = kept * (1 - p.autoShare);
+    add(s, ['validate', 'rejected'], rej);
+    add(s, ['validate', 'dedupe', 'dupes'], ok * p.dupRate);
+    add(s, ['validate', 'dedupe', 'auto', 'loaded'], kept * p.autoShare);
+    add(s, ['validate', 'dedupe', 'review', 'loaded'], manual * p.reviewPass);
+    add(s, ['validate', 'dedupe', 'review', 'quarantine'], manual * (1 - p.reviewPass)); }
+  return { nodes: NODES, paths };
+}
+// everything that passes through a node (pure, so Node can check the targets without the runtime)
+const inflow = (model, id, m = 'records') => model.paths.filter(p => p.nodes.includes(id)).reduce((s, p) => s + p.values[m], 0);
+if (typeof module === 'object' && module.exports) module.exports = { SOURCES, REAL, TARGETS, NODES, flows, inflow };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE, SKX = IE.sankey;
+IE.sources({   // every number the page quotes gets an entry; cite with cite('id')
+  run: { title: 'Daily pipeline run report (REPLACE)', where: 'Run summary, typical day', quote: '10,000 records received (162 MB); 500 rejected at validation; 950 duplicates removed; 8,208 loaded; 342 quarantined (REPLACE).' },
+  design: { title: 'Pipeline design note (REPLACE)', where: 'section 3', quote: 'About 80% of de-duplicated records are approved automatically; manual review passes four in five (REPLACE).' },
+});
+const MEAS = { records: { name: 'records', fmt: v => fmt.int(v), unit: 'records' }, mb: { name: 'megabytes', fmt: v => fmt.num(v, v < 10 ? 2 : 1) + ' MB', unit: '' } };
+let MODEL = null, sk = null, ends = null, M = MEAS.records;
+const cur = () => sk.G;
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'webReject', label: 'Web forms rejected', min: 0, max: 0.3, step: 0.01, fmt: v => fmt.pct(v) },
+    { id: 'otherReject', label: 'Files and API rejected', min: 0, max: 0.3, step: 0.01, fmt: v => fmt.pct(v) },
+    { id: 'dupRate', label: 'Duplicates among valid records', min: 0, max: 0.3, step: 0.01, fmt: v => fmt.pct(v), off: 'offDedupe' },
+    { id: 'autoShare', label: 'Approved automatically', min: 0, max: 1, step: 0.05, fmt: v => fmt.pct(v) },
+    { id: 'reviewPass', label: 'Passed by manual review', min: 0, max: 1, step: 0.05, fmt: v => fmt.pct(v), off: 'offReview' },
+  ],
+  toggles: [{ id: 'offDedupe', label: 'Remove Deduplicate: duplicates flow on to approval' }, { id: 'offReview', label: 'Remove Manual review: its records are dropped' },
+    { id: 'byVolume', label: 'Measure data volume (MB) instead of records' }],
+  options: [{ id: 'follow', label: 'Follow units: animate them along the flow', value: true }],
+  whatIf: [{ key: 'real', label: 'Real', set: { offDedupe: false, offReview: false } }, { key: 'nodedupe', label: 'No dedupe', set: { offDedupe: true, offReview: false } },
+    { key: 'noreview', label: 'No review', set: { offDedupe: false, offReview: true } }],
+  sel: { stepBy: (dir, a) => a.setSel(SKX.step(cur(), a.sel, dir)), keyHint: 'previous / next stage' },
+  steps: [   // params list only what differs from REAL (toggles default off); sel = 'n:<node>' | 'l:<from>><to>' | null
+    { title: '1 · Follow one web record', sel: 'n:web',
+      html: () => `<p>Start with one source. Of every 100 records from web forms, ${D('fLoaded')} are loaded, ${D('fRejected')} are rejected at validation and ${D('fDupes')} are removed as duplicates${cite('run')}.</p><p>The dots are single records travelling along those routes. Click another source to compare.</p>` },
+    { title: '2 · The whole flow', sel: null,
+      html: () => `<p>${D('total')} ${D('measureUnit')} enter each day from three sources. ${D('loadedPct')} end up loaded; the rest drop out at each stage as red bands. Every stage keeps its books: what goes in equals what comes out plus what it drops (see the check table).</p>` },
+    { title: '3 · Validation rejects', sel: 'l:validate>rejected',
+      html: () => `<p>${D('rejected')} records fail validation. Web forms send half of the records but ${D('webRejShare')} of the rejects, because they fail ${D('webRate')} of the time against ${D('otherRate')} for files and the API.</p>
+        <p><button data-set="webReject=0.04">Halve the web reject rate</button></p>` },
+    { title: '4 · Duplicates: the biggest loss', sel: 'n:dupes',
+      html: () => `<p>Deduplication removes ${D('dupes')} records, almost twice what validation rejects${cite('run')}. Fixing duplicates at the source would load more than fixing web forms.</p>
+        <p><button data-set="dupRate=0.05">Halve the duplicates</button> <button data-set="sel=n:loaded">Show what is loaded</button></p>` },
+    { title: '5 · What if nobody reviews?', params: { offReview: true }, sel: 'n:dropped:review',
+      html: () => `<p>Remove Manual review and its ${D('dropped')} records have nowhere to go: they are dropped, and loaded falls to ${D('loaded')}.</p>
+        <p><button data-set="offReview=false; offDedupe=true">Remove Deduplicate instead</button></p>` },
+    { title: '6 · The step up: every source, by volume', params: { byVolume: true }, sel: 'n:files',
+      html: () => `<p>Measured in megabytes the picture changes: partner files are ${D('filesShare')} of all data, and validation removes only ${D('rejShare')} of the volume. The table under the diagram shows every source's fate at once.</p>` },
+  ],
+  recompute(P){
+    M = P.byVolume ? MEAS.mb : MEAS.records;
+    MODEL = flows(P);
+    if (P.offDedupe) MODEL = SKX.removeNode(MODEL, 'dedupe', { mode: 'reroute' });
+    if (P.offReview) MODEL = SKX.removeNode(MODEL, 'review', { mode: 'drop', label: 'Dropped (no review)' });
+    const spec = { ...MODEL, measure: P.byVolume ? 'mb' : 'records', fmt: M.fmt, unit: M.unit, particles: P.follow };
+    if (sk) sk.set(spec);
+    else sk = SKX(document.getElementById('sankey'), { ...spec, title: 'Where the records go', onPick: k => app.setSel(k) });
+    const pick = document.getElementById('pick');
+    pick.innerHTML = '<option value="">(nothing selected)</option>' + SKX.order(cur()).map(k => `<option value="${IE.esc(k)}">${IE.esc(cur().by[k.slice(2)].label)}</option>`).join('');
+    drawFates();
+  },
+  render({ P, sel }){
+    const G = cur(), key = sel && SKX.follow(G, sel) ? sel : null;
+    sk.set({ selected: key, particles: P.follow });
+    document.getElementById('pick').value = key && key.startsWith('n:') ? key : '';
+    document.getElementById('detail').innerHTML = SKX.card(G, key, { fmt: M.fmt, unit: M.unit });
+    const F = key ? SKX.follow(G, key) : null, useFate = F && Object.keys(F.fate).length && !(F.node && (F.node.role === 'sink' || F.node.role === 'loss'));
+    const rows = G.nodes.filter(n => n.role === 'sink' || n.role === 'loss').map(n => ({ id: n.id, label: n.label, value: useFate ? (F.fate[n.id] || 0) : n.value / G.total, color: n.color }))
+      .sort((a, b) => b.value - a.value);
+    const spec = { title: 'Where they end up', rows, fmt: v => fmt.pct(v, v < 0.1 && v > 0 ? 1 : 0), min: 0, max: 1, highlight: key && key.slice(2), onPick: id => app.setSel('n:' + id) };
+    ends ? ends.set(spec) : (ends = IE.barChart(document.getElementById('ends'), spec));
+    IE.qsa('#fates tr[data-pick]').forEach(tr => tr.classList.toggle('on', tr.dataset.pick === key));
+    valid.render();
+  },
+  dyn({ P, sel }){
+    const G = cur(), F = sel ? SKX.follow(G, sel) : null, fate = id => F && F.fate[id] != null ? fmt.pct(F.fate[id], F.fate[id] < 0.1 ? 1 : 0) : '0%';
+    const at = id => G.by[id] ? G.by[id].in : 0, ls = G.nodes.filter(n => n.role === 'loss').sort((a, b) => b.value - a.value)[0];
+    const rec = SKX.graph(MODEL, { measure: 'records' });
+    const fr = SKX.follow(rec, 'l:validate>rejected'), rejFromWeb = fr ? fr.origin.web || 0 : 0;
+    const fn = F && F.node ? F.node.label : F && F.link ? `${F.link.s.label} → ${F.link.t.label}` : null, showF = F && !(F.node && (F.node.role === 'sink' || F.node.role === 'loss'));
+    return { total: M.fmt(G.total), totalLbl: `${M.name} enter`, loaded: M.fmt(at('loaded')), loadedLbl: `${M.name} loaded`, loadedPct: fmt.pct(at('loaded') / G.total),
+      bigLoss: ls ? ls.label.toLowerCase() : 'none', bigLossV: ls ? M.fmt(ls.value) : '–', measureName: `${M.name}, to scale`, measureUnit: M.name,
+      fLoaded: fate('loaded'), fRejected: fate('rejected'), fDupes: fate('dupes'),
+      rejected: fmt.int(rec.by.rejected ? rec.by.rejected.in : 0), dupes: fmt.int(rec.by.dupes ? rec.by.dupes.in : 0), dropped: fmt.int(rec.by['dropped:review'] ? rec.by['dropped:review'].in : 0),
+      webRejShare: fmt.pct(rejFromWeb), webRate: fmt.pct(P.webReject), otherRate: fmt.pct(P.otherReject),
+      filesShare: fmt.pct(G.by.files ? G.by.files.value / G.total : 0), rejShare: fmt.pct(G.by.rejected ? G.by.rejected.in / G.total : 0, 1),
+      endsOf: !showF ? `all ${M.name}` : `${M.name} ${F.link ? 'on' : F.node.role === 'source' ? 'from' : 'through'} ${fn}`, endsBase: showF ? `what passes through ${fn}` : `everything that enters` };
+  },
+  readout({ sel }){
+    const G = cur(), b = SKX.balance(G), F = sel ? SKX.follow(G, sel) : null;
+    return `In <b>${M.fmt(b.totalIn)}</b> = loaded or kept <b>${M.fmt(b.delivered)}</b> + lost <b>${M.fmt(b.lost)}</b>` + (b.ok ? ' · balances at every stage' : ' · <b>does not balance</b>') +
+      (F ? ` · selected: <b>${IE.esc(F.node ? F.node.label : F.link.s.label + ' → ' + F.link.t.label)}</b>, ${M.fmt(F.amount)} (${fmt.pct(F.amount / G.total, 1)})` : ' · click a stage to trace it');
+  },
+});
+document.getElementById('pick').addEventListener('change', e => app.setSel(e.target.value || null));
+
+// ---- "every source at once": fate of each source's units (the step up)
+function drawFates(){
+  const G = cur(), f = SKX.fates(G), host = document.getElementById('fates');
+  IE.table(host, { caption: 'Share of each source that ends in each place', rows: f.sources.map(s => ({ id: s, src: G.by[s].label, size: G.by[s].value, ...f.m[s] })), pick: r => 'n:' + r.id,
+    columns: [{ key: 'src', label: 'Source' }, { key: 'size', label: M.name === 'records' ? 'Records' : 'MB', num: true, fmt: v => M.fmt(v) },
+      ...f.ends.map(e => ({ key: e, label: IE.esc(G.by[e].short || G.by[e].label), num: true, fmt: v => fmt.pct(v, v > 0 && v < 0.1 ? 1 : 0) }))] });
+  IE.qsa('#fates tr[data-pick]').forEach(tr => { tr.tabIndex = 0; tr.setAttribute('role', 'button'); tr.setAttribute('aria-label', 'Follow ' + tr.cells[0].textContent); });
+}
+const fatesHost = document.getElementById('fates');
+fatesHost.addEventListener('click', e => { const tr = e.target.closest('tr[data-pick]'); if (tr) app.setSel(tr.dataset.pick); });
+fatesHost.addEventListener('keydown', e => { const tr = e.target.closest('tr[data-pick]'); if (tr && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); app.setSel(tr.dataset.pick); } });
+
+// ---- validation: the real settings against the run report, plus live conservation (REPLACE targets)
+const near = (a, b, t = 1e-6) => Math.abs(a - b) <= t * Math.max(1, Math.abs(b));
+const G0 = m => SKX.graph(flows(REAL), { measure: m });
+const atR = (id, model = flows(REAL), m = 'records') => SKX.graph(model, { measure: m }).by[id]?.in ?? 0;
+const vrow = (claim, id, target) => ({ claim, source: 'run', target: fmt.int(target), model: () => fmt.int(atR(id)), ok: () => near(atR(id), target) });
+const valid = IE.validation('valid', [
+  { claim: 'Records received per day', source: 'run', target: fmt.int(TARGETS.received), model: () => fmt.int(G0('records').total), ok: () => near(G0('records').total, TARGETS.received) },
+  vrow('Rejected at validation', 'rejected', TARGETS.rejected), vrow('Duplicates removed', 'dupes', TARGETS.duplicates),
+  vrow('Loaded', 'loaded', TARGETS.loaded), vrow('Quarantined after review', 'quarantine', TARGETS.quarantined),
+  { claim: 'Data received per day', source: 'run', target: TARGETS.mb + ' MB', model: () => fmt.num(G0('mb').total, 1) + ' MB', ok: () => near(G0('mb').total, TARGETS.mb) },
+  { claim: 'Web forms supply 400 of the 500 rejects', source: 'run', target: '80%', model: () => fmt.pct(SKX.follow(G0('records'), 'l:validate>rejected').origin.web, 1),
+    ok: () => near(SKX.follow(G0('records'), 'l:validate>rejected').origin.web, 0.8) },
+  { claim: 'Conservation at every stage, records (current settings)', source: 'model check', target: 'in = out + losses',
+    model: () => 'largest gap ' + fmt.num(SKX.balance(SKX.graph(MODEL, { measure: 'records' })).maxDiff, 6), ok: () => SKX.balance(SKX.graph(MODEL, { measure: 'records' })).ok },
+  { claim: 'Conservation at every stage, MB (current settings)', source: 'model check', target: 'in = out + losses',
+    model: () => 'largest gap ' + fmt.num(SKX.balance(SKX.graph(MODEL, { measure: 'mb' })).maxDiff, 6), ok: () => SKX.balance(SKX.graph(MODEL, { measure: 'mb' })).ok },
+  { claim: 'Every source\'s records all end somewhere (current settings)', source: 'model check', target: '100% each',
+    model: () => { const f = SKX.fates(cur()); return f.sources.map(s => fmt.pct(IE.sum(Object.values(f.m[s])), 1)).join(' / '); },
+    ok: () => { const f = SKX.fates(cur()); return f.sources.every(s => near(IE.sum(Object.values(f.m[s])), 1)); } },
+  { claim: 'Without Deduplicate, loaded = 9,500 × (0.8 + 0.2 × 0.8)', source: 'design', target: fmt.int(TARGETS.noDedupeLoaded),
+    model: () => fmt.int(atR('loaded', SKX.removeNode(flows(REAL), 'dedupe'))), ok: () => near(atR('loaded', SKX.removeNode(flows(REAL), 'dedupe')), TARGETS.noDedupeLoaded) },
+  { claim: 'Without Manual review, its records are dropped', source: 'design', target: fmt.int(TARGETS.noReviewDropped),
+    model: () => fmt.int(atR('dropped:review', SKX.removeNode(flows(REAL), 'review', { mode: 'drop' }))), ok: () => near(atR('dropped:review', SKX.removeNode(flows(REAL), 'review', { mode: 'drop' })), TARGETS.noReviewDropped) },
+]);
+</script>
+</body>
+</html>

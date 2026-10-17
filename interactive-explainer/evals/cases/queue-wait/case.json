@@ -1,0 +1,13 @@
+{
+  "id": "queue-wait",
+  "tier": "Explainer",
+  "prompt": "/interactive-explainer on source.md",
+  "expect_shapes": ["sweep"],
+  "targets": [
+    { "label": "reproduces 4/16/36/76 min", "expr": "['4','16','36','76'].every(n => new RegExp('\\\\b' + n + '(\\\\.0)?\\\\s*min').test(document.body.innerText))" },
+    { "label": "20-minute threshold ~83%", "expr": "/8[23](\\.\\d)?\\s*%/.test(document.body.innerText)" },
+    { "label": "unbounded at 100% said in words", "expr": "/(never settles|without (a )?limit|unbounded|grows forever|no steady)/i.test(document.body.innerText)" },
+    { "label": "validation table all pass", "expr": "document.querySelectorAll('.ok').length >= 4 && !document.querySelector('.fail')" }
+  ],
+  "budget": { "minutes": 15, "output_tokens": 150000 }
+}

@@ -24,6 +24,7 @@ function build(file, from){
   const abs = path.resolve(file), dir = path.dirname(abs);
   let html = fs.readFileSync(abs, 'utf8');
   const report = [];
+  const comments = []; html = html.replace(/<!--[\s\S]*?-->/g, m => `\u0000C${comments.push(m) - 1}\u0000`);   // tags written inside comments are not blocks
   const safe = (s, tag) => tag === 'script' ? s.replace(/<\/script/gi, '<\\/script') : s.replace(/<\/style/gi, '<\\/style');
   html = html.replace(/<(script|style)\b([^>]*)\bdata-ie="([^"]+)"([^>]*)>([\s\S]*?)<\/\1>/g, (m, tag, a1, name, a2) => {
     const f = path.join(RT, name + (tag === 'style' ? '.css' : '.js'));
@@ -37,6 +38,7 @@ function build(file, from){
     const src = fs.readFileSync(f, 'utf8'); report.push(`${rel} ${(src.length / 1024).toFixed(1)} KB`);
     return `<${tag}${a1}data-ie-file="${rel}"${a2}>\n${safe(src, tag)}\n</${tag}>`;
   });
+  html = html.replace(/\u0000C(\d+)\u0000/g, (m, i) => comments[+i]);
   const gen = `<meta name="generator" content="interactive-explainer runtime ${version}">`;
   html = /<meta name="generator"[^>]*>/.test(html) ? html.replace(/<meta name="generator"[^>]*>/, gen) : html.replace(/<head>/i, `<head>\n${gen}`);
   fs.writeFileSync(abs, html);

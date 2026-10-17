@@ -1,0 +1,35 @@
+/* interactive-explainer runtime: machine.css (the isometric figure, IE.machine). Needs core.css.
+   Materials are mixed from the core theme tokens, so a figure follows light and dark mode; each face is the
+   material mixed with white (top) or black (sides) by machine.js. */
+.ie-mach{
+  --mm-base: color-mix(in oklab, var(--axis), var(--panel) 30%);
+  --mm-steel: color-mix(in oklab, var(--muted), var(--panel) 30%);
+  --mm-dark: color-mix(in oklab, var(--ink2), var(--panel) 25%);
+  --mm-rubber: color-mix(in oklab, var(--ink), var(--panel) 35%);
+  --mm-glass: color-mix(in oklab, var(--s1), var(--panel) 55%);
+  --mm-paper: color-mix(in oklab, var(--s4), var(--panel) 72%);
+  --mm-brass: color-mix(in oklab, var(--s4), var(--ink2) 25%);
+  --mm-accent: var(--accent); --mm-token: var(--accent); --mm-good: var(--good); --mm-bad: var(--bad); --mm-ink: var(--ink);
+  --m: var(--mm-steel);
+  margin:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px}
+.ie-mach .mh,.ie-mach .mf{display:flex;justify-content:space-between;align-items:baseline;gap:6px 16px;flex-wrap:wrap}
+.ie-mach .mfig{font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.ie-mach .mttl{font-size:.9rem;font-weight:620;color:var(--ink);text-align:right}
+.ie-mach .mhint{font-size:.8rem;color:var(--muted)}
+.ie-mach .mro{font-size:.84rem;color:var(--ink2);text-align:right;font-variant-numeric:tabular-nums;margin-left:auto}
+.ie-mach .mro b{color:var(--ink)}
+.ie-mach .msvg svg{width:100%;height:auto;display:block;overflow:visible}
+.ie-mach .f{stroke:color-mix(in oklab, var(--m), black 42%);stroke-width:.7px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.ie-mach .f.sm{stroke-width:.5px}
+.ie-mach .glass .f{fill-opacity:.2;stroke-opacity:.55}
+.ie-mach .glass .f.sm{stroke-opacity:0}
+.ie-mach .lit{filter:drop-shadow(0 0 .09px var(--mm-accent))}
+.ie-mach .part[data-pick]{cursor:pointer;outline:none}
+.ie-mach .part[data-pick]:hover .f,.ie-mach .part[data-pick]:focus-visible .f{stroke:var(--accent)!important;stroke-width:1.2px}
+.ie-mach .part.picked .f{stroke:var(--accent)!important;stroke-width:1.6px;stroke-opacity:1!important}
+.ie-mach .part.picked .f.sm{stroke-width:.8px}
+.ie-mcard{border-top:1px solid var(--line);padding:7px 2px 0;font-size:.86rem;color:var(--ink2);min-height:2.2em}
+.ie-mcard b{color:var(--ink)}
+.ie-mcard .mchip,.ie-mcard .mclose{font:inherit;font-size:.76rem;background:var(--btn);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:1px 8px;margin:2px 0;cursor:pointer}
+.ie-mcard .mclose{float:right;border-radius:6px;padding:0 7px;margin-left:8px}
+.ie-mcard .mchip:hover,.ie-mcard .mclose:hover{border-color:var(--accent)}

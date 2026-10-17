@@ -1,0 +1,56 @@
+/* interactive-explainer runtime: tree.css (IE.tree views). Theme tokens only, so light and dark both work. */
+main .panel,main .grid2>*{min-width:0}
+.tablewrap{position:relative}
+.mut{color:var(--muted);font-size:.78rem;font-weight:400}
+.tr-seglab{font-size:.76rem;color:var(--ink2);margin:0 0 3px}
+#whatSeg{flex-wrap:wrap}
+.panel.spot{outline:2px solid var(--accent);outline-offset:-2px}
+/* breadcrumb */
+.tr-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px 14px;font-size:.88rem}
+.tr-crumbs .lab{color:var(--muted);font-size:.76rem;margin-right:4px}
+.tr-crumbs .crumb{background:none;border:1px solid transparent;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:5px;font:inherit;overflow-wrap:anywhere;text-align:left}
+.tr-crumbs .crumb:hover{border-color:var(--line)} .tr-crumbs .crumb.cur{color:var(--ink);font-weight:650;border-color:var(--line)}
+.tr-crumbs .sep{color:var(--muted)}
+/* collapsible tree */
+.tr-tree{font-size:.84rem}
+.tr-tree .hd,.tr-tree .row{display:grid;grid-template-columns:minmax(0,1fr) 44px 66px 50px 50px;gap:6px;align-items:center}
+.tr-tree .hd{color:var(--muted);font-size:.72rem;border-bottom:1px solid var(--axis);padding:0 4px 3px;margin-bottom:2px}
+.tr-tree .row{padding:2px 4px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+.tr-tree .row:hover{background:var(--btn)}
+.tr-tree .row.path{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.tr-tree .row.sel{background:var(--btn-on);border-color:var(--accent)}
+.tr-tree .row.hid{opacity:.5} .tr-tree .row.hid .nm b{text-decoration:line-through}
+.tr-tree .nm{display:flex;align-items:center;gap:4px;min-width:0;white-space:nowrap;overflow:hidden}
+.tr-tree .nm b{font-weight:650} .tr-tree .nm .t{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.tr-tree .tog{width:18px;height:18px;flex-shrink:0;padding:0;text-align:center;color:var(--ink2);border:0;background:none;border-radius:3px;font:inherit;line-height:18px;cursor:pointer}
+.tr-tree button.tog:hover{background:var(--btn-on);color:var(--ink)}
+.tr-tree .hd .sh{display:none}
+.tr-tree .num,.tr-top .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.minibar{display:block;height:6px;background:var(--grid);border-radius:3px;overflow:hidden} .minibar i{display:block;height:100%}
+/* treemap */
+svg.tr-map{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none;overflow:hidden}
+.tr-map g.box,.tr-map rect.b2{cursor:pointer}
+.tr-map rect.b1{stroke-width:1.2}
+.tr-map rect.b2{stroke:var(--panel2);stroke-width:1}
+.tr-map g.box:hover rect.b1,.tr-map g.box:focus-visible rect.b1{stroke-width:2.5}
+.tr-map g.box:focus{outline:none}
+.tr-map g.box.sel rect.b1{stroke:var(--ink);stroke-width:3}
+.tr-map text{fill:var(--ink);font:600 12px var(--font);pointer-events:none}
+.tr-map text.v1{font:11px var(--font);fill:var(--ink2)}
+.tr-map text.n2{font:600 11px var(--font)} .tr-map text.v2{font:10.5px var(--font);fill:var(--ink2)}
+.tr-map text.msg{font:13px var(--font);fill:var(--muted)}
+/* top leaves */
+.tr-top .li{display:grid;grid-template-columns:20px minmax(0,1fr) 74px 54px;gap:8px;align-items:center;padding:3px 4px;border-radius:5px;cursor:pointer;font-size:.84rem;border:1px solid transparent}
+.tr-top .li:hover{background:var(--btn)} .tr-top .li.sel{background:var(--btn-on);border-color:var(--accent)}
+.tr-top .rk{color:var(--muted);text-align:right} .tr-top .pth{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-top .pth .minibar{margin-top:2px}
+/* detail card, selection nav */
+.tr-kv{width:100%;border-collapse:collapse;font-size:.84rem;margin-bottom:8px} .tr-kv td{padding:2px 6px;border-bottom:1px solid var(--grid);vertical-align:top}
+.tr-kv td:first-child{color:var(--ink2);white-space:nowrap;width:1%}
+#detail p{margin:0 0 8px;font-size:.9rem}
+.tr-selnav{display:flex;align-items:center;gap:8px} .tr-selnav .cur{flex:1;min-width:0;font-size:.88rem;overflow-wrap:anywhere}
+@media (max-width:560px){
+  .tr-tree .hd,.tr-tree .row{grid-template-columns:minmax(0,1fr) 62px 44px 44px;gap:4px}
+  .tr-tree .bar{display:none} .tr-tree .hd .lg{display:none} .tr-tree .hd .sh{display:inline}
+  .tr-tree .nm .t{display:none}
+}

@@ -1,0 +1,19 @@
+/* interactive-explainer runtime: sim.css (IE.sim views). Include with <style data-ie="sim"></style> after core. */
+.ie-sim-stage{position:relative}
+.ie-sim-stage canvas{display:block;width:100%}
+.ie-sim-stage svg.ie-sim-over{position:absolute;left:0;top:0;width:100%;pointer-events:none;overflow:hidden}
+.ie-sim-over .wall{fill:none;stroke:var(--ink2);stroke-width:3;stroke-linejoin:round}
+.ie-sim-over .zone rect{fill-opacity:.14;stroke-width:1.6;stroke-dasharray:5 3}
+.ie-sim-over .zone.off rect{fill-opacity:0;stroke-opacity:.5}
+.ie-sim-over text.off{fill:var(--muted)}
+.ie-sim-over [data-pick]{pointer-events:auto;cursor:pointer}
+.ie-sim-over [data-pick]:focus{outline:none} .ie-sim-over [data-pick]:focus-visible rect{stroke:var(--focus);stroke-width:3}
+.ie-sim-over text{font:600 11.5px var(--font);fill:var(--ink);paint-order:stroke;stroke:var(--panel2);stroke-width:3px;stroke-linejoin:round}
+.ie-sim-hud{margin:0 0 6px;font-size:.84rem;color:var(--ink2);font-variant-numeric:tabular-nums}
+.ie-sim-hud b{color:var(--ink)}
+.ie-sim-transport{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.ie-sim-transport .seg{margin:0;flex:1 1 auto}
+.ie-sim-transport .seg button{flex:1;white-space:nowrap}
+/* workaround until core.css has it: the validation table's absolutely positioned .sr-only header escapes an unpositioned
+   scroll wrapper and makes a phone page scroll sideways when the table is wider than the screen */
+.tablewrap{position:relative}

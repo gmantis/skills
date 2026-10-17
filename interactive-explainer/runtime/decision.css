@@ -1,0 +1,33 @@
+/* interactive-explainer runtime: decision.css (IE.decision views). Include with <style data-ie="decision"></style>. */
+.ie-qs{display:flex;flex-direction:column;gap:9px}
+.ie-q label{display:block;font-size:.84rem;color:var(--ink2);margin-bottom:2px}
+.ie-qin{display:flex;align-items:center;gap:8px}
+.ie-qin input[type=number]{width:78px;flex-shrink:0;font:inherit;font-size:.88rem;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--ink);font-variant-numeric:tabular-nums}
+.ie-qin .unit{font-size:.78rem;color:var(--muted);min-width:44px;white-space:nowrap}
+.ie-qin input[type=range]{flex:1;min-width:60px}
+.ie-q .hint{margin:2px 0 0;font-size:.76rem;color:var(--muted)}
+.ie-qmore > summary{font-size:.84rem;color:var(--ink2);font-weight:600;margin:2px 0 8px}
+.ie-qmore[open] > summary{margin-bottom:8px}
+.ie-qmore .ie-q{margin-bottom:9px}
+.ie-tree .tedge{fill:none;stroke:var(--axis);stroke-width:1.4}
+.ie-tree .tedge.on{stroke:var(--accent);stroke-width:2.6}
+.ie-tree .tbox{fill:var(--panel);stroke:var(--axis);stroke-width:1}
+.ie-tree .tnode.on .tbox{fill:var(--btn-on);stroke:var(--accent);stroke-width:1.8}
+.ie-tree .tnode.best .tbox{stroke:var(--good);stroke-width:2.4}
+.ie-tree .tmark:not([fill]){fill:var(--ink2)}
+.ie-tree text.tname{font-weight:600;fill:var(--ink)}
+.ie-tree text.tval{fill:var(--ink2);font-size:11.5px;font-variant-numeric:tabular-nums}
+.ie-tree .tnode[data-pick],.ie-sbars .srow[data-pick],.ie-tornado .trow[data-pick]{cursor:pointer}
+.ie-tree .tnode:focus,.ie-sbars .srow:focus,.ie-tornado .trow:focus{outline:none}
+.ie-tree .tnode:focus-visible .tbox{stroke:var(--focus);stroke-width:2.5}
+.ie-sbars .sbg,.ie-tornado .tbg{fill:transparent}
+.ie-sbars .srow[data-pick]:hover .sbg,.ie-tornado .trow[data-pick]:hover .tbg{fill:var(--btn)}
+.ie-sbars .srow.on .sbg,.ie-tornado .trow.on .tbg{fill:var(--hl)}
+.ie-sbars .srow:focus-visible .sbg,.ie-tornado .trow:focus-visible .tbg{stroke:var(--focus);stroke-width:2}
+.ie-sbars .srow.on .sout{stroke:var(--ink);stroke-width:1.5}
+.ie-tornado .tzero{stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 4}
+.ie-tornado text.tzl{fill:var(--accent);font-weight:600}
+.ie-tornado .trow.flips text.tl{font-weight:650;fill:var(--ink)}
+.ie-tornado text.tv{font-size:11.5px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.ie-pick{flex-wrap:wrap}
+.ptop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}

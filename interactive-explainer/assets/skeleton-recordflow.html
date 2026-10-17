@@ -5,541 +5,319 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TITLE — interactive explainer</title>
 <!--
-  RECORD-FLOW SKELETON for the interactive-explainer skill (shapes: record-flow walkthrough, data pipeline, ETL job,
-  Ab Initio graph, a request through middleware — see shapes/SHAPES.md). Everything marked REPLACE is placeholder.
-  Demo model: an Ab Initio-flavoured payments graph. INPUT FILE → REFORMAT (clean) → REFORMAT with a lookup (add FX
-  rate) → FILTER BY EXPRESSION (amount > 0, deselect port) → REFORMAT (amount_usd) → OUTPUT FILE, with reject flows.
-  The model is pure: simulate(params) → RUN = { order, counts, flows, recs }, where every record carries one hop per
-  component it reached: the record before and after, the port it left on, every transform rule that ran (with its
-  result), and the error message if it was rejected. Selection state = (record R, hop H): which record, at which node.
-  Keep the structure: MODEL (pure) -> INVARIANTS -> STATE -> STEPS -> pipeline SVG (build per size/structure, update
-  attributes per frame) -> side panels (rebuilt when the selection or params change) -> main loop.
-  Same engine contract as the other skeletons: STEPS + goStep, [data-w] what-ifs, [data-dyn] live numbers,
-  data-set buttons (also h=<node> and r=<record>), [data-pick] on every node, record chip and diff row.
+  SKELETON (record-flow shape) for the interactive-explainer skill. Guide: shapes/recordflow.md. API: runtime/API.md.
+  Demo: an Ab Initio-flavoured payments graph with a join of two inputs. Payments → Clean → Add rate (lookup) → Filter
+  (deselect port) → Join with Customers → To USD → Output, plus a shared reject file and an unmatched file.
+  The model is graph(p) (components as pure functions); IE.recordflow.run(graph(p), p) runs every record through it.
+  The selection is (record, component), kept as the string 'KEY@NODE': chips, the hop slider, ← →, clicking a box or a
+  diff row all move it. Build: node scripts/build.js <this file> --from "$TEMP/<name>". Replace everything marked REPLACE.
 -->
-<style>
-  :root{ --bg:#0a0f1c; --panel:#121a2c; --panel2:#0e1526; --ink:#e6ebf5; --muted:#8e9ab2; --line:#23304b;
-    --ok:#6fe3cf; --null:#c9a0ff; --bad:#ff7aa8; --cur:#ffd84d; --accent:#5aa9ff; --desel:#9aa6bd; }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
-  header{padding:16px 24px 2px} header h1{margin:0 0 4px;font-size:1.3rem;font-weight:600;overflow-wrap:anywhere}
-  code{overflow-wrap:anywhere;font:12px ui-monospace,Consolas,'DejaVu Sans Mono',monospace}
-  header p{margin:0;color:var(--muted);max-width:1100px;font-size:.9rem}
-  .layout{display:flex;gap:16px;padding:12px 24px 28px;align-items:flex-start}
-  aside{width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
-  .card,.panel{background:var(--panel);border-radius:10px;padding:12px 14px}
-  .stepnav{display:flex;align-items:center;gap:8px}
-  .stepnav button,.btn,#stepText button{background:#1b2640;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem}
-  .stepnav button:disabled,.btn:disabled{opacity:.35;cursor:default}
-  .dots{display:flex;gap:5px;flex:1;justify-content:center}
-  .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
-  .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
-  #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--cur)}
-  #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
-  #stepText code .dyn{white-space:normal;overflow-wrap:anywhere} #stepText code.pre .dyn{white-space:pre}
-  h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
-  .ctl{margin-bottom:9px} .ctl .lab{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
-  .ctl .lab output{color:var(--ink);font-weight:600} .ctl input[type=range]{width:100%;accent-color:var(--accent)}
-  .seg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px} .seg button{flex:1 1 auto;border-radius:6px;background:#1b2640;border:1px solid var(--line);color:var(--ink);padding:5px 7px;font-size:.75rem;cursor:pointer}
-  .seg button.on{background:#2b4a7a;border-color:var(--accent)}
-  .chk{display:flex;gap:7px;font-size:.78rem;color:var(--muted);margin-bottom:6px}
-  main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
-  .panel h3{margin:0 0 2px;font-size:.93rem;color:var(--accent);font-weight:600} .panel .sub{margin:0 0 6px;color:var(--muted);font-size:.78rem}
-  .tracenav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px} .tracenav input{flex:1;min-width:120px;accent-color:var(--cur)} .tracenav output{font-size:.8rem;color:var(--muted);white-space:nowrap}
-  #readout{background:var(--panel);border-radius:10px;padding:10px 14px;font-size:.84rem;color:var(--muted)} #readout b{color:var(--ink)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2>*{min-width:0}
-  /* record chips */
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
-  .chip{background:#16213a;border:1px solid var(--line);border-left:4px solid var(--ok);color:var(--ink);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.78rem;white-space:nowrap}
-  .chip small{color:var(--muted);margin-left:4px} .chip.REJ{border-left-color:var(--bad)} .chip.DSEL{border-left-color:var(--desel)} .chip.LOST{border-left-color:var(--bad);border-left-style:dashed}
-  .chip.on{background:#2a2a14;border-color:var(--cur)} .chip.differs small{color:var(--bad)}
-  /* pipeline svg */
-  #flow{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none}
-  #flow text{fill:var(--ink);font:12px 'Segoe UI',system-ui,sans-serif;pointer-events:none;text-anchor:middle;dominant-baseline:central}
-  #flow text.name{font-weight:600} #flow text.kind{fill:var(--muted);font-size:10px} #flow text.kind.warn{fill:var(--bad);font-weight:600}
-  #flow text.badge{font:bold 11px 'Segoe UI',system-ui,sans-serif}
-  #flow .node{cursor:pointer} #flow .node rect{fill:#16213a;stroke:#33476e;stroke-width:1.5}
-  #flow .node.side rect{fill:#121c31;stroke-dasharray:4 3} #flow .node.onpath rect{stroke:#8a7a3a}
-  #flow .node.sel rect{stroke:var(--cur);stroke-width:2.6} #flow .node.endbad rect{fill:#3a1726}
-  #flow .node.cut rect{opacity:.45}
-  #flow path.fl{fill:none;stroke-width:1.8} #flow path.fl.main{stroke:var(--ok)} #flow path.fl.rej{stroke:var(--bad)} #flow path.fl.desel{stroke:var(--desel)}
-  #flow path.fl.lookup{stroke:var(--accent);stroke-dasharray:3 4} #flow path.fl.zero{opacity:.3}
-  #flow path.fl.live{stroke-dasharray:7 5;animation:flow 1.1s linear infinite} #flow path.fl.onpath{stroke:var(--cur);stroke-width:3.2;opacity:1}
-  #flow path.fl.cut{stroke-dasharray:2 5;opacity:.35;animation:none}
-  #flow circle.bg{fill:#0e1526;stroke:#33476e} #flow circle.bg.onpath{stroke:var(--cur)}
-  #flow circle.recdot{fill:var(--cur);stroke:#0a0f1c;stroke-width:2;transition:transform .35s ease;pointer-events:none}
-  @keyframes flow{to{stroke-dashoffset:-12}}
-  @media (prefers-reduced-motion:reduce){#flow path.fl.live{animation:none}#flow circle.recdot{transition:none}}
-  /* hop card */
-  .note{color:var(--muted);font-size:.82rem;margin:0 0 6px} #atHop p{margin:0 0 6px;font-size:.85rem}
-  .port{font-weight:600;white-space:nowrap} .port.out,.port.written{color:var(--ok)} .port.reject{color:var(--bad)} .port.deselect{color:var(--desel)}
-  .scroll{overflow:auto;max-width:100%}
-  .ba{width:100%;border-collapse:collapse;font-size:.8rem;margin:2px 0 8px} .ba th{color:var(--muted);text-align:left;font-weight:500}
-  .ba td,.ba th{padding:2px 6px;border-bottom:1px solid var(--line);vertical-align:top} .ba td{white-space:nowrap}
-  .ba .ty{display:block;color:var(--muted);font-size:.7rem} .ba .s{white-space:pre}
-  .ba tr.chg td:last-child{color:var(--cur);font-weight:600} .ba tr.add td:not(:nth-child(2)){color:var(--ok);font-weight:600}
-  .ba tr.drop td:not(:last-child){text-decoration:line-through;color:var(--muted)} .ba tr.drop td:last-child{color:var(--muted);font-style:italic}
-  .null{color:var(--null);font-style:italic;font-weight:600}
-  .rule{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:.8rem;padding:3px 6px;border-left:3px solid var(--ok);margin:0 0 4px;background:#0f1729}
-  .rule code{color:#dfe6f2} .rule span{color:var(--muted)} .rule.nul{border-left-color:var(--null)} .rule.fail{border-left-color:var(--bad)} .rule.fail span{color:var(--bad)} .rule.skip{opacity:.55}
-  .err{background:#3a1726;border:1px solid var(--bad);border-radius:6px;padding:6px 8px;font-size:.8rem;margin:6px 0}
-  .inv{font-size:.82rem;margin:0 0 4px} .inv .ok{color:var(--ok)} .inv .bad{color:var(--bad)} .inv .tbd{color:var(--muted)} .inv small{color:var(--muted)}
-  .rates{border-collapse:collapse;font-size:.8rem} .rates td{padding:2px 10px;border-bottom:1px solid var(--line)} .rates tr.hit td{color:var(--cur);font-weight:600}
-  /* source */
-  pre.src{max-height:60vh;overflow:auto;margin:0;font:12px/1.5 ui-monospace,Consolas,'DejaVu Sans Mono',monospace;background:var(--panel2);border-radius:6px;padding:6px 0;color:#c8d1e3}
-  pre.src .ln{display:block;padding:0 10px 0 0;white-space:pre} pre.src .ln.hl{background:#3a3414;color:#fff} pre.src .ln.hl.nul{background:#2a1f45} pre.src .ln.hl.bad{background:#4a1a2c}
-  pre.src .ln.skip{color:#6f7a90} pre.src .n{color:#56627a;display:inline-block;width:3.4em;text-align:right;margin-right:10px;user-select:none} pre.src .ln.hl .n{color:var(--cur)}
-  /* diff table */
-  .cmpwrap{max-height:50vh} .cmp{width:100%;border-collapse:collapse;font-size:.78rem} .cmp th{color:var(--muted);text-align:left;font-weight:500}
-  .cmp td,.cmp th{padding:2px 6px;border-bottom:1px solid var(--line);white-space:nowrap} .cmp tr[data-pick]{cursor:pointer}
-  .cmp tr.cur td{background:#2a2a14} .cmp td.d{color:var(--bad)}
-  .assume{font-size:.8rem;color:var(--muted)} .assume ul{margin:4px 0 8px;padding-left:18px} .assume b{color:var(--ink)}
-  @media (max-width:1000px){.layout{flex-direction:column}aside,main{width:100%}aside{position:static;max-height:none}.grid2{grid-template-columns:1fr}}
-  @media (max-width:520px){.layout{padding:8px 8px 20px}header{padding:12px 10px 2px}.panel,.card{padding:10px}}
+<style data-ie="core"></style>
+<style data-ie="recordflow"></style>
+<style>/* page-only styles */
+  .assume ul{margin:4px 0 8px;padding-left:18px} .assume li{margin-bottom:4px}
+  code{font:12px ui-monospace,Consolas,"DejaVu Sans Mono",monospace;overflow-wrap:anywhere}
+  #stepText code .dyn{white-space:pre}
 </style>
 </head>
 <body>
-<header>
-  <h1>TITLE (REPLACE)</h1>
-  <p>One-paragraph framing of the question from the source (REPLACE). Say what the reader can do: follow one record through the graph, see its fields before and after every component, find where a NULL turns into a reject, and check that every record is accounted for.</p>
-</header>
+<header class="ie-head"><div class="ttl">
+  <h1>What happens to each payment in this graph? (REPLACE)</h1>
+  <p class="lede">One or two sentences of the question from the source (REPLACE). Follow one record through the graph, see its fields before and after every component, find where a NULL turns into a reject, and check that every record is accounted for.</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> of <span class="dyn" data-dyn="nIn"></span> payments, <span class="dyn" data-dyn="nOut"></span> reach the output. A NULL or unknown currency makes the rate lookup return NULL, out.rate is not nullable, so those payments are rejected at Add rate; a payment whose customer is missing leaves the join as unmatched.</p>
+  <div class="stat"><b data-dyn="nOut"></b><span>written to payments_usd.dat</span></div>
+  <div class="stat"><b data-dyn="nRej"></b><span>in the rejects file</span></div>
+  <div class="stat"><b data-dyn="nLost"></b><span>lost (no reject port)</span></div>
+</div>
+
 <div class="layout">
 <aside>
-  <div class="card">
-    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
-    <h2 id="stepTitle"></h2><div id="stepText"></div>
-  </div>
-  <div class="card">
-    <h4>What if?</h4>
-    <div class="seg" id="whatSeg"><button data-w="asWritten" class="on">As written</button><button data-w="fixed">Default rule (prio 2)</button><button data-w="filterFirst">Filter first</button><button data-w="noReject">No reject port</button><button data-w="clean">Clean feed</button></div>
-    <label class="chk"><input type="checkbox" id="defaultRule"><span>Add rate has priority-2 default rules</span></label>
-    <label class="chk"><input type="checkbox" id="filterFirst"><span>Filter before the lookup</span></label>
-    <label class="chk"><input type="checkbox" id="noRejectPort"><span>Reject ports not connected</span></label>
-    <label class="chk"><input type="checkbox" id="cleanFeed"><span>Clean feed (every currency known)</span></label>
-    <div id="params"></div>
-    <button class="btn" id="reset">Reset to as written</button>
-  </div>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Record and component</h4><div id="chips"></div><div id="hopnav"></div></div>
 </aside>
 <main>
   <section class="panel"><h3>The graph, and one record moving through it (REPLACE)</h3>
-    <p class="sub">Pick a record (chips), then step through the components it reached. Numbers on flows = records that crossed that flow; the gold path and dot are the selected record. Click any component.</p>
-    <div class="chips" id="chips"></div>
-    <div class="tracenav"><button class="btn" id="kprev">◀</button><button class="btn" id="play">▶ Play</button><button class="btn" id="knext">▶|</button>
-      <input type="range" id="k" min="0" max="1" step="1" value="0"><output id="k_o"></output></div>
-    <svg id="flow" role="img" aria-label="Pipeline of components with record counts on each flow"></svg>
-  </section>
+    <p class="sub">Numbers on flows count the records that crossed them; the amber path and dot are the selected record. Click any component, pick a record on the left, or press ← →.</p>
+    <div id="flow"></div></section>
   <div class="grid2">
-    <section class="panel"><h3 id="hopTitle">At this hop</h3><p class="sub">The record before and after this component: <span style="color:var(--cur)">gold</span> changed, <span style="color:var(--ok)">teal</span> added, struck-through dropped, <span class="null">NULL</span> missing. Then the rules that ran and the checks.</p><div id="atHop"></div></section>
-    <section class="panel" id="srcPanel"><h3 id="srcTitle">Source</h3><p class="sub">The lines that ran for this record are highlighted (purple = returned NULL, pink = failed).</p><pre class="src" id="src"></pre></section>
+    <section class="panel"><h3 id="hopTitle">At this hop</h3><p class="sub">The record before and after this component (highlighted = changed, green = added, struck through = dropped, <span class="rf-null">NULL</span> = missing), the rules that ran, and the checks.</p><div id="atHop"></div></section>
+    <section class="panel" id="srcPanel"><h3 id="srcTitle">Source</h3><p class="sub">The lines that ran for this record are highlighted (purple = returned NULL, red = failed, grey = not run).</p><pre class="rf-src" id="src"></pre></section>
   </div>
-  <section class="panel"><h3 id="cmpTitle">Reference vs this run</h3><p class="sub">Where each record ends in the reference run and in this run. Pink = the first hop where its path or fields differ. Click a row.</p><div class="scroll cmpwrap" id="cmpwrap"><table class="cmp" id="cmp"></table></div></section>
-  <div id="readout"></div>
-  <section class="panel assume"><h3>What the model assumes (REPLACE)</h3>
+  <section class="panel"><h3 id="cmpTitle">Fixed graph vs this run</h3><p class="sub">Where each record ends in the reference run and in this run, and the first hop where its path or fields differ. Click a row.</p><div id="cmp" class="rf-diff"></div></section>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model match the notes and the counts?</h2><div id="valid"></div></section>
+  <section class="assume"><details><summary>What the model assumes (REPLACE)</summary>
     <p>A model built from reading the graph, not a run of it. <b>From the DAIS DML notes</b> (dml/transform-rules.md, dml/nulls.md):</p>
     <ul>
       <li>Lower priority numbers run first, an unprioritized rule runs last, and once a field has a value no later rule for it runs. A prioritized rule that returns NULL hands over to the next priority.</li>
       <li>A concrete rule for a field takes it out of <code>out.* :: in.*</code>, so its fallback must be another concrete rule (a priority-2 <code>out.*</code> does not fill it).</li>
       <li>String functions and arithmetic pass NULL through; <code>first_defined(x, d)</code> supplies a default.</li>
-      <li>If no rule gives a value, a nullable field becomes NULL; a non-nullable one makes the transform fail. The notes quote <code>NULL value in priority 1 assignment for out.…</code> from a Co&gt;Op 4.4.3.1 run, and say this error stops the graph by default.</li>
+      <li>If no rule gives a value, a nullable field becomes NULL; a non-nullable one makes the transform fail, and this error stops the graph by default.</li>
     </ul>
-    <p><b>Illustrative, not checked:</b> the components are set to keep going and send a failing record to the reject port (by default the graph would stop); an unconnected reject port discards the record; a lookup miss or a NULL key gives NULL; the rates, record format and rounding; the message wording when priority 2 is the last rule.</p>
-  </section>
-</main>
+    <p><b>Illustrative, not checked</b> <span class="badge illustrative">illustrative</span>: the components keep going and send a failing record to the reject port (by default the graph would stop); an unconnected reject port discards the record; a lookup miss or a NULL key gives NULL; the inner join sends unmatched payments to unused0 and drops unmatched customers on the unconnected unused1; the rates, record formats and rounding.</p>
+  </details></section>
+  <section id="sources"></section>
 </div>
 
-<script>
-// ============================ MODEL (pure, no DOM) — REPLACE ============================
-const RATES = { USD: 1, EUR: 1.08, GBP: 1.25, JPY: 0.0067 };          // REPLACE: lookup file contents (illustrative)
-const INPUT = [                                                          // REPLACE: the sample input; '' currency = NULL
-  { id: 'P-1001', amount: '120.00', currency: 'USD' },
-  { id: 'P-1002', amount: '250.00', currency: 'eur' },
-  { id: '  P-1003 ', amount: '75.60', currency: 'GBP' },
-  { id: 'P-1004', amount: '300.00', currency: '' },
-  { id: 'P-1005', amount: '-40.00', currency: 'USD' },
-  { id: 'P-1006', amount: '99.20', currency: 'XYZ' },
-  { id: 'P-1007', amount: '-15.00', currency: 'ZZZ' },
-  { id: 'P-1008', amount: '1200.00', currency: 'jpy' },
+<script data-ie="core"></script>
+<script data-ie="recordflow"></script>
+<!-- MODEL: graph(p) with one pure function per component, no DOM. Write it as model.js in $TEMP and test it in Node with
+     require('<skill>/runtime/recordflow.js').run(graph(p), p); build with --from "$TEMP/<name>". -->
+<script data-ie-file="model.js">
+// Demo model (REPLACE): an Ab Initio-flavoured payments graph. payments.dat → Clean → Add rate (lookup fx_rates) →
+// Filter (amount > minAmt, deselect port) → Join with customers.dat on cust_id → To USD → payments_usd.dat, with a
+// shared reject file and an unmatched file. graph(p) is pure: IE.recordflow.run(graph(p), p) runs it (also in Node).
+const RATES = { USD: 1, EUR: 1.08, GBP: 1.25, JPY: 0.0067 };            // lookup file contents (illustrative)
+const PAYMENTS = [                                                        // sample input; '' currency = NULL
+  { id: 'P-1001', amount: '120.00', currency: 'USD', cust: 'C-01' },
+  { id: 'P-1002', amount: '250.00', currency: 'eur', cust: 'C-02' },
+  { id: '  P-1003 ', amount: '75.60', currency: 'GBP', cust: 'C-03' },
+  { id: 'P-1004', amount: '300.00', currency: '', cust: 'C-01' },
+  { id: 'P-1005', amount: '-40.00', currency: 'USD', cust: 'C-02' },
+  { id: 'P-1006', amount: '99.20', currency: 'XYZ', cust: 'C-03' },
+  { id: 'P-1007', amount: '-15.00', currency: 'ZZZ', cust: 'C-01' },
+  { id: 'P-1008', amount: '1200.00', currency: 'jpy', cust: 'C-09' },
+];
+const CUSTOMERS = [
+  { cust: 'C-01', name: 'Acme Pte', country: 'SG' }, { cust: 'C-02', name: 'Borealis Ltd', country: 'GB' },
+  { cust: 'C-03', name: 'Cobalt GmbH', country: 'DE' }, { cust: 'C-04', name: 'Delta SA', country: 'FR' },
 ];
 const CLEAN_FIX = { 'P-1004': 'USD', 'P-1006': 'GBP', 'P-1007': 'USD' }; // the "clean feed" what-if
 const REAL = { defaultRule: false, filterFirst: false, noRejectPort: false, cleanFeed: false, minAmt: 0 };
-const NAME = { IN: 'Input', RF1: 'Clean', LK: 'Add rate', FBE: 'Filter', RF2: 'To USD', OUT: 'Output', LKF: 'fx_rates', DSEL: 'Deselected', REJ: 'Rejects' };
-const KIND = { IN: 'INPUT FILE', RF1: 'REFORMAT', LK: 'REFORMAT', FBE: 'FILTER BY EXPR', RF2: 'REFORMAT', OUT: 'OUTPUT FILE', LKF: 'LOOKUP FILE', DSEL: 'OUTPUT FILE', REJ: 'OUTPUT FILE' };
-const FILE = { IN: 'payments.dat', OUT: 'payments_usd.dat', DSEL: 'deselected.dat', REJ: 'rejects.dat', LKF: 'fx_rates.dat' };
-const SIDE = ['LKF', 'DSEL', 'REJ'], REJECTERS = ['RF1', 'LK', 'RF2'];   // side nodes; components whose reject port is drawn
 const DP = { amount: 2, rate: 4, amount_usd: 2 };                       // decimal places shown per decimal field
 const F = (v, t) => ({ v, t });                                          // a field: value (null = NULL) and its DML type
-const trim = s => s.replace(/^\s+|\s+$/g, ''), q = s => `"${s}"`;
-const chainOrder = p => p.filterFirst ? ['IN', 'RF1', 'FBE', 'LK', 'RF2', 'OUT'] : ['IN', 'RF1', 'LK', 'FBE', 'RF2', 'OUT'];
-const inputRows = p => INPUT.map(r => p.cleanFeed && CLEAN_FIX[trim(r.id)] ? { ...r, currency: CLEAN_FIX[trim(r.id)] } : r);
-// SRC(node, p): the text shown in the source panel; tag = what rule results point at. REPLACE with the real transforms.
+const trim = s => s.replace(/^\s+|\s+$/g, ''), qt = s => `"${s}"`;
+const refParams = p => ({ ...p, defaultRule: true, noRejectPort: false, minAmt: REAL.minAmt });   // the fixed graph, same input
+const REF_LABEL = 'Fixed graph';
+
+// One entry per component: name, kind, file, and the pure function that runs one record (see runtime/recordflow.js).
+const NODES = [
+  { id: 'IN', name: 'Payments', kind: 'INPUT FILE', file: 'payments.dat', role: 'source',
+    read: p => PAYMENTS.map(r => p.cleanFeed && CLEAN_FIX[trim(r.id)] ? { ...r, currency: CLEAN_FIX[trim(r.id)] } : r), key: r => trim(r.id),
+    fn(raw){ const cur = raw.currency === '' ? null : raw.currency;
+      return { after: { id: F(raw.id, 'string'), amount: F(raw.amount, 'string'), currency: F(cur, 'string, nullable'), cust_id: F(raw.cust, 'string') },
+        note: 'Reads one line of payments.dat and splits it into fields.',
+        rules: [{ tag: 'id', res: qt(raw.id), st: 'ok' }, { tag: 'amount', res: qt(raw.amount), st: 'ok' },
+          cur == null ? { tag: 'currency', res: 'empty, so NULL (the field declares NULL(""))', st: 'null' } : { tag: 'currency', res: qt(cur), st: 'ok' }, { tag: 'cust', res: qt(raw.cust), st: 'ok' }] }; } },
+  { id: 'CUST', name: 'Customers', kind: 'INPUT FILE', file: 'customers.dat', role: 'source', read: () => CUSTOMERS, key: r => r.cust,
+    fn: raw => ({ after: { cust_id: F(raw.cust, 'string'), name: F(raw.name, 'string'), country: F(raw.country, 'string') }, note: 'Reads one customer.',
+      rules: [{ tag: 'cust_id', res: qt(raw.cust), st: 'ok' }, { tag: 'name', res: qt(raw.name), st: 'ok' }, { tag: 'country', res: qt(raw.country), st: 'ok' }] }) },
+  { id: 'RF1', name: 'Clean', kind: 'REFORMAT',
+    fn(i){ const id = trim(i.id.v), amt = Number(i.amount.v), cur = i.currency.v;
+      return { after: { id: F(id, 'string'), amount: F(amt, 'decimal'), currency: F(cur == null ? null : cur.toUpperCase(), i.currency.t), cust_id: i.cust_id },
+        note: 'Trims the id, converts the amount from text to a decimal, upper-cases the currency.',
+        rules: [{ tag: 'id', res: qt(id), st: 'ok' }, { tag: 'amount', res: `${amt.toFixed(2)} (string → decimal)`, st: 'ok' },
+          cur == null ? { tag: 'currency', res: 'NULL: string_upcase passes NULL through; out.currency is nullable, so it stays NULL', st: 'null' } : { tag: 'currency', res: qt(cur.toUpperCase()), st: 'ok' },
+          { tag: 'cust', res: qt(i.cust_id.v), st: 'ok' }] }; } },
+  { id: 'LK', name: 'Add rate', kind: 'REFORMAT',
+    fn(i, p){
+      const o = { id: i.id, amount: i.amount }, rules = [], cur = i.currency.v, look = k => k != null && RATES[k] != null ? RATES[k] : null, keys = [];
+      if (!p.defaultRule) o.currency = i.currency;
+      o.cust_id = i.cust_id;
+      rules.push({ tag: 'star', res: 'copied ' + Object.keys(o).join(', '), st: 'ok' });
+      if (p.defaultRule){
+        if (cur != null){ o.currency = i.currency; rules.push({ tag: 'cur1', res: qt(cur), st: 'ok' }, { tag: 'cur2', res: 'not evaluated: priority 1 gave a value', st: 'skip' }); }
+        else { o.currency = F('USD', i.currency.t); rules.push({ tag: 'cur1', res: 'NULL, so priority 2 is tried', st: 'null' }, { tag: 'cur2', res: '"USD"', st: 'ok' }); }
+      }
+      let rate = look(cur), prio = 1; keys.push({ key: cur, value: rate == null ? null : rate.toFixed(4) });
+      const miss = k => k == null ? 'NULL: the key is NULL, so no row matches' : `NULL: "${k}" is not in fx_rates`;
+      rules.push(rate != null ? { tag: 'rate1', res: rate.toFixed(4), st: 'ok' } : { tag: 'rate1', res: miss(cur) + (p.defaultRule ? ', so priority 2 is tried' : '; no other rule for out.rate'), st: p.defaultRule ? 'null' : 'fail' });
+      if (p.defaultRule){
+        if (rate != null) rules.push({ tag: 'rate2', res: 'not evaluated: priority 1 gave a value', st: 'skip' });
+        else { const k2 = cur == null ? 'USD' : cur; rate = look(k2); prio = 2; keys.push({ key: k2, value: rate == null ? null : rate.toFixed(4) });
+          rules.push(rate != null ? { tag: 'rate2', res: `${rate.toFixed(4)} (key "${k2}")`, st: 'ok' } : { tag: 'rate2', res: miss(k2) + ' either; no rule left', st: 'fail' }); }
+      }
+      if (rate == null) return { after: null, port: 'reject', rules, keys, err: `NULL value in priority ${prio} assignment for out.rate`,
+        note: 'Looks up the rate. out.rate is not nullable, so a NULL there fails the transform and the record goes to the reject port.' };
+      o.rate = F(rate, 'decimal'); return { after: o, rules, keys, note: 'Copies the record and adds the FX rate from the lookup file.' };
+    } },
+  { id: 'FBE', name: 'Filter', kind: 'FILTER BY EXPR',
+    fn(i, p){ const keep = i.amount.v > p.minAmt;
+      return { after: { ...i }, port: keep ? 'out' : 'deselect', note: 'Does not change the record; it only chooses the port.',
+        rules: [{ tag: 'expr', res: `${i.amount.v.toFixed(2)} > ${p.minAmt} is ${keep}, so the ${keep ? 'out' : 'deselect'} port`, st: keep ? 'ok' : 'null' }] }; } },
+  { id: 'JN', name: 'Join', kind: 'JOIN', inputs: 2, discard: ['unused1'],
+    join([pays, custs]){
+      const out = [], hit = new Set();
+      pays.forEach((r, i) => { const k = r.cust_id.v, j = custs.findIndex(c => c.cust_id.v === k);
+        if (j < 0) out.push({ use: [i, null], port: 'unused0', after: r, note: `No customer ${qt(k)} in customers.dat, so the inner join sends the payment to unused0.`,
+          rules: [{ tag: 'key', res: `no in1 record with cust_id ${qt(k)}`, st: 'null' }] });
+        else { hit.add(j); const c = custs[j];
+          out.push({ use: [i, j], after: { ...r, customer: c.name, country: c.country }, note: 'Matches on cust_id and adds the customer name and country.',
+            rules: [{ tag: 'key', res: `cust_id ${qt(k)} matches`, st: 'ok' }, { tag: 'star', res: 'copied ' + Object.keys(r).join(', '), st: 'ok' },
+              { tag: 'name', res: qt(c.name.v), st: 'ok' }, { tag: 'country', res: qt(c.country.v), st: 'ok' }] }); } });
+      custs.forEach((c, j) => { if (!hit.has(j)) out.push({ use: [null, j], port: 'unused1', after: c,
+        note: 'No payment for this customer. It leaves on unused1, which is not connected, so it is discarded: normal for an inner join.',
+        rules: [{ tag: 'key', res: `no in0 record with cust_id ${qt(c.cust_id.v)}`, st: 'null' }] }); });
+      return out;
+    } },
+  { id: 'RF2', name: 'To USD', kind: 'REFORMAT',
+    fn(i){ const usd = Math.round(i.amount.v * i.rate.v * 100) / 100;      // rounded to cents (illustrative)
+      return { after: { id: i.id, amount: i.amount, currency: i.currency, cust_id: i.cust_id, customer: i.customer, country: i.country, amount_usd: F(usd, 'decimal') },
+        note: 'Adds amount_usd; rate is not in the output format, so it is dropped.',
+        rules: [{ tag: 'star', res: 'copied every field except rate', st: 'ok' }, { tag: 'usd', res: `${i.amount.v.toFixed(2)} × ${i.rate.v.toFixed(4)} = ${usd.toFixed(2)}`, st: 'ok' }] }; } },
+  { id: 'OUT', name: 'Output', kind: 'OUTPUT FILE', file: 'payments_usd.dat', role: 'sink',
+    fn: i => ({ note: 'Writes the record: ' + [i.id.v, i.amount.v.toFixed(2), i.currency.v == null ? '' : i.currency.v, i.customer.v, i.amount_usd.v.toFixed(2)].join('|') }) },
+  { id: 'LKF', name: 'fx_rates', kind: 'LOOKUP FILE', file: 'fx_rates.dat', role: 'lookup', keyName: 'currency', rows: () => Object.entries(RATES).map(([k, r]) => [k, r.toFixed(4)]) },
+  { id: 'DSEL', name: 'Deselected', kind: 'OUTPUT FILE', file: 'deselected.dat', role: 'sink', fn: () => ({ note: 'The deselected record is written unchanged.' }) },
+  { id: 'UNM', name: 'Unmatched', kind: 'OUTPUT FILE', file: 'unmatched.dat', role: 'sink', fn: () => ({ note: 'A payment with no customer, written unchanged.' }) },
+  { id: 'REJ', name: 'Rejects', kind: 'OUTPUT FILE', file: 'rejects.dat', role: 'sink', fn: (i, p, it) => ({ note: 'The reject port carries the record as it entered the component that failed.' }) },
+];
+function graph(p){
+  const chain = p.filterFirst ? ['RF1', 'FBE', 'LK'] : ['RF1', 'LK', 'FBE'];
+  return { nodes: NODES, edges: [
+    { from: 'IN', to: chain[0] }, { from: chain[0], to: chain[1] }, { from: chain[1], to: chain[2] }, { from: chain[2], to: 'JN' },
+    { from: 'CUST', to: 'JN', toPort: 1 }, { from: 'JN', to: 'RF2' }, { from: 'RF2', to: 'OUT' },
+    { from: 'LKF', to: 'LK', kind: 'lookup' }, { from: 'FBE', port: 'deselect', to: 'DSEL' }, { from: 'JN', port: 'unused0', to: 'UNM' },
+    ...['RF1', 'LK', 'RF2'].map(c => ({ from: c, port: 'reject', to: 'REJ', cut: p.noRejectPort })),
+  ] };
+}
+// SRC(node, p): the text of each component for the source panel; a rule's tag points at its line. REPLACE with the real transforms.
 function SRC(id, p){
   const L = (t, tag) => ({ t, tag });
-  if (id === 'IN') return [L('// INPUT FILE payments.dat: record format'), L('record'), L('  string("|")  id;', 'id'), L('  string("|")  amount;', 'amount'), L('  string("\\n") currency = NULL("");', 'currency'), L('end;')];
-  if (id === 'RF1') return [L('out :: reformat(in) ='), L('begin'), L('  out.id       :: string_lrtrim(in.id);', 'id'),
-    L('  out.amount   :: in.amount;   // out.amount is decimal', 'amount'), L('  out.currency :: string_upcase(in.currency);', 'currency'), L('end;')];
-  if (id === 'LK') return p.defaultRule
-    ? [L('out :: reformat(in) ='), L('begin'), L('  out.*        :: in.*;', 'star'), L('  out.currency :1: in.currency;', 'cur1'), L('  out.currency :2: "USD";', 'cur2'),
-       L('  out.rate     :1: lookup("fx_rates", in.currency).rate;', 'rate1'), L('  out.rate     :2: lookup("fx_rates", first_defined(in.currency, "USD")).rate;', 'rate2'), L('end;')]
-    : [L('out :: reformat(in) ='), L('begin'), L('  out.*    :: in.*;', 'star'), L('  out.rate :1: lookup("fx_rates", in.currency).rate;', 'rate1'), L('end;')];
-  if (id === 'FBE') return [L('// FILTER BY EXPRESSION, parameter select_expr:'), L(`amount > ${p.minAmt}`, 'expr'), L('// true: out port; false: deselect port')];
-  if (id === 'RF2') return [L('out :: reformat(in) ='), L('begin'), L('  out.*          :: in.*;   // output has no rate field', 'star'), L('  out.amount_usd :: in.amount * in.rate;', 'usd'), L('end;')];
-  if (id === 'OUT') return [L('// OUTPUT FILE payments_usd.dat, fields in order:'), L('//   id | amount | currency | amount_usd')];
-  if (id === 'DSEL') return [L('// OUTPUT FILE deselected.dat, fed by the'), L('// FILTER BY EXPRESSION deselect port (record unchanged)')];
-  if (id === 'REJ') return [L('// OUTPUT FILE rejects.dat, fed by the reject ports.'), L('// Each component also writes the message to its error port.')];
-  return [L('// LOOKUP FILE fx_rates, key: currency'), ...Object.entries(RATES).map(([k, r]) => L(`${k.padEnd(5)}${r.toFixed(4)}`, 'k:' + k))];
+  switch (id){
+    case 'IN': return [L('// INPUT FILE payments.dat: record format'), L('record'), L('  string("|")  id;', 'id'), L('  string("|")  amount;', 'amount'), L('  string("|")  currency = NULL("");', 'currency'), L('  string("\\n") cust_id;', 'cust'), L('end;')];
+    case 'CUST': return [L('// INPUT FILE customers.dat'), L('record'), L('  string("|")  cust_id;', 'cust_id'), L('  string("|")  name;', 'name'), L('  string("\\n") country;', 'country'), L('end;')];
+    case 'RF1': return [L('out :: reformat(in) ='), L('begin'), L('  out.id       :: string_lrtrim(in.id);', 'id'), L('  out.amount   :: in.amount;   // out.amount is decimal', 'amount'),
+      L('  out.currency :: string_upcase(in.currency);', 'currency'), L('  out.cust_id  :: in.cust_id;', 'cust'), L('end;')];
+    case 'LK': return p.defaultRule
+      ? [L('out :: reformat(in) ='), L('begin'), L('  out.*        :: in.*;', 'star'), L('  out.currency :1: in.currency;', 'cur1'), L('  out.currency :2: "USD";', 'cur2'),
+         L('  out.rate     :1: lookup("fx_rates", in.currency).rate;', 'rate1'), L('  out.rate     :2: lookup("fx_rates", first_defined(in.currency, "USD")).rate;', 'rate2'), L('end;')]
+      : [L('out :: reformat(in) ='), L('begin'), L('  out.*    :: in.*;', 'star'), L('  out.rate :1: lookup("fx_rates", in.currency).rate;', 'rate1'), L('end;')];
+    case 'FBE': return [L('// FILTER BY EXPRESSION, parameter select_expr:'), L(`amount > ${p.minAmt}`, 'expr'), L('// true: out port; false: deselect port')];
+    case 'JN': return [L('// JOIN, key {cust_id}, inner join; in0 = payments, in1 = customers', 'key'), L('out :: join(in0, in1) ='), L('begin'), L('  out.*        :: in0.*;', 'star'),
+      L('  out.customer :: in1.name;', 'name'), L('  out.country  :: in1.country;', 'country'), L('end;'), L('// unused0 → unmatched.dat; unused1 not connected')];
+    case 'RF2': return [L('out :: reformat(in) ='), L('begin'), L('  out.*          :: in.*;   // output has no rate field', 'star'), L('  out.amount_usd :: in.amount * in.rate;', 'usd'), L('end;')];
+    case 'OUT': return [L('// OUTPUT FILE payments_usd.dat, fields in order:'), L('//   id | amount | currency | cust_id | customer | country | amount_usd')];
+    case 'DSEL': return [L('// OUTPUT FILE deselected.dat, fed by the'), L('// FILTER BY EXPRESSION deselect port (record unchanged)')];
+    case 'UNM': return [L('// OUTPUT FILE unmatched.dat, fed by the JOIN unused0 port')];
+    case 'REJ': return [L('// OUTPUT FILE rejects.dat, fed by the reject ports.'), L('// Each component also writes the message to its error port.')];
+    default: return [L('// LOOKUP FILE fx_rates, key: currency'), ...Object.entries(RATES).map(([k, r]) => L(`${k.padEnd(5)}${r.toFixed(4)}`, 'k:' + k))];
+  }
 }
-// One function per component: (record in, params) → { after, port: 'out'|'reject'|'deselect', rules: [{tag, res, st}], err, note }.
-// st: 'ok' assigned, 'null' returned NULL (next rule tried), 'fail' NULL with no rule left, 'skip' not evaluated.
-const COMP = {
-  IN(raw){ const cur = raw.currency === '' ? null : raw.currency;
-    return { after: { id: F(raw.id, 'string'), amount: F(raw.amount, 'string'), currency: F(cur, 'string, nullable') }, port: 'out', note: 'Reads one line of payments.dat and splits it into fields.',
-      rules: [{ tag: 'id', res: q(raw.id), st: 'ok' }, { tag: 'amount', res: q(raw.amount), st: 'ok' },
-        cur == null ? { tag: 'currency', res: 'empty, so NULL (the field declares NULL(""))', st: 'null' } : { tag: 'currency', res: q(cur), st: 'ok' }] }; },
-  RF1(i){ const id = trim(i.id.v), amt = Number(i.amount.v), cur = i.currency.v;
-    return { after: { id: F(id, 'string'), amount: F(amt, 'decimal'), currency: F(cur == null ? null : cur.toUpperCase(), i.currency.t) }, port: 'out',
-      note: 'Trims the id, converts the amount from text to a decimal, upper-cases the currency.',
-      rules: [{ tag: 'id', res: q(id), st: 'ok' }, { tag: 'amount', res: `${amt.toFixed(2)} (string → decimal)`, st: 'ok' },
-        cur == null ? { tag: 'currency', res: 'NULL: string_upcase passes NULL through; out.currency is nullable, so it stays NULL', st: 'null' } : { tag: 'currency', res: q(cur.toUpperCase()), st: 'ok' }] }; },
-  LK(i, p){
-    const o = { id: i.id, amount: i.amount }, rules = [], cur = i.currency.v, look = k => k != null && RATES[k] != null ? RATES[k] : null, keys = [];
-    if (!p.defaultRule) o.currency = i.currency;
-    rules.push({ tag: 'star', res: 'copied ' + Object.keys(o).join(', '), st: 'ok' });
-    if (p.defaultRule){
-      if (cur != null){ o.currency = i.currency; rules.push({ tag: 'cur1', res: q(cur), st: 'ok' }, { tag: 'cur2', res: 'not evaluated: priority 1 gave a value', st: 'skip' }); }
-      else { o.currency = F('USD', i.currency.t); rules.push({ tag: 'cur1', res: 'NULL, so priority 2 is tried', st: 'null' }, { tag: 'cur2', res: '"USD"', st: 'ok' }); }
-    }
-    let rate = look(cur), prio = 1; keys.push({ key: cur, rate });
-    const miss = k => k == null ? 'NULL: the key is NULL, so no row matches' : `NULL: "${k}" is not in fx_rates`;
-    rules.push(rate != null ? { tag: 'rate1', res: rate.toFixed(4), st: 'ok' } : { tag: 'rate1', res: miss(cur) + (p.defaultRule ? ', so priority 2 is tried' : '; no other rule for out.rate'), st: p.defaultRule ? 'null' : 'fail' });
-    if (p.defaultRule){
-      if (rate != null) rules.push({ tag: 'rate2', res: 'not evaluated: priority 1 gave a value', st: 'skip' });
-      else { const k2 = cur == null ? 'USD' : cur; rate = look(k2); prio = 2; keys.push({ key: k2, rate });
-        rules.push(rate != null ? { tag: 'rate2', res: `${rate.toFixed(4)} (key "${k2}")`, st: 'ok' } : { tag: 'rate2', res: miss(k2) + ' either; no rule left', st: 'fail' }); }
-    }
-    if (rate == null) return { after: null, port: 'reject', rules, keys, err: `NULL value in priority ${prio} assignment for out.rate`,
-      note: 'Looks up the rate. out.rate is not nullable, so a NULL there fails the transform and the record goes to the reject port.' };
-    o.rate = F(rate, 'decimal'); return { after: o, port: 'out', rules, keys, note: 'Copies the record and adds the FX rate from the lookup file.' };
-  },
-  FBE(i, p){ const keep = i.amount.v > p.minAmt;
-    return { after: { ...i }, port: keep ? 'out' : 'deselect', note: 'Does not change the record; it only chooses the port.',
-      rules: [{ tag: 'expr', res: `${i.amount.v.toFixed(2)} > ${p.minAmt} is ${keep}, so the ${keep ? 'out' : 'deselect'} port`, st: keep ? 'ok' : 'null' }] }; },
-  RF2(i){ const usd = Math.round(i.amount.v * i.rate.v * 100) / 100;    // rounded to cents (illustrative)
-    return { after: { id: i.id, amount: i.amount, currency: i.currency, amount_usd: F(usd, 'decimal') }, port: 'out', note: 'Adds amount_usd; rate is not in the output format, so it is dropped.',
-      rules: [{ tag: 'star', res: 'copied id, amount, currency; rate dropped', st: 'ok' }, { tag: 'usd', res: `${i.amount.v.toFixed(2)} × ${i.rate.v.toFixed(4)} = ${usd.toFixed(2)}`, st: 'ok' }] }; },
-  OUT(i){ return { after: { ...i }, port: 'out', rules: [], note: 'Writes the record: ' + [i.id.v, i.amount.v.toFixed(2), i.currency.v == null ? '' : i.currency.v, i.amount_usd.v.toFixed(2)].join('|') }; },
-};
-function simulate(p){
-  const order = chainOrder(p), counts = {}, flows = {};
-  [...order, ...SIDE].forEach(id => counts[id] = { in: 0, out: 0, rej: 0, desel: 0, lost: 0 });
-  const fl = (from, to, kind) => flows[from + '>' + to] = { from, to, kind, n: 0 };
-  order.slice(1).forEach((id, i) => fl(order[i], id, 'main')); fl('LKF', 'LK', 'lookup'); fl('FBE', 'DSEL', 'desel'); REJECTERS.forEach(c => fl(c, 'REJ', 'rej'));
-  const recs = inputRows(p).map(raw => {
-    const hops = []; let rec = raw, end = null, endAt = null;
-    for (let j = 0; j < order.length && !end; j++){
-      const c = order[j], before = j ? rec : null, r = COMP[c](rec, p); counts[c].in++;
-      hops.push({ node: c, before, ...r });
-      if (r.port === 'out'){ counts[c].out++; if (j < order.length - 1) flows[c + '>' + order[j + 1]].n++; else end = 'OUT'; rec = r.after; }
-      else if (r.port === 'deselect'){ counts[c].desel++; flows[c + '>DSEL'].n++; counts.DSEL.in++; end = 'DSEL'; endAt = c;
-        hops.push({ node: 'DSEL', before: r.after, after: r.after, port: 'written', rules: [], from: c, note: 'The deselected record is written unchanged.' }); }
-      else if (p.noRejectPort){ counts[c].lost++; end = 'LOST'; endAt = c; }
-      else { counts[c].rej++; flows[c + '>REJ'].n++; counts.REJ.in++; end = 'REJ'; endAt = c;
-        hops.push({ node: 'REJ', before, after: before, port: 'written', rules: [], err: r.err, from: c, note: 'The reject port carries the record as it entered ' + NAME[c] + '.' }); }
-    }
-    return { id: trim(raw.id), raw, line: [raw.id, raw.amount, raw.currency].join('|'), hops, end, endAt };
-  });
-  return { order, counts, flows, recs };
-}
-// The run to compare against: the fixed graph on the same input and layout (for code: the fixed version under the same conditions).
-const REF_LABEL = 'Fixed graph';
-function referenceRun(p){ return simulate({ ...p, defaultRule: true, noRejectPort: false, minAmt: REAL.minAmt }); }
-// ============================ INVARIANTS (pure) — REPLACE ============================
-// comp(counts) is checked at every component; hop(hop) at every hop of every record. true / false / null (does not apply).
+// Checks at every hop (the page adds IE.recordflow.BALANCE for "in = out + rejected + deselected" per component).
 const INVARIANTS = [
-  { id: 'balance', label: 'No record silently dropped: in = out + deselected + rejected', comp: c => c.in === c.out + c.desel + c.rej },
   { id: 'positive', label: 'No negative amount reaches the output file', hop: h => h.node === 'OUT' ? h.after.amount.v > 0 : null },
 ];
-function analyse(run){
-  const fb = {};
-  for (const inv of INVARIANTS){ fb[inv.id] = null;
-    if (inv.comp){ const c = run.order.find(id => inv.comp(run.counts[id]) === false); if (c) fb[inv.id] = { node: c, r: null }; }
-    else for (let r = 0; r < run.recs.length && !fb[inv.id]; r++){ const h = run.recs[r].hops.find(h => inv.hop(h) === false); if (h) fb[inv.id] = { node: h.node, r }; }
-  }
-  return { firstBreak: fb };
-}
-// Per record: the first hop whose node, port or fields differ from the reference (-1 = identical).
-function diffRuns(ref, run){
-  const sig = h => h ? h.node + '|' + h.port + '|' + JSON.stringify(h.after) : '';
-  return run.recs.map((r, i) => { const a = ref.recs[i].hops, b = r.hops, n = Math.max(a.length, b.length);
-    for (let j = 0; j < n; j++) if (sig(a[j]) !== sig(b[j])) return { j, node: (b[j] || a[j]).node };
-    return { j: -1, node: null }; });
-}
-const endText = r => ({ OUT: 'was written to the output', DSEL: 'was deselected at ' + NAME[r.endAt], REJ: 'was rejected at ' + NAME[r.endAt],
-  LOST: 'was lost at ' + NAME[r.endAt] + ' (reject port not connected)' })[r.end];
-const endShort = r => r.end === 'OUT' ? 'output · ' + r.hops[r.hops.length - 1].after.amount_usd.v.toFixed(2) + ' USD' : endText(r).replace('was ', '');
+if (typeof module === 'object' && module.exports) module.exports = { RATES, PAYMENTS, CUSTOMERS, REAL, DP, refParams, REF_LABEL, NODES, graph, SRC, INVARIANTS, trim };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const RF = IE.recordflow, $ = IE.$;
+IE.sources({   // every claim the page makes about the product gets an entry; cite with cite('id')
+  dml: { title: 'DAIS DML notes: transform rules and NULLs (REPLACE with your source)', where: 'dml/transform-rules.md, dml/nulls.md' },
+  graph: { title: 'The graph being explained (REPLACE)', where: 'payments_usd.mp, fx_rates.dat' },
+});
+const INVS = [RF.BALANCE, ...INVARIANTS];
+let RUN = null, REF = null, AN = null, DIFF = {}, OTHER = null, shown = '';
+const cur = () => RF.parse(app.sel);
+const srcText = (node, tag) => { const l = SRC(node, app.P).find(x => x.tag === tag); return l ? l.t.trim() : tag; };
+const flow = RF($('flow'), { title: 'Payments graph (REPLACE)', onPick: id => { nav.stop(); app.setSel(RF.sel(cur().key, id)); } });
+const nav = RF.nav($('hopnav'), {
+  step: dir => { const s = RF.stepBy(RUN, app.sel, dir); if (s === app.sel) return false; app.setSel(s); return true; },
+  go: k => { const { key } = cur(), path = RF.path(RUN, key); app.setSel(RF.sel(key, path[Math.max(0, Math.min(path.length - 1, k))])); },
+  atEnd: () => { const { key, node } = cur(), path = RF.path(RUN, key); return path.indexOf(node) === path.length - 1; } });
 
-// ============================ STATE ============================
-const $ = id => document.getElementById(id);
-const SPEC = [   // REPLACE: thresholds worth exploring
-  { id: 'minAmt', label: 'Filter keeps records with amount >', min: -50, max: 200, step: 10, fmt: v => String(v) },
-];
-const BOOLS = ['defaultRule', 'filterFirst', 'noRejectPort', 'cleanFeed'];   // REPLACE: rule / layout / data checkboxes
-const WHAT = { asWritten: {}, fixed: { defaultRule: true }, filterFirst: { filterFirst: true }, noReject: { noRejectPort: true }, clean: { cleanFeed: true } };
-const WHAT_KEYS = [...new Set(Object.values(WHAT).flatMap(Object.keys))];
-const SHOW_SOURCE = true;   // REPLACE: false hides the source panel
-const P = { ...REAL };
-let RUN = null, REF = null, AN = null, DIFF = [], OTHER = null, R = 0, H = 'IN', STEP = 0, playing = false, dirty = true, lastPlay = null, G = null;
-function recompute(){
-  RUN = simulate(P); REF = referenceRun(P); AN = analyse(RUN); DIFF = diffRuns(REF, RUN); OTHER = simulate({ ...P, filterFirst: !P.filterFirst });
-  R = Math.max(0, Math.min(RUN.recs.length - 1, R)); dirty = true;
-}
-const pathOf = () => RUN.recs[R].hops.map(h => h.node);
-const hopAt = node => RUN.recs[R].hops.find(h => h.node === node);
-
-// ============================ STEPS (guided tour) — REPLACE ============================
-// Each step: title, full params on entry, r = record index, h = node id on entry, html with D('key') live numbers.
-const D = k => `<span class="dyn" data-dyn="${k}"></span>`;
-const STEPS = [
-  { title: '1 · Follow one clean record', params: { ...REAL }, r: 0, h: 'IN',
-    html: () => `<p>Payment ${D('cur')} enters at the left. Press <b>▶ Play</b> or use ← → to walk it through ${D('nHops')} components and watch the gold dot. It is written out with amount_usd ${D('usd')}.</p>
-      <p>The number on each flow counts how many of the ${D('nIn')} input records crossed it.</p>` },
-  { title: '2 · A field changes shape', params: { ...REAL }, r: 2, h: 'RF1',
-    html: () => `<p><code class="pre">${D('idRaw')}</code> arrives with spaces around its id and its amount as text. <b>Clean</b> trims the id and turns the amount from a string into a decimal (gold = changed).</p>
-      <p><button data-set="h=LK">Next hop: rate is added</button> <button data-set="h=RF2">rate is dropped</button></p>` },
-  { title: '3 · A NULL becomes a reject', params: { ...REAL }, r: 3, h: 'LK',
-    html: () => `<p>${D('cur')} has an empty currency, which the input format reads as NULL. <b>Clean</b> keeps the NULL: string_upcase of NULL is NULL, and out.currency is nullable.</p>
-      <p>At <b>Add rate</b> the lookup finds nothing, the only rule for out.rate gives NULL, and out.rate is not nullable. The record goes to the reject port with <code>${D('err')}</code>. It differs from the fixed graph at ${D('divCur')}.</p>` },
-  { title: '4 · Every record is accounted for', params: { ...REAL }, r: 5, h: 'LK',
-    html: () => `<p>At Add rate: in ${D('in_LK')} = out ${D('out_LK')} + rejected ${D('rej_LK')}. Across the graph: input ${D('nIn')} = output ${D('nOut')} + deselected ${D('nDesel')} + rejects file ${D('nRej')}, with ${D('nLost')} lost.</p>
-      <p><button data-set="noRejectPort=1">Disconnect the reject ports</button> <button data-set="noRejectPort=0">Reconnect</button></p>` },
-  { title: '5 · Order matters: filter first', params: { ...REAL, filterFirst: true }, r: 6, h: 'FBE',
-    html: () => `<p>Filter now runs before the lookup. ${D('cur')} is negative <i>and</i> has an unknown currency: it ${D('endCur')} instead of being rejected, and Add rate does ${D('lookups')} lookups, not ${D('lookupsOther')}.</p>
-      <p><button data-set="filterFirst=0">Lookup first again</button> <button data-set="minAmt=-50">Loosen the filter to amount &gt; -50</button></p>` },
-  { title: '6 · The fix: priority-2 defaults', params: { ...REAL, defaultRule: true }, r: 3, h: 'LK',
-    html: () => `<p>Priority 1 returns NULL for ${D('cur')}, so DML tries priority 2: <code>first_defined(in.currency, "USD")</code> finds rate ${D('rateCur')}. The fallback is a concrete rule because <code>out.* :: in.*</code> never fills a field that has its own rule.</p>
-      <p>Records that differ from the fixed graph: ${D('ndiff')}. P-1006 is still rejected: an unknown code should not be guessed. Number the lookup rule <code>:1:</code>, since an unprioritized rule runs after every numbered one. <button data-set="defaultRule=0">Back to as written</button></p>` },
-];
-
-// ============================ PIPELINE SVG: build per size/structure, update attributes per frame ============================
-const NS = 'http://www.w3.org/2000/svg';
-const S = (tag, attrs, parent) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.appendChild(el); return el; };
-const bez = (c, t) => { const u = 1 - t; return [0, 1].map(k => u * u * u * c[0][k] + 3 * u * u * t * c[1][k] + 3 * u * t * t * c[2][k] + t * t * t * c[3][k]); };
-const line4 = (a, b) => [a, [a[0] + (b[0] - a[0]) / 3, a[1] + (b[1] - a[1]) / 3], [a[0] + 2 * (b[0] - a[0]) / 3, a[1] + 2 * (b[1] - a[1]) / 3], b];
-function buildFlow(){
-  const svg = $('flow'), W = Math.max(280, svg.clientWidth || svg.parentNode.clientWidth), pad = 14, order = RUN.order, n = order.length, NH = 48, pos = {};
-  let NW = Math.min(150, (W - 2 * pad) / n - 40), NWs = NW, vert = NW < 90, H;
-  if (!vert){   // left to right: lookup file and deselect file above, rejects below
-    const colW = (W - 2 * pad) / n, yTop = pad + NH / 2, yMid = yTop + NH + 44, yBot = yMid + NH + 66; H = yBot + NH / 2 + pad;
-    order.forEach((id, i) => pos[id] = { x: pad + colW * (i + 0.5), y: yMid });
-    pos.LKF = { x: pos.LK.x, y: yTop }; pos.DSEL = { x: pos.FBE.x, y: yTop }; pos.REJ = { x: (pos.LK.x + pos.FBE.x) / 2, y: yBot };
-  } else {      // top to bottom (phone): the chain in the middle, lookup/deselect files right, rejects bottom left
-    const cw = (W - 2 * pad) / 3, rowH = NH + 40; NW = Math.min(150, cw - 6); NWs = Math.min(130, cw - 30);
-    order.forEach((id, i) => pos[id] = { x: pad + cw * 1.35, y: pad + NH / 2 + rowH * i });
-    pos.LKF = { x: pad + cw * 2.55, y: pos.LK.y }; pos.DSEL = { x: pad + cw * 2.55, y: pos.FBE.y }; pos.REJ = { x: pad + cw * 0.42, y: pos.OUT.y };
-    H = pos.OUT.y + NH / 2 + pad;
-  }
-  const wOf = id => SIDE.includes(id) ? NWs : NW;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.replaceChildren();
-  const defs = S('defs', {}, svg);
-  for (const [id, c] of [['main', '#6fe3cf'], ['rej', '#ff7aa8'], ['desel', '#9aa6bd'], ['lookup', '#5aa9ff'], ['cur', '#ffd84d']]){
-    const m = S('marker', { id: 'm-' + id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, markerUnits: 'userSpaceOnUse', orient: 'auto' }, defs); S('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }, m); }
-  const gF = S('g', {}, svg), gN = S('g', {}, svg), gB = S('g', {}, svg), flows = {}, nodes = {};
-  const rejSrc = REJECTERS.slice().sort((a, b) => vert ? pos[a].y - pos[b].y : pos[a].x - pos[b].x);
-  for (const key in RUN.flows){
-    const f = RUN.flows[key], a = pos[f.from], b = pos[f.to], wa = wOf(f.from) / 2, wb = wOf(f.to) / 2; let c, t = 0.5;
-    if (f.kind === 'main') c = vert ? line4([a.x, a.y + NH / 2], [b.x, b.y - NH / 2]) : line4([a.x + wa, a.y], [b.x - wb, b.y]);
-    else if (f.kind === 'lookup') c = vert ? line4([a.x - wa, a.y], [b.x + wb, b.y]) : line4([a.x, a.y + NH / 2], [b.x, b.y - NH / 2]);
-    else if (f.kind === 'desel') c = vert ? line4([a.x + wa, a.y], [b.x - wb, b.y]) : line4([a.x, a.y - NH / 2], [b.x, b.y + NH / 2]);
-    else { const off = (rejSrc.indexOf(f.from) - 1) * 16, tx = b.x + off, ty = b.y - NH / 2;
-      c = vert ? [[a.x - wa, a.y], [tx, a.y], [tx, a.y], [tx, ty]] : [[a.x, a.y + NH / 2], [a.x, a.y + NH / 2 + 30], [tx, ty - 30], [tx, ty]]; t = vert ? 0.18 : 0.3; }
-    const d = `M${c[0][0]},${c[0][1]} C${c[1][0]},${c[1][1]} ${c[2][0]},${c[2][1]} ${c[3][0]},${c[3][1]}`;
-    const path = S('path', { d, class: 'fl ' + f.kind }, gF), m = bez(c, t);
-    let bg = null, badge = null;
-    if (f.kind !== 'lookup'){ bg = S('circle', { cx: m[0], cy: m[1], r: 9, class: 'bg' }, gB); badge = S('text', { x: m[0], y: m[1], class: 'badge lbl' }, gB); }
-    flows[key] = { path, bg, badge, c, kind: f.kind };
-  }
-  for (const id of [...order, ...SIDE]){
-    const p = pos[id], w = wOf(id), g = S('g', { class: 'node' + (SIDE.includes(id) ? ' side' : ''), 'data-pick': 'n:' + id }, gN);
-    S('rect', { x: p.x - w / 2, y: p.y - NH / 2, width: w, height: NH, rx: 8 }, g);
-    S('text', { x: p.x, y: p.y - 8, class: 'name lbl' }, g).textContent = NAME[id];
-    const kind = S('text', { x: p.x, y: p.y + 10, class: 'kind lbl' }, g); kind.textContent = KIND[id];
-    S('title', {}, g).textContent = `${NAME[id]} (${KIND[id]}${FILE[id] ? ' ' + FILE[id] : ''})`;
-    nodes[id] = { g, kind, p, w };
-  }
-  const dot = S('circle', { r: 6.5, class: 'recdot' }, svg);
-  G = { W, key: order.join(), vert, NH, pos, flows, nodes, dot };
-  dot.style.transform = dotTarget();
-}
-// Where the selected record's dot sits: at the end of the flow into the selected node (or the input edge of the first node).
-function dotTarget(){
-  const path = pathOf(), at = H === 'LKF' ? 'LK' : path.includes(H) ? H : path[path.length - 1], k = path.indexOf(at);
-  let xy;
-  if (H === 'LKF') xy = bez(G.flows['LKF>LK'].c, 0.55);
-  else if (k > 0 && G.flows[path[k - 1] + '>' + at]) xy = G.flows[path[k - 1] + '>' + at].c[3];   // where the record enters the box (badges sit mid-flow)
-  else { const p = G.nodes[at].p; xy = G.vert ? [p.x, p.y - G.NH / 2] : [p.x - G.nodes[at].w / 2, p.y]; }
-  return `translate(${xy[0].toFixed(1)}px, ${xy[1].toFixed(1)}px)`;
-}
-function updateFlow(){
-  const rec = RUN.recs[R], path = pathOf(), on = new Set(path.slice(1).map((id, i) => path[i] + '>' + id));
-  if (path.includes('LK')) on.add('LKF>LK');
-  for (const key in G.flows){ const h = G.flows[key], f = RUN.flows[key], cut = f.kind === 'rej' && P.noRejectPort, cur = on.has(key);
-    h.path.classList.toggle('zero', !f.n && f.kind !== 'lookup'); h.path.classList.toggle('onpath', cur); h.path.classList.toggle('cut', cut);
-    h.path.classList.toggle('live', (f.n > 0 || f.kind === 'lookup') && !cur && !cut && f.kind !== 'lookup');
-    h.path.setAttribute('marker-end', cut ? '' : `url(#m-${cur ? 'cur' : f.kind})`);
-    if (h.badge){ const lost = cut ? RUN.counts[f.from].lost : 0, txt = cut ? (lost ? '×' : '0') : String(f.n);
-      if (h.badge.textContent !== txt) h.badge.textContent = txt;
-      h.badge.setAttribute('fill', cut && lost ? '#ff7aa8' : cur ? '#ffd84d' : '#e6ebf5'); h.bg.classList.toggle('onpath', cur); } }
-  for (const id in G.nodes){ const h = G.nodes[id], c = RUN.counts[id];
-    h.g.classList.toggle('sel', id === H); h.g.classList.toggle('onpath', path.includes(id) || (id === 'LKF' && path.includes('LK')));
-    h.g.classList.toggle('endbad', (rec.end === 'REJ' || rec.end === 'LOST') && id === rec.endAt); h.g.classList.toggle('cut', id === 'REJ' && P.noRejectPort);
-    const kt = c.lost ? `${c.lost} record${c.lost > 1 ? 's' : ''} lost` : id === 'REJ' && P.noRejectPort ? 'not connected' : KIND[id];
-    if (h.kind.textContent !== kt) h.kind.textContent = kt; h.kind.classList.toggle('warn', !!c.lost); }
-  const tf = dotTarget(); if (G.dot.style.transform !== tf) G.dot.style.transform = tf;
+const app = IE.app({
+  real: REAL,
+  params: [{ id: 'minAmt', label: 'Filter keeps records with amount >', min: -50, max: 200, step: 10, fmt: v => String(v) }],
+  toggles: [
+    { id: 'defaultRule', label: 'Add rate has priority-2 default rules' }, { id: 'filterFirst', label: 'Filter before the lookup' },
+    { id: 'noRejectPort', label: 'Reject ports not connected' }, { id: 'cleanFeed', label: 'Clean feed (every currency known)' },
+  ],
+  whatIf: [
+    { key: 'asWritten', label: 'As written', set: { defaultRule: false, filterFirst: false, noRejectPort: false, cleanFeed: false } },
+    { key: 'fixed', label: 'Default rule', set: { defaultRule: true, filterFirst: false, noRejectPort: false, cleanFeed: false } },
+    { key: 'filterFirst', label: 'Filter first', set: { defaultRule: false, filterFirst: true, noRejectPort: false, cleanFeed: false } },
+    { key: 'noReject', label: 'No reject port', set: { defaultRule: false, filterFirst: false, noRejectPort: true, cleanFeed: false } },
+    { key: 'clean', label: 'Clean feed', set: { defaultRule: false, filterFirst: false, noRejectPort: false, cleanFeed: true } },
+  ],
+  sel: { stepBy(dir, app){ const s = RF.stepBy(RUN, app.sel, dir); if (s !== app.sel) app.setSel(s); }, keyHint: 'previous / next component of this record' },
+  steps: [   // sel = 'RECORD@COMPONENT' on entry; params list only what differs from REAL
+    { title: '1 · Follow one clean record', sel: 'P-1001@IN',
+      html: () => `<p>Payment ${D('cur')} enters at the left. Press <b>▶ Play</b> or use ← → to walk it through its ${D('nHops')} components and watch the amber dot. It is written out with amount_usd ${D('usd')}.</p>
+        <p>The number on each flow counts how many of the ${D('nIn')} payments and ${D('nCust')} customers crossed it${cite('graph')}.</p>` },
+    { title: '2 · A field changes shape', sel: 'P-1003@RF1',
+      html: () => `<p><code>${D('idRaw')}</code> arrives with spaces around its id and its amount as text. <b>Clean</b> trims the id and turns the amount from a string into a decimal (highlighted = changed).</p>
+        <p><button data-set="sel=P-1003@LK">Next hop: rate is added</button> <button data-set="sel=P-1003@RF2">rate is dropped</button></p>` },
+    { title: '3 · A NULL becomes a reject', sel: 'P-1004@LK',
+      html: () => `<p>${D('cur')} has an empty currency, which the input format reads as NULL. <b>Clean</b> keeps the NULL: string_upcase of NULL is NULL, and out.currency is nullable${cite('dml')}.</p>
+        <p>At <b>Add rate</b> the lookup finds nothing, the only rule for out.rate gives NULL, and out.rate is not nullable. The record goes to the reject port with <code>${D('err')}</code>. It differs from the fixed graph at ${D('divCur')}.</p>` },
+    { title: '4 · Two inputs meet at the Join', sel: 'P-1008@JN',
+      html: () => `<p>The Join matches payments (in0) with customers (in1) on cust_id. ${D('cur')} belongs to customer C-09, which is not in customers.dat, so the inner join sends it to unused0 and on to <b>Unmatched</b>.</p>
+        <p>Customers are records too. <button data-set="sel=C-01@JN">Follow C-01</button> joins P-1001. <button data-set="sel=C-04@JN">Follow C-04</button> has no payment and leaves on unused1, which is not connected: dropped by design, and counted, so the Join balances: in ${D('in_JN')} = out ${D('pass_JN')} + unmatched ${D('desel_JN')} + dropped ${D('drop_JN')}.</p>` },
+    { title: '5 · Every record is accounted for', sel: 'P-1006@LK',
+      html: () => `<p>At Add rate: in ${D('in_LK')} = out ${D('pass_LK')} + rejected ${D('rej_LK')}. Across the graph, the ${D('nIn')} payments end as output ${D('nOutP')}, deselected ${D('nDesel')}, rejected ${D('nRej')}, unmatched ${D('nUnm')}, lost ${D('nLost')}.</p>
+        <p><button data-set="noRejectPort=true">Disconnect the reject ports</button> <button data-set="noRejectPort=false">Reconnect</button></p>` },
+    { title: '6 · Order matters: filter first', params: { filterFirst: true }, sel: 'P-1007@FBE',
+      html: () => `<p>Filter now runs before the lookup. ${D('cur')} is negative <i>and</i> has an unknown currency: it ${DW('endCur')} instead of being rejected, and Add rate does ${D('lookups')} lookups, not ${D('lookupsOther')}.</p>
+        <p><button data-set="filterFirst=false">Lookup first again</button> <button data-set="minAmt=-50">Loosen the filter to amount &gt; −50</button></p>` },
+    { title: '7 · The fix, across every record', params: { defaultRule: true }, sel: 'P-1004@LK',
+      html: () => `<p>Priority 1 returns NULL for ${D('cur')}, so DML tries priority 2: <code>first_defined(in.currency, "USD")</code> finds rate ${D('rateCur')}${cite('dml')}. The fallback is a concrete rule because <code>out.* :: in.*</code> never fills a field that has its own rule.</p>
+        <p>Step up to every record: the table below compares each one with the fixed graph. Records that differ: ${D('ndiff')}. P-1006 is still rejected: an unknown code should not be guessed. <button data-set="defaultRule=false">Back to as written</button></p>` },
+  ],
+  recompute(P){
+    RUN = RF.run(graph(P), P); const rp = refParams(P); REF = RF.run(graph(rp), rp);
+    AN = RF.analyse(RUN, INVS); DIFF = RF.diff(REF, RUN); const op = { ...P, filterFirst: !P.filterFirst }; OTHER = RF.run(graph(op), op); shown = '';
+  },
+  render({ sel }){
+    const { key, node } = RF.parse(sel), rec = RUN.byKey[key], n = RUN.nodes[node]; if (!rec || !n) return;
+    flow.set({ run: RUN, key, node });
+    const path = RF.path(RUN, key), k = path.indexOf(node);
+    nav.update(k, path.length, k >= 0 ? `hop ${k + 1} of ${path.length} · ${n.name}` : `${n.name} (${n.role === 'lookup' ? 'lookup file' : 'not reached'})`);
+    if (shown === sel) return; shown = sel;   // the side panels change only with the selection or the settings
+    RF.chips($('chips'), RUN, { selected: key, diff: DIFF, onPick: k2 => { nav.stop(); app.setSel(RF.select(RUN, k2, cur().node)); } });
+    $('hopTitle').textContent = `At this hop: ${key} at ${n.name}`;
+    $('atHop').innerHTML = RF.hopCard(RUN, key, node, { dp: DP, srcText, rawLine: r => Object.values(r.raw).join('|'), invariants: INVS, analysis: AN });
+    const h = rec.hops.find(x => x.node === node), st = {}; (h ? h.rules : []).forEach(r => { st[r.tag] = r.st; });
+    if (n.role === 'lookup') rec.hops.forEach(x => (x.keys || []).forEach(q => { if (q.value != null) st['k:' + q.key] = 'ok'; }));
+    if ($('src')){ $('srcTitle').textContent = `Source: ${n.name} (${n.kind})`; RF.source($('src'), SRC(node, app.P), st); }   // delete #srcPanel to drop the source view
+    $('cmpTitle').textContent = `${REF_LABEL} vs this run`;
+    RF.diffTable($('cmp'), REF, RUN, DIFF, { selected: key, refLabel: REF_LABEL, detail: r => { const o = r.hops[r.hops.length - 1].after; return o && o.amount_usd ? o.amount_usd.v.toFixed(2) + ' USD' : ''; },
+      onPick: k2 => { nav.stop(); const d = DIFF[k2]; app.setSel(d.j >= 0 && RF.path(RUN, k2).includes(d.node) ? RF.sel(k2, d.node) : RF.select(RUN, k2, cur().node)); } });
+    valid.render();
+  },
+  dyn: ({ sel }) => dynOf(sel),
+  readout({ sel }){
+    const d = dynOf(sel), bad = INVS.filter(inv => AN.firstBreak[inv.id]).map(inv => inv.label.toLowerCase());
+    return `Payments <b>${d.nIn}</b> → output <b>${d.nOutP}</b> · deselected <b>${d.nDesel}</b> · rejected <b>${d.nRej}</b> · unmatched <b>${d.nUnm}</b>` +
+      (+d.nLost ? ` · <b>${d.nLost} lost</b>` : '') + ' · ' + (bad.length ? `<b>broken: ${bad.join('; ')}</b>` : '<b>all checks hold</b>') + ` · <b>${d.ndiff}</b> record(s) differ from the ${REF_LABEL.toLowerCase()}`;
+  },
+});
+function dynOf(sel){   // every D('key') in the steps and the answer block
+  const { key } = RF.parse(sel), rec = RUN.byKey[key] || RUN.recs[0], t = RUN.counts, v = {}, out = rec.hops.find(h => h.node === 'OUT'), lk = rec.hops.find(h => h.node === 'LK' && h.after);
+  for (const id in t) for (const k of ['in', 'pass', 'rej', 'desel', 'drop', 'lost']) v[k + '_' + id] = String(t[id][k]);
+  const pays = RUN.recs.filter(r => r.src === 'IN'), cnt = f => String(pays.filter(f).length), d = DIFF[rec.key];
+  return Object.assign(v, { nIn: String(pays.length), nCust: String(RUN.recs.length - pays.length), nOut: String(t.OUT.in), nOutP: cnt(r => r.end === 'OUT'),
+    nDesel: cnt(r => r.end === 'DSEL'), nRej: cnt(r => r.end === 'REJ'), nUnm: cnt(r => r.end === 'UNM'), nLost: cnt(r => r.end === 'LOST'),
+    cur: rec.key, idRaw: JSON.stringify(rec.raw.id || rec.key), nHops: String(rec.hops.length), usd: out ? out.after.amount_usd.v.toFixed(2) : `none (it ${RF.endText(RUN, rec)})`,
+    err: (rec.hops.find(h => h.err) || {}).err || 'no error', rateCur: lk ? lk.after.rate.v.toFixed(4) : 'none (no rule gave a value)', endCur: RF.endText(RUN, rec),
+    divCur: d && d.j >= 0 ? `hop ${d.j + 1} (${RUN.nodes[d.node].name})` : 'no hop (same path and fields)', ndiff: String(Object.values(DIFF).filter(x => x.j >= 0).length),
+    lookups: String(t.LK.in), lookupsOther: String(OTHER.counts.LK.in) });
 }
 
-// ============================ SIDE PANELS (rebuilt when the selection or params change, not per frame) ============================
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const val = (k, f) => f.v == null ? '<span class="null">NULL</span>' : f.t.startsWith('string') ? `<span class="s">"${esc(f.v)}"</span>` : f.v.toFixed(DP[k] ?? 2);
-const srcText = (node, tag) => { const l = SRC(node, P).find(x => x.tag === tag); return l ? l.t.trim() : tag; };
-function baTable(h){
-  const b = h.before || {}, a = h.after || {}, keys = [...new Set([...Object.keys(b), ...Object.keys(a)])];
-  return `<div class="scroll"><table class="ba"><tr><th>field</th><th>before</th><th>after${h.after ? '' : ' (no output record)'}</th></tr>` + keys.map(k => {
-    const bv = b[k], av = a[k], cls = !bv && av ? 'add' : bv && h.after && !av ? 'drop' : bv && av && JSON.stringify(bv) !== JSON.stringify(av) ? 'chg' : '';
-    const ty = bv && av && bv.t !== av.t ? `${bv.t} → ${av.t}` : (av || bv).t;
-    return `<tr class="${cls}"><td>${k}<span class="ty">${ty}</span></td><td>${bv ? val(k, bv) : '—'}</td><td>${av ? val(k, av) : h.after ? 'dropped' : '—'}</td></tr>`; }).join('') + '</table></div>';
-}
-function hopCard(rec, h, k, n){
-  const port = { out: h.node === 'OUT' ? 'written to ' + FILE.OUT : '→ out port', deselect: '→ deselect port', written: 'written to ' + FILE[h.node],
-    reject: P.noRejectPort ? '→ reject port, not connected: the record is discarded' : '→ reject port' }[h.port];
-  let s = `<p><b>${esc(rec.id)}</b> at <b>${NAME[h.node]}</b> (${KIND[h.node]}) · hop ${k + 1} of ${n} · <span class="port ${h.port}">${port}</span></p>`;
-  if (h.node === 'IN') s += `<p class="note">Line read: <code>${esc(rec.line)}</code></p>`;
-  if (h.note) s += `<p class="note">${esc(h.note)}</p>`;
-  s += baTable(h);
-  if (h.rules.length) s += '<h4>Rules that ran</h4>' + h.rules.map(r => `<div class="rule ${r.st === 'null' ? 'nul' : r.st}"><code>${esc(srcText(h.node, r.tag))}</code><span>→ ${esc(r.res)}</span></div>`).join('');
-  if (h.err) s += `<div class="err"><b>${h.node === 'REJ' ? 'Error port of ' + NAME[h.from] : 'Error'}:</b> <code>${esc(h.err)}</code></div>`;
-  return s;
-}
-function lookupCard(rec){
-  const lk = rec.hops.find(h => h.node === 'LK'), used = new Set(lk ? lk.keys.map(x => x.key) : []);
-  let s = `<p><b>fx_rates</b> (LOOKUP FILE, key: currency) feeds <b>Add rate</b>.</p>`;
-  s += lk ? `<p>${esc(rec.id)} looked up ${lk.keys.map(x => (x.key == null ? 'NULL' : q(x.key)) + ' → ' + (x.rate == null ? 'no row (NULL)' : x.rate.toFixed(4))).join(', then ')}.</p>`
-    : `<p>${esc(rec.id)} never reached Add rate: it ${endText(rec)}.</p>`;
-  return s + '<table class="rates">' + Object.entries(RATES).map(([c, r]) => `<tr class="${used.has(c) ? 'hit' : ''}"><td>${c}</td><td>${r.toFixed(4)}</td></tr>`).join('') + '</table>';
-}
-function rulesChecked(h){
-  const node = h ? h.node : H, c = RUN.counts[node], isComp = RUN.order.includes(node);
-  return '<h4 style="margin-top:10px">Rules checked</h4>' + INVARIANTS.map(inv => {
-    const r = inv.comp ? (isComp ? inv.comp(c) : null) : h ? inv.hop(h) : null, fb = AN.firstBreak[inv.id];
-    const detail = inv.comp ? (isComp ? `in ${c.in} = out ${c.out} + deselected ${c.desel} + rejected ${c.rej}${c.lost ? ` (+ ${c.lost} lost)` : ''}` : 'checked at components')
-      : r == null ? 'checked when a record reaches Output' : `amount ${h.after.amount.v.toFixed(2)}`;
-    return `<p class="inv"><span class="${r === true ? 'ok' : r === false ? 'bad' : 'tbd'}">${r === true ? '✓' : r === false ? '✗' : '…'}</span> ${inv.label} <small>(${detail})</small>` +
-      (fb ? ` <span class="bad">breaks at ${NAME[fb.node]}${fb.r != null ? ' for ' + esc(RUN.recs[fb.r].id) : ''}</span>` : '') + '</p>'; }).join('');
-}
-function renderAtHop(){
-  const rec = RUN.recs[R], path = pathOf(), k = path.indexOf(H), h = k >= 0 ? rec.hops[k] : null;
-  $('hopTitle').textContent = `At this hop: ${rec.id} at ${NAME[H]}`;
-  let s = H === 'LKF' ? lookupCard(rec) : h ? hopCard(rec, h, k, path.length)
-    : `<p><b>${esc(rec.id)}</b> never reached <b>${NAME[H]}</b>: it ${endText(rec)} (hop ${path.length}). Pick a record chip with a teal edge to follow one that got this far.</p>`;
-  $('atHop').innerHTML = s + rulesChecked(h);
-}
-function renderSource(){
-  if (!SHOW_SOURCE) return;
-  const h = hopAt(H), st = {}; (h ? h.rules : []).forEach(r => st[r.tag] = r.st);
-  if (H === 'LKF'){ const lk = hopAt('LK'); if (lk) lk.keys.forEach(x => { if (x.rate != null) st['k:' + x.key] = 'ok'; }); }
-  $('srcTitle').textContent = `Source: ${NAME[H]} (${KIND[H]})`;
-  $('src').innerHTML = SRC(H, P).map((l, i) => { const s = st[l.tag], cls = s === 'ok' ? 'hl' : s === 'null' ? 'hl nul' : s === 'fail' ? 'hl bad' : s === 'skip' ? 'skip' : '';
-    return `<span class="ln ${cls}"><span class="n">${i + 1}</span>${esc(l.t)}</span>`; }).join('');
-  keepInView($('src'), document.querySelector('#src .ln.hl'));
-}
-function renderChips(){
-  $('chips').innerHTML = RUN.recs.map((r, i) => `<button class="chip ${r.end}${i === R ? ' on' : ''}${DIFF[i].j >= 0 ? ' differs' : ''}" data-pick="r:${i}" title="${esc(r.id)} ${endText(r)}">${esc(r.id)}<small>${{ OUT: 'out', DSEL: 'deselected', REJ: 'rejected', LOST: 'lost' }[r.end]}</small></button>`).join('');
-}
-const diffText = i => DIFF[i].j < 0 ? 'no hop (same path and fields)' : `hop ${DIFF[i].j + 1} (${NAME[DIFF[i].node]})`;
-function renderCmp(){
-  $('cmp').innerHTML = `<tr><th>record</th><th>${REF_LABEL}</th><th>This run</th><th>First difference</th></tr>` + RUN.recs.map((r, i) =>
-    `<tr data-pick="d:${i}" class="${i === R ? 'cur' : ''}"><td>${esc(r.id)}</td><td>${endShort(REF.recs[i])}</td><td class="${DIFF[i].j >= 0 ? 'd' : ''}">${endShort(r)}</td><td class="${DIFF[i].j >= 0 ? 'd' : ''}">${DIFF[i].j >= 0 ? diffText(i) : 'same'}</td></tr>`).join('');
-  keepInView($('cmpwrap'), document.querySelector('#cmp tr.cur'));
-}
-// Keep the element in view inside its own scroll box (never scrolls the page).
-function keepInView(box, el){ if (!box || !el) return; const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
-  if (r.top < b.top + 24 || r.bottom > b.bottom - 24) box.scrollTop += (r.top - b.top) - b.height / 2 + r.height / 2; }
-function dynValues(){   // every D('key') used in STEPS must have an entry here
-  const rec = RUN.recs[R], t = RUN.counts, v = {}, out = rec.hops.find(h => h.node === 'OUT'), lk = rec.hops.find(h => h.node === 'LK' && h.after);
-  for (const id in t) for (const k of ['in', 'out', 'rej', 'desel', 'lost']) v[k + '_' + id] = String(t[id][k]);
-  return Object.assign(v, { nIn: String(RUN.recs.length), nOut: String(t.OUT.out), nDesel: String(t.DSEL.in), nRej: String(t.REJ.in), nLost: String(RUN.order.reduce((a, id) => a + t[id].lost, 0)),
-    cur: rec.id, idRaw: q(rec.raw.id), nHops: String(rec.hops.length), usd: out ? out.after.amount_usd.v.toFixed(2) : `none (it ${endText(rec)})`,
-    err: (rec.hops.find(h => h.err) || {}).err || 'no error', rateCur: lk ? lk.after.rate.v.toFixed(4) : 'none (no rule gave a value)', endCur: endText(rec), divCur: diffText(R),
-    ndiff: String(DIFF.filter(d => d.j >= 0).length), lookups: String(t.LK.in), lookupsOther: String(OTHER.counts.LK.in), minAmt: String(P.minAmt) });
-}
-
-// ============================ MAIN ============================
-let shownKey = '';
-function renderAll(){
-  if (!G || G.key !== RUN.order.join() || Math.abs(G.W - $('flow').clientWidth) > 2) buildFlow();
-  updateFlow();
-  const key = R + '|' + H + '|' + JSON.stringify(P); if (key !== shownKey){ shownKey = key; renderChips(); renderAtHop(); renderSource(); renderCmp(); }
-  const dv = dynValues();
-  document.querySelectorAll('[data-dyn]').forEach(el => { const v = dv[el.dataset.dyn]; if (v !== undefined && el.textContent !== v) el.textContent = v; });
-  const path = pathOf(), k = path.indexOf(H);
-  $('k').max = path.length - 1; if (+$('k').value !== Math.max(0, k)) $('k').value = Math.max(0, k);
-  $('k_o').textContent = k >= 0 ? `hop ${k + 1} of ${path.length} · ${NAME[H]}` : `${NAME[H]} (not reached)`;
-  $('kprev').disabled = k === 0; $('knext').disabled = k === path.length - 1;
-  const bad = INVARIANTS.filter(inv => AN.firstBreak[inv.id]).map(inv => inv.label.toLowerCase());
-  $('readout').innerHTML = `Input <b>${dv.nIn}</b> → output <b>${dv.nOut}</b> · deselected <b>${dv.nDesel}</b> · rejects file <b>${dv.nRej}</b>` +
-    (+dv.nLost ? ` · <b style="color:#ff7aa8">${dv.nLost} lost</b>` : '') + ' · ' + (bad.length ? `<b style="color:#ff7aa8">broken: ${bad.join('; ')}</b>` : '<b>all rules hold</b>') +
-    ` · <b>${dv.ndiff}</b> record(s) differ from the ${REF_LABEL.toLowerCase()}`;
-}
-function setK(k){ const path = pathOf(); H = path[Math.max(0, Math.min(path.length - 1, k))]; dirty = true; }
-function setR(i){ R = Math.max(0, Math.min(RUN.recs.length - 1, i)); const path = pathOf(); if (H !== 'LKF' && !path.includes(H)) H = path[path.length - 1]; dirty = true; }
-function syncUI(){
-  for (const s of SPEC){ $(s.id).value = P[s.id]; $(s.id + '_o').textContent = s.fmt(P[s.id]); }
-  for (const b of BOOLS) $(b).checked = !!P[b];
-  document.querySelectorAll('#whatSeg button').forEach(b => { const w = { ...REAL, ...WHAT[b.dataset.w] }; b.classList.toggle('on', WHAT_KEYS.every(k => P[k] === w[k])); });
-}
-function setParams(o){ Object.assign(P, o); syncUI(); recompute(); }
-function goStep(i){
-  STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
-  if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params }); }
-  playing = false; $('play').textContent = '▶ Play';
-  R = st.r || 0; H = st.h || 'IN';
-  $('stepTitle').textContent = st.title; $('stepText').innerHTML = st.html();
-  document.querySelectorAll('#dots span').forEach((d, k) => d.classList.toggle('on', k === STEP));
-  $('prev').disabled = STEP === 0; $('next').disabled = STEP === STEPS.length - 1; dirty = true;
-}
-function init(){
-  for (const s of SPEC){ const d = document.createElement('div'); d.className = 'ctl';
-    d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
-    $('params').appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); }
-  for (const b of BOOLS) $(b).onchange = () => setParams({ [b]: $(b).checked });
-  STEPS.forEach((s, k) => { const d = document.createElement('span'); d.textContent = k + 1; d.title = s.title; d.onclick = () => goStep(k); $('dots').appendChild(d); });
-  $('prev').onclick = () => goStep(STEP - 1); $('next').onclick = () => goStep(STEP + 1);
-  $('stepText').addEventListener('click', ev => { const b = ev.target.closest('button[data-set]'); if (!b) return; const o = {};
-    b.dataset.set.split(';').forEach(kv => { const [k, v] = kv.split('=').map(s => s.trim());
-      if (k === 'h') H = v; else if (k === 'r') setR(+v); else o[k] = BOOLS.includes(k) ? v === '1' : parseFloat(v); });
-    playing = false; if (Object.keys(o).length) setParams(o); dirty = true; });
-  document.querySelectorAll('#whatSeg button').forEach(b => b.onclick = () => setParams({ ...REAL, ...Object.fromEntries(SPEC.map(s => [s.id, REAL[s.id]])), ...WHAT[b.dataset.w] }));
-  $('reset').onclick = () => setParams({ ...REAL });
-  const kNow = () => pathOf().indexOf(H);
-  $('kprev').onclick = () => { playing = false; setK(kNow() - 1); }; $('knext').onclick = () => { playing = false; setK(kNow() + 1); };
-  $('k').oninput = () => { playing = false; setK(+$('k').value); };
-  $('play').onclick = () => { playing = !playing; if (playing && kNow() === pathOf().length - 1) setK(0); $('play').textContent = playing ? '❚❚ Pause' : '▶ Play'; };
-  $('flow').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t){ playing = false; H = t.dataset.pick.slice(2); dirty = true; } });
-  $('chips').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t){ playing = false; setR(+t.dataset.pick.slice(2)); } });
-  $('cmp').addEventListener('click', ev => { const t = ev.target.closest('tr[data-pick]'); if (!t) return; playing = false; const i = +t.dataset.pick.slice(2);
-    setR(i); if (DIFF[i].j >= 0 && pathOf().includes(DIFF[i].node)) H = DIFF[i].node; });
-  document.addEventListener('keydown', ev => { if (ev.target.closest('input, textarea')) return;
-    if (ev.key === 'ArrowRight'){ setK(kNow() + 1); ev.preventDefault(); } else if (ev.key === 'ArrowLeft'){ setK(Math.max(0, kNow() - 1)); ev.preventDefault(); } });
-  window.addEventListener('resize', () => dirty = true);
-  $('cmpTitle').textContent = `${REF_LABEL} vs this run`; if (!SHOW_SOURCE){ $('srcPanel').hidden = true; $('srcPanel').parentNode.classList.remove('grid2'); }
-  syncUI(); goStep(0);
-  const frame = now => {
-    if (playing){ if (lastPlay === null || now - lastPlay > 750){ lastPlay = now; const k = kNow();
-      if (k < pathOf().length - 1) setK(k + 1); else { playing = false; $('play').textContent = '▶ Play'; } } } else lastPlay = null;
-    if (dirty){ dirty = false; renderAll(); }
-    requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
-}
-init();
+// ---- validation: claims from the notes and conservation laws, recomputed live (REPLACE)
+const runOf = p => RF.run(graph(p), p), R0 = runOf(REAL), R1 = runOf(refParams(REAL)), RFF = runOf({ ...REAL, filterFirst: true });
+const hopOf = (R, key, node) => R.byKey[key].hops.find(h => h.node === node);
+const valid = IE.validation('valid', [
+  { claim: 'Current settings: in = out + rejected + deselected (+ dropped by design) at every component', source: 'dml', target: 'holds everywhere',
+    model: () => { const b = RF.balance(RUN), x = b.filter(q => !q.ok); return x.length ? 'breaks at ' + x.map(q => RUN.nodes[q.id].name).join(', ') : `holds at all ${b.length}`; }, ok: () => RF.balance(RUN).every(q => q.ok) },
+  { claim: 'Current settings: every input record ends in exactly one place', source: 'graph', target: `${R0.recs.length} of ${R0.recs.length}`,
+    model: () => `${RUN.recs.filter(r => r.end).length} of ${RUN.recs.length}`, ok: () => RUN.recs.every(r => r.end) },
+  { claim: 'P-1002: 250.00 EUR × 1.0800 = amount_usd', source: 'graph', target: '270.00', model: () => hopOf(R0, 'P-1002', 'OUT').after.amount_usd.v.toFixed(2), ok: () => hopOf(R0, 'P-1002', 'OUT').after.amount_usd.v === 270 },
+  { claim: 'P-1004: an empty currency is NULL, and string_upcase keeps it NULL', source: 'dml', target: 'NULL', model: () => String(hopOf(R0, 'P-1004', 'RF1').after.currency.v).toUpperCase(), ok: () => hopOf(R0, 'P-1004', 'RF1').after.currency.v === null },
+  { claim: 'P-1004 as written: NULL into the non-nullable out.rate fails', source: 'dml', target: 'NULL value in priority 1 assignment for out.rate', model: () => hopOf(R0, 'P-1004', 'LK').err, ok: () => hopOf(R0, 'P-1004', 'LK').err === 'NULL value in priority 1 assignment for out.rate' },
+  { claim: 'P-1004 with the priority-2 default: the rate comes from "USD"', source: 'dml', target: '1.0000', model: () => hopOf(R1, 'P-1004', 'LK').after.rate.v.toFixed(4), ok: () => hopOf(R1, 'P-1004', 'LK').after.rate.v === 1 },
+  { claim: 'P-1008: customer C-09 is missing, so the payment leaves on unused0', source: 'graph', target: 'Unmatched', model: () => R0.nodes[R0.byKey['P-1008'].end].name, ok: () => R0.byKey['P-1008'].end === 'UNM' },
+  { claim: 'Filter before the lookup: Add rate looks up fewer records', source: 'graph', target: '6 instead of 8', model: () => `${RFF.counts.LK.in} instead of ${R0.counts.LK.in}`, ok: () => RFF.counts.LK.in === 6 && R0.counts.LK.in === 8 },
+]);
 </script>
 </body>
 </html>

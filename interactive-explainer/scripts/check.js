@@ -137,7 +137,14 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
       await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150); let moved = (await tv()) !== v0;
       if (!moved){ await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(150); moved = (await tv()) !== v0; }   // may sit at a clamped end
       if (!moved) errors.push('keyboard: ← / → did not move time (input[data-time] unchanged); wire onKey/stepTime as in the skeleton');
-    } else warnings.push('keyboard: no time slider marked data-time, so ← / → is untested');
+    } else {   // non-numeric selection (node, option, event): ← / → must change APP.sel through sel.stepBy
+      const sb = await page.evaluate(() => !!(window.APP && APP.cfg.sel && APP.cfg.sel.stepBy));
+      if (sb){ const s0 = await page.evaluate(() => JSON.stringify(APP.sel));
+        await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150);
+        if (await page.evaluate(() => JSON.stringify(APP.sel)) === s0){ await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(150);
+          if (await page.evaluate(() => JSON.stringify(APP.sel)) === s0) errors.push('keyboard: ← / → did not move the selection (sel.stepBy)'); } }
+      else warnings.push('keyboard: no time slider marked data-time and no sel.stepBy, so ← / → is untested');
+    }
     if (kb.steps && nSteps > 1){
       const s0 = await page.evaluate(() => STEP);
       await page.keyboard.press('Control+ArrowRight'); await page.waitForTimeout(200); const s1 = await page.evaluate(() => STEP);
@@ -147,7 +154,7 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
   }
   // diagram shapes: click every [data-pick] target (boxes, arrows, tree nodes, table rows) and probe after each
   await page.evaluate(() => typeof goStep === 'function' && goStep(0)); await page.waitForTimeout(250);
-  const picks = await page.$$eval('[data-pick]', es => es.map(e => e.dataset.pick));
+  const picks = [...new Set(await page.$$eval('[data-pick]', es => es.map(e => e.dataset.pick)))];   // one click per id
   // a pick can disappear when an earlier click zooms or re-renders the view: reset the tour and retry, warn if still gone
   const clickPick = k => page.evaluate(k => { const el = [...document.querySelectorAll('[data-pick]')].find(e => e.dataset.pick === k);
     if (!el) return false; el.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; }, k);
@@ -198,10 +205,10 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
         const gap = best / s, Hc = H / s; if (gap > 0.4 * Hc && gap > 120) out.push(`${name(cv)}: ${Math.round(gap)} of ${Math.round(Hc)} px is one blank band`); });
       document.querySelectorAll('main svg, .panel svg').forEach(sv => { if (!vis(sv) || sv.parentElement.closest('svg')) return;
         const S = sv.getBoundingClientRect(), cov = [];
-        sv.querySelectorAll('path, line, polyline, polygon, circle, ellipse, rect, text, image, foreignObject').forEach(e => {
+        sv.querySelectorAll('path, line, polyline, polygon, circle, ellipse, rect, text, image, foreignObject, use').forEach(e => {
           const b = e.getBoundingClientRect(); if (!b.width && !b.height) return;
-          if (e.tagName === 'rect' && b.width > 0.9 * S.width && b.height > 0.9 * S.height) return;   // background
-          cov.push([Math.max(0, b.top - S.top), Math.min(S.height, b.bottom - S.top)]); });
+          if (e.tagName === 'rect' && !e.closest('[data-pick]') && b.width > 0.9 * S.width && b.height > 0.9 * S.height) return;   // background (a pickable box that fills the view is content)
+          const a = Math.min(S.height, Math.max(0, b.top - S.top)), c = Math.min(S.height, Math.max(0, b.bottom - S.top)); if (c > a) cov.push([a, c]); });
         const gap = biggestGap(S.height, cov); if (gap > 0.4 * S.height && gap > 120) out.push(`${name(sv)}: ${Math.round(gap)} of ${Math.round(S.height)} px is empty`); });
       return out;
     });

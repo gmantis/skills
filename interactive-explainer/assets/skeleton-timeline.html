@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITLE — interactive explainer</title>
+<!--
+  SKELETON (timeline shape) for the interactive-explainer skill: what happened when, in which era, and what changed
+  because of it. Demo: a fictional company's data platform, 2010–2023, 39 dated changes in 4 lanes and 4 eras.
+  Start a page: node scripts/build.js new timeline page.html. Replace everything marked REPLACE.
+  The runtime (core + timeline) is inlined by build.js; never edit inside data-ie blocks. API: runtime/API.md and shapes/timeline.md.
+-->
+<style data-ie="core"></style>
+<style data-ie="timeline"></style>
+<style>/* page-only styles (usually none) */</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>Fourteen years of a data platform (REPLACE)</h1>
+  <p class="lede">REPLACE: the question in the reader's words. How did the platform get from one server to real-time pipelines, and what pushed each change? The tour walks the history era by era; pick any event to read it, drag the strip under the timeline to zoom.</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> the platform changed era three times, and each jump followed incidents within months. The clearest case: a three-day outage, then the cloud decision <span class="dyn" data-dyn="pivotGap"></span> later.</p>
+  <div class="stat"><b data-dyn="total"></b><span>dated changes in the log</span></div>
+  <div class="stat"><b data-dyn="busiest"></b><span>busiest year (changes)</span></div>
+  <div class="stat"><b data-dyn="pivotGap"></b><span>outage to cloud decision</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"><h4>What if? Show only…</h4></div>
+  <div class="card" id="controls"><h4>Selected event</h4></div>
+</aside>
+<main>
+  <section class="panel"><h3>The history, era by era</h3>
+    <p class="sub">Dots are dated changes, bars are changes that took months, one lane per kind of change. Labels that do not fit are hidden; pick the dot to read it. Arrows show what a change led to. Drag the strip below to zoom, double-click it to see everything.</p>
+    <div id="tl"></div></section>
+  <div class="grid2">
+    <section class="panel"><h3>Selected change</h3><div id="detail" aria-live="polite"></div></section>
+    <section class="panel"><h3>Changes per era</h3><p class="sub">Coloured by lane; click an era to jump to its first change.</p><div id="counts"></div></section>
+  </div>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model reproduce the source?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>REPLACE: the model is the source's change log as data: each change has a date (year, month or day, printed at that precision), a lane (its kind), a short label, a sentence and a citation; changes that took months have an end date. Eras are the source's own periods; a change belongs to the era its start date falls in, and a span must end inside that era. "Led to" links are the source's own cause-and-effect statements, never inferred from dates alone.</p>
+    <p>The timeline packs labels into up to three rows per lane: right of the dot, else left of it, else hidden (the dot stays and the card shows it). Density view counts changes per year (per quarter when zoomed under three years). The counts per era are recomputed from the event list and checked against the source's summary table above. <span class="badge illustrative">fictional demo data</span></p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="timeline"></script>
+<!-- MODEL: the source's dated changes as data. Write it as model.js in $TEMP, test it in Node with
+     require('<skill>/runtime/timeline.js') (prepare / audit / matrix), and build with --from "$TEMP/<name>". -->
+<script data-ie-file="model.js">
+// REPLACE: lanes = kinds of change, eras = the source's own periods, events = one row per dated change in the source.
+const LANES = [
+  { id: 'infra', label: 'Infrastructure', color: 's1' },
+  { id: 'soft', label: 'Software', color: 's3' },
+  { id: 'team', label: 'Team & process', color: 's4' },
+  { id: 'inc', label: 'Incidents', color: 's2' },
+];
+const ERAS = [
+  { id: 'e1', label: 'On-premise batch', short: 'Batch', start: '2010', end: '2013' },
+  { id: 'e2', label: 'Scale-out cluster', short: 'Cluster', start: '2014', end: '2016' },
+  { id: 'e3', label: 'Cloud migration', short: 'Cloud', start: '2017', end: '2020' },
+  { id: 'e4', label: 'Real-time and governance', short: 'Real-time', start: '2021', end: '2023' },
+];
+// date: YYYY | YYYY-MM | YYYY-MM-DD; end (optional) makes a span; short = the label on the timeline (≤ 22 chars)
+const EVENTS = [
+  { id: 'server', date: '2010-02', lane: 'infra', short: 'First warehouse server', title: 'First warehouse server installed', text: 'A single on-premise database server hosts the nightly batch warehouse.', source: 'log' },
+  { id: 'batch1', date: '2010-05', lane: 'soft', short: 'Nightly batch v1', title: 'Nightly batch load, version 1', text: 'Sales and stock files are loaded once a night; reports are ready by 7 am.', source: 'log' },
+  { id: 'team2', date: '2010-09', lane: 'team', short: 'Two-person team', title: 'A two-person data team', text: 'One developer and one analyst run the warehouse part-time.', source: 'log' },
+  { id: 'portal', date: '2011-03', lane: 'soft', short: 'Reporting portal', title: 'Reporting portal launched', text: 'Managers read the morning reports in a web portal instead of e-mailed spreadsheets.', source: 'log' },
+  { id: 'disk', date: '2011-08-14', lane: 'inc', short: 'Disk full', title: 'Disk full stops the nightly batch', text: 'The batch fails for two nights when the only disk fills up.', source: 'log', ledTo: ['storage'] },
+  { id: 'storage', date: '2011-11', lane: 'infra', short: 'Storage array', title: 'Storage array added', text: 'A shared storage array triples capacity.', source: 'log' },
+  { id: 'batch2', date: '2012-04', lane: 'soft', short: 'Batch v2: parallel', title: 'Batch version 2 runs jobs in parallel', text: 'The nightly window drops from six hours to two.', source: 'log' },
+  { id: 'oncall', date: '2012-06', lane: 'team', short: 'On-call rota', title: 'On-call rota starts', text: 'Someone is now paged when the batch fails at night.', source: 'log' },
+  { id: 'late', date: '2012-10-02', lane: 'inc', short: 'Late quarter-end reports', title: 'Quarter-end reports two days late', text: 'Quarter-end volumes overrun the batch window; finance reports arrive two days late.', source: 'log', ledTo: ['dc2'] },
+  { id: 'dc2', date: '2013-01', end: '2013-09', lane: 'infra', short: 'Second data centre', title: 'Second data centre built', text: 'A standby site with a copy of the warehouse; nine months to build and test.', source: 'log' },
+  { id: 'dq', date: '2013-05', lane: 'soft', short: 'Data quality checks', title: 'Data quality checks added to the batch', text: 'Loads stop on bad files instead of loading them.', source: 'log' },
+  { id: 'cluster', date: '2014-02', lane: 'infra', short: 'Cluster: 12 nodes', title: 'Scale-out cluster with 12 nodes', text: 'Storage and compute move to a cluster of commodity servers.', source: 'log' },
+  { id: 'port', date: '2014-03', end: '2014-11', lane: 'soft', short: 'Jobs ported to cluster', title: 'Batch jobs ported to the cluster', text: 'All 140 batch jobs are rewritten for the cluster over nine months.', source: 'log' },
+  { id: 'platteam', date: '2014-07', lane: 'team', short: 'Platform team formed', title: 'Platform team formed', text: 'Five engineers own the cluster; analysts move to a separate team.', source: 'log' },
+  { id: 'nn', date: '2015-01-20', lane: 'inc', short: 'Name-node failure', title: 'Cluster name-node failure', text: 'The single coordinating server fails; the cluster is down for a day.', source: 'log', ledTo: ['cluster40', 'board'] },
+  { id: 'cluster40', date: '2015-04', lane: 'infra', short: 'Cluster: 40 nodes', title: 'Cluster grows to 40 nodes, with a standby coordinator', text: 'More nodes and a hot standby for the coordinating server.', source: 'log' },
+  { id: 'selfserve', date: '2015-09', lane: 'soft', short: 'Self-service queries', title: 'Self-service query layer', text: 'Analysts query the cluster directly with SQL.', source: 'log' },
+  { id: 'board', date: '2016-02', lane: 'team', short: 'Change board', title: 'Change board introduced', text: 'Every production change is reviewed weekly.', source: 'log' },
+  { id: 'backlog', date: '2016-06-07', lane: 'inc', short: 'Week-long backlog', title: 'Week-long data backlog', text: 'A failed upgrade leaves a week of data unloaded.', source: 'log', ledTo: ['cloudgo'] },
+  { id: 'catalog', date: '2016-10', lane: 'soft', short: 'Metadata catalogue', title: 'Metadata catalogue, version 1', text: 'Every table gets an owner and a description.', source: 'log' },
+  { id: 'power', date: '2017-01-16', lane: 'inc', short: 'Power loss: 3-day outage', title: 'Data-centre power loss: three-day outage', text: 'Both power feeds fail; the standby site is out of date, so recovery takes three days.', source: 'review', ledTo: ['cloudgo'] },
+  { id: 'cloudgo', date: '2017-03-16', lane: 'team', short: 'Cloud decision', title: 'Decision to move to the cloud', text: 'The board approves a move of the whole platform to a public cloud.', source: 'review', ledTo: ['migrate', 'containers'] },
+  { id: 'migrate', date: '2017-05', end: '2018-12', lane: 'infra', short: 'Migration to cloud', title: 'Migration to the cloud', text: 'Twenty months, one subject area at a time, with both platforms running in parallel.', source: 'log', ledTo: ['dcclose'] },
+  { id: 'containers', date: '2017-09', lane: 'soft', short: 'Containerised jobs', title: 'Jobs packaged as containers', text: 'The same job image runs on the cluster and in the cloud during the move.', source: 'log' },
+  { id: 'cost', date: '2018-04-11', lane: 'inc', short: 'Cost overrun', title: 'Cloud bill 60% over budget', text: 'Idle clusters left running double the monthly bill.', source: 'log', ledTo: ['finops'] },
+  { id: 'finops', date: '2018-08', lane: 'team', short: 'Monthly cost review', title: 'Monthly cost review starts', text: 'Each team sees and owns its own cloud spend.', source: 'log' },
+  { id: 'dcclose', date: '2019-01', lane: 'infra', short: 'Old data centre closed', title: 'Old data centre closed', text: 'The last on-premise servers are switched off.', source: 'log' },
+  { id: 'autoscale', date: '2019-05', lane: 'soft', short: 'Auto-scaling', title: 'Auto-scaling scheduler', text: 'Compute grows and shrinks with the job queue.', source: 'log' },
+  { id: 'region', date: '2019-11-05', lane: 'inc', short: 'Region failover works', title: 'Cloud region outage; failover works', text: 'A provider region fails; jobs move to another region within an hour.', source: 'log' },
+  { id: 'remote', date: '2020-03', lane: 'team', short: 'Remote team', title: 'The team works fully remote', text: 'No change to operations: everything already runs in the cloud.', source: 'log' },
+  { id: 'pilot', date: '2020-09', lane: 'soft', short: 'Streaming pilot', title: 'Streaming pilot', text: 'Orders flow in seconds instead of overnight for one region.', source: 'log', ledTo: ['streamlive'] },
+  { id: 'streamlive', date: '2021-02', lane: 'soft', short: 'Streaming live', title: 'Streaming in production', text: 'All order data now arrives within a minute.', source: 'log' },
+  { id: 'region2', date: '2021-06', lane: 'infra', short: 'Second region', title: 'Second cloud region in use', text: 'Production runs active-active across two regions.', source: 'log' },
+  { id: 'govoffice', date: '2021-10', lane: 'team', short: 'Governance office', title: 'Data governance office', text: 'A small team owns definitions, access and retention.', source: 'log' },
+  { id: 'lineage', date: '2022-03', end: '2022-10', lane: 'soft', short: 'Lineage rollout', title: 'Lineage rollout', text: 'Every report can be traced back to its sources.', source: 'log' },
+  { id: 'schema', date: '2022-05-23', lane: 'inc', short: 'Schema change breaks feeds', title: 'An upstream schema change breaks six feeds', text: 'A source system renames columns without notice.', source: 'log', ledTo: ['contracts'] },
+  { id: 'contracts', date: '2022-11', lane: 'team', short: 'Data contracts', title: 'Data contracts policy', text: 'Source teams must announce schema changes a month ahead.', source: 'log' },
+  { id: 'tiering', date: '2023-04', lane: 'infra', short: 'Storage tiering', title: 'Storage tiering', text: 'Data older than a year moves to cheaper storage automatically.', source: 'log' },
+  { id: 'alerts', date: '2023-09', lane: 'soft', short: 'Real-time quality alerts', title: 'Real-time data quality alerts', text: 'Bad records are flagged within a minute of arriving.', source: 'log' },
+];
+// The source's own summary table (changes per era and lane): the validation target. REPLACE.
+const SOURCE_COUNTS = {
+  e1: { infra: 3, soft: 4, team: 2, inc: 2 }, e2: { infra: 2, soft: 3, team: 2, inc: 2 },
+  e3: { infra: 2, soft: 3, team: 3, inc: 3 }, e4: { infra: 2, soft: 3, team: 2, inc: 1 },
+};
+const PIVOT = { cause: 'power', effect: 'cloudgo', months: 2 };   // "two months later" (source: review)
+const HISTORY = { lanes: LANES, eras: ERAS, events: EVENTS };
+if (typeof module === 'object' && module.exports) module.exports = { LANES, ERAS, EVENTS, SOURCE_COUNTS, PIVOT, HISTORY };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE, TLX = IE.timeline;
+IE.sources({   // every claim the page quotes gets an entry; cite with cite('id')
+  log: { title: 'Platform change log, 2010–2023 (REPLACE)', where: 'Appendix A, 39 entries and the summary table', quote: 'Changes per era: 11, 9, 11 and 8; incidents in every era (REPLACE).' },
+  review: { title: 'Post-incident review of the January 2017 outage (REPLACE)', where: 'p. 2', quote: 'Two months after the outage the board approved moving the platform to the cloud (REPLACE).' },
+});
+const DATA = TLX.prepare(HISTORY), N = DATA.events.length, AUD = TLX.audit(HISTORY), MAT = TLX.matrix(DATA);
+const ev = id => DATA.byId[id], E = id => DATA.events[ev(id)];
+const monthsBetween = (a, b) => (E(b).t - E(a).t) * 12;
+const yrs = r => `${TLX.fmtT(r.t0, 'y')}–${TLX.fmtT(r.t1 - 1e-6, 'y').slice(2)}`;
+const hiddenOf = P => LANES.filter(l => !P['lane_' + l.id]).map(l => l.id);
+let VIS = () => true, tl = null, cnt = null, shownK = -1, cntEra = null;
+const shown = (P, sel) => TLX.step(DATA, sel, 0, VIS);   // the slider may sit on a filtered-out event: show the nearest visible one
+const busiest = () => { const c = TLX.count(DATA, 'year'), y = Object.keys(c).sort((a, b) => c[b] - c[a] || a - b)[0]; return y ? { y, n: c[y] } : null; };
+
+const app = IE.app({
+  real: { era: 'all' },
+  toggles: [...LANES.map(l => ({ id: 'lane_' + l.id, label: `Show ${l.label.toLowerCase()}`, value: true })),
+    { id: 'density', label: 'Density view: count changes per year instead of listing them' }],
+  whatIf: [{ key: 'all', label: 'All', set: { era: 'all' } }, ...DATA.eras.map(r => ({ key: r.id, label: yrs(r), set: { era: r.id } }))],
+  sel: { label: 'Event', min: 0, max: N - 1, step: 1, unit: 1, value: 0, play: { rate: 1.5 }, keyHint: 'previous / next event in date order',
+    fmt: v => { const e = DATA.events[shown(app.P, v)]; return `${e.i + 1} of ${N} · ${TLX.fmtT(e.t, e.prec === 'd' ? 'm' : e.prec)}`; },
+    stepBy: (dir, a) => a.setSel(TLX.step(DATA, shown(a.P, a.sel), dir, VIS)) },
+  steps: [   // params list only what differs (era 'all', every lane on, density off); sel = an event index
+    { title: '1 · Fourteen years, 39 changes', sel: 0,
+      html: () => `<p>Every dot is one dated change from the platform's change log${cite('log')}, in four lanes by kind; bars are changes that took months. The shaded bands are the four eras.</p>
+        <p>Press <kbd>→</kbd> to walk through the changes in date order, or click any dot. Now: ${DW('selTitle')} (${D('selDate')}).</p>` },
+    { title: '2 · Era 1: one server, nightly batch', params: { era: 'e1' }, sel: () => ev('dc2'),
+      html: () => `<p>${D('eraCount')} changes in four years. Two incidents, a full disk and late quarter-end reports, came before the biggest change of the era: a <b>second data centre</b>.</p>
+        <p><button data-set="sel=${ev('late')}">Show the late reports</button></p>` },
+    { title: '3 · Era 2: the cluster years', params: { era: 'e2' }, sel: () => ev('nn'),
+      html: () => `<p>The cluster brought scale and a new single point of failure. The name-node failure led to a bigger cluster with a standby and to a weekly change board (follow the arrows).</p>` },
+    { title: '4 · The pivotal event', sel: () => ev('power'),
+      html: () => `<p>On ${D('pivotDate')} a power loss took the data centre down for three days${cite('review')}. The board decided to move to the cloud <b>${D('pivotGap')}</b> later, and the migration took 20 months.</p>
+        <p><button data-set="sel=${ev('cloudgo')}">Jump to the decision</button> <button data-set="sel=${ev('migrate')}">Jump to the migration</button></p>` },
+    { title: '5 · Incidents come before the jumps', params: { lane_soft: false, lane_team: false }, sel: () => ev('migrate'),
+      html: () => `<p>With software and team changes hidden, the pattern is plain: in each of the first three eras an incident comes first and an infrastructure change follows within months. Switch lanes back on under <i>What if?</i></p>` },
+    { title: '6 · The step up: changes per year', params: { density: true }, sel: () => ev('power'),
+      html: () => `<p>Counting instead of listing: the busiest year is <b>${D('busiest')}</b>, the outage and decision year. Most years see two or three changes; the eras differ less in pace than in what changed.</p>` },
+  ],
+  recompute(P){
+    const only = P.era === 'all' ? null : P.era, hidden = hiddenOf(P);
+    VIS = TLX.visible({ hidden, only });
+    const spec = { hidden, only, density: !!P.density, summary: `${N} changes in ${DATA.eras.length} eras` };
+    if (tl) tl.set(spec);
+    else tl = TLX(document.getElementById('tl'), { ...spec, data: DATA, title: 'Platform history', onPick: i => { app.pause(); app.setSel(i); },
+      onEra: id => { app.pause(); app.setSel(TLX.step(DATA, DATA.events.findIndex(e => e.era === id), 0, VIS)); } });
+    const cs = { hidden, only };
+    if (cnt) cnt.set(cs);
+    else cnt = TLX.counts(document.getElementById('counts'), { ...cs, data: DATA, title: 'Changes per era',
+      onPick: id => { app.pause(); if (P.era !== 'all' && P.era !== id) app.set({ era: id }); app.setSel(TLX.step(DATA, DATA.events.findIndex(e => e.era === id), 0, VIS)); } });
+    shownK = -1; cntEra = null;
+  },
+  render({ P, sel }){
+    const k = shown(P, sel), e = DATA.events[k];
+    tl.set({ selected: k });
+    if (cntEra !== e.era){ cntEra = e.era; cnt.set({ highlight: e.era }); }
+    if (k !== shownK){ shownK = k; document.getElementById('detail').innerHTML = TLX.card(DATA, k, { hiddenLabel: tl.labelHidden(k) && !P.density }); }
+  },
+  dyn({ P, sel }){
+    const e = DATA.events[shown(P, sel)], b = busiest(), era = DATA.eras.find(r => r.id === (P.era === 'all' ? e.era : P.era));
+    return { total: String(N), busiest: b ? `${b.y} (${b.n})` : '–', pivotGap: `${fmt.num(monthsBetween(PIVOT.cause, PIVOT.effect), 0)} months`,
+      pivotDate: TLX.fmtWhen(E(PIVOT.cause)), selTitle: e.title, selDate: TLX.fmtWhen(e),
+      eraCount: era ? String(DATA.events.filter(x => x.era === era.id && VIS(x)).length) : '–' };
+  },
+  readout({ P, sel }){
+    const k = shown(P, sel), e = DATA.events[k], lane = DATA.lanes[e.laneIdx], era = DATA.eras.find(r => r.id === e.era), nv = DATA.events.filter(VIS).length;
+    return `Event <b>${k + 1}</b> of ${N} · <b>${TLX.fmtWhen(e)}</b> · ${lane.label} · ${era ? era.label : 'no era'} · <b>${IE.esc(e.title)}</b>` +
+      (nv < N ? ` · showing ${nv} of ${N}` : '') + (e.next.length ? ` · led to ${e.next.length} later change${e.next.length > 1 ? 's' : ''}` : '');
+  },
+});
+
+// ---- validation: the event list against the source's summary table, plus the shape's own invariants (REPLACE targets)
+const laneStr = o => LANES.map(l => o[l.id]).join(' / ');
+const valid = IE.validation('valid', [
+  ...DATA.eras.map(r => ({ claim: `${r.label}: changes per lane (${LANES.map(l => l.label.split(' ')[0].toLowerCase()).join(' / ')})`, source: 'log',
+    target: laneStr(SOURCE_COUNTS[r.id]), model: () => laneStr(MAT[r.id]), ok: () => LANES.every(l => MAT[r.id][l.id] === SOURCE_COUNTS[r.id][l.id]) })),
+  { claim: 'Total dated changes', source: 'log', target: String(Object.values(SOURCE_COUNTS).reduce((s, o) => s + IE.sum(Object.values(o)), 0)), model: () => String(N),
+    ok: () => N === Object.values(SOURCE_COUNTS).reduce((s, o) => s + IE.sum(Object.values(o)), 0) },
+  { claim: 'The log lists changes in date order', source: 'log', target: 'sorted', model: () => AUD.sortedInput ? 'sorted' : 'out of order at ' + AUD.firstUnsorted, ok: () => AUD.sortedInput },
+  { claim: 'Every change has a known lane and falls in an era', source: 'model check', target: '0 missing', model: () => String(AUD.unknownLane.length + AUD.noEra.length) + ' missing', ok: () => !AUD.unknownLane.length && !AUD.noEra.length },
+  { claim: 'Every span ends after it starts and inside its era', source: 'model check', target: '0 outside', model: () => (AUD.crossEra.concat(AUD.badSpan).join(', ') || '0') + ' outside', ok: () => !AUD.crossEra.length && !AUD.badSpan.length },
+  { claim: 'Eras do not overlap or leave gaps', source: 'log', target: 'contiguous', model: () => AUD.eraOverlap.length || AUD.eraGap.length ? AUD.eraOverlap.concat(AUD.eraGap).join(', ') : 'contiguous', ok: () => !AUD.eraOverlap.length && !AUD.eraGap.length },
+  { claim: '"Led to" always points to a later change', source: 'model check', target: '0 backwards', model: () => (AUD.badLink.join(', ') || '0') + ' backwards', ok: () => !AUD.badLink.length },
+  { claim: 'The cloud decision came two months after the outage', source: 'review', target: PIVOT.months + ' months', model: () => fmt.num(monthsBetween(PIVOT.cause, PIVOT.effect), 1) + ' months',
+    ok: () => Math.round(monthsBetween(PIVOT.cause, PIVOT.effect)) === PIVOT.months },
+]);
+</script>
+</body>
+</html>

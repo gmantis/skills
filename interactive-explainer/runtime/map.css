@@ -1,0 +1,35 @@
+/* interactive-explainer runtime: map.css (IE.map views). Include with <style data-ie="map"></style> after core. */
+svg.ie-map{width:100%;background:var(--panel2);border-radius:6px;overflow:hidden;touch-action:manipulation}
+.ie-map .sea{fill:var(--panel2)}
+.ie-map .grat{fill:none;stroke:var(--grid);stroke-width:.7}
+.ie-map .cty{fill:var(--btn);fill-rule:evenodd;stroke:var(--axis);stroke-width:.6;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.ie-map .cty.off{display:none}
+.ie-map .cty[data-pick]{cursor:pointer}
+.ie-map .cty[data-pick]:hover{stroke:var(--ink);stroke-width:1.2}
+.ie-map .cty:focus{outline:none} .ie-map .cty:focus-visible{stroke:var(--focus);stroke-width:2.5}
+.ie-map .selpath{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;pointer-events:none;vector-effect:non-scaling-stroke}
+.ie-map .field{fill:none;stroke-width:1.1;stroke-linecap:round;opacity:.45;pointer-events:none}
+.ie-map .flow path{fill:none;stroke-linecap:round;opacity:.85}
+.ie-map .flow path.head{opacity:.95}
+.ie-map .sym{fill-opacity:.22;stroke-width:1.6}
+.ie-map .pt{stroke:var(--panel2);stroke-width:1.5}
+.ie-map [data-pick]:not(.cty){cursor:pointer}
+.ie-map [data-pick]:not(.cty):focus{outline:none} .ie-map [data-pick]:not(.cty):focus-visible{stroke:var(--focus);stroke-width:2.5}
+.ie-map text{font:12px var(--font);fill:var(--ink2);paint-order:stroke;stroke:var(--panel2);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.ie-map text.on,.ie-map text.pt-lbl{fill:var(--ink);font-weight:650}
+.ie-map text.sym-lbl,.ie-map text.flow-lbl{font-size:11px;fill:var(--muted)}
+.ie-map .labels{transition:opacity .2s}
+.ie-map-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:.8rem;color:var(--ink2);margin:0 0 6px}
+.ie-map-legend b{font-weight:600;color:var(--ink)}
+.ie-map-legend .cls{display:flex;flex-wrap:wrap;gap:2px 8px}
+.ie-map-legend .it{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.ie-map-legend .sw{display:inline-block;width:16px;height:11px;border-radius:2px;border:1px solid var(--line)}
+.ie-map-legend .sw.nodata{background:var(--btn)}
+.ie-map-legend svg{display:inline-block;overflow:visible}
+.ie-map-card h4{margin:0 0 4px} .ie-map-card dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0;font-size:.86rem}
+.ie-map-card dt{color:var(--ink2)} .ie-map-card dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.ie-map-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 6px}
+.ie-map-tools .seg{margin:0} .ie-map-tools .seg button{flex:none;white-space:nowrap;padding:4px 10px}
+/* workaround until core.css has it: the validation table's absolutely positioned .sr-only header escapes an unpositioned
+   scroll wrapper and makes a phone page scroll sideways when the table is wider than the screen */
+.tablewrap{position:relative}

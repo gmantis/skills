@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where does the haze come from? — interactive explainer (REPLACE)</title>
+<!--
+  SKELETON (map shape, "where") for the interactive-explainer skill. Guide: shapes/map.md. API: runtime/API.md.
+  Demo: illustrative hotspot clusters in six countries send smoke downwind to one city. The choropleth is the smoke
+  each country sends, circles are hotspot clusters, orange arrows are smoke reaching the city, grey arrows the wind.
+  Selection = a country (ISO3 code); ← → cycle countries by smoke sent. Replace everything marked REPLACE.
+  World geometry: the geo-world110m runtime block. Finer geometry (50m, districts): a page file, see shapes/map.md.
+-->
+<style data-ie="core"></style>
+<style data-ie="map"></style>
+<style>/* page-only styles (usually none) */</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>Where does the haze come from? (REPLACE)</h1>
+  <p class="lede">Fires burn in six countries, but only some of the smoke reaches the city. Walk the tour on the left, change the wind under <i>What if?</i>, and click a country, a bar or a fire cluster to see what it sends. (Illustrative numbers; REPLACE with the source's.)</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> the wind decides more than the fire count. With the wind from <span class="dyn" data-dyn="windTxt"></span>, <span class="dyn wrap" data-dyn="topName"></span> sends <span class="dyn" data-dyn="topShare"></span> of the smoke that reaches the city.</p>
+  <div class="stat"><b data-dyn="total"></b><span>smoke index over the city</span></div>
+  <div class="stat"><b data-dyn="hotTotal"></b><span>hotspots in the region</span></div>
+  <div class="stat"><b data-dyn="upwindShare"></b><span>of hotspots are upwind</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Selected country</h4><div id="browse"></div></div>
+</aside>
+<main>
+  <section class="panel"><h3>Hotspots, wind and smoke</h3>
+    <p class="sub">Country colour: smoke it sends to the city. Orange circles: fire clusters (area = hotspots). Orange arrows: smoke that arrives. Grey arrows: the wind. Click a coloured country or a circle.</p>
+    <div class="ie-map-tools"><span class="sub" style="margin:0">Zoom:</span><div class="seg" id="zoomSeg" role="group" aria-label="Zoom the map">
+      <button type="button" data-zoom="world" aria-pressed="false">World</button><button type="button" data-zoom="region" aria-pressed="false">Region</button><button type="button" data-zoom="near" aria-pressed="false">Near the city</button></div></div>
+    <div id="map"></div></section>
+  <div class="grid2">
+    <section class="panel"><h3>Smoke sent to the city, by country</h3><p class="sub">The same numbers as the map colours. Click a bar to select its country.</p><div id="bars"></div></section>
+    <section class="panel"><h3>Selected country</h3><div id="card" aria-live="polite"></div></section>
+  </div>
+  <section class="panel"><h3>Smoke over the city for every wind direction</h3><p class="sub">Solid: all fires. Dashed: Indonesia's fires alone. The cursor is the current wind; click to set it.</p><div id="sweep"></div></section>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model reproduce the source?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>Each hotspot cluster sends smoke in proportion to its hotspot count. The share that reaches the city is
+      <b>cos²(angle)</b> × <b>e<sup>−distance / reach</sup></b>: the angle is between the direction the wind blows towards and the
+      great-circle line from the cluster to the city (zero if the wind blows away from the city), and the reach grows with the
+      wind speed (120 km per m/s). The wind is the same everywhere. Country values are the sums over their clusters, so the
+      bars, the colours and the total always add up. <span class="badge illustrative">illustrative</span> hotspot counts, reach and
+      the transport rule are made up for the skeleton (REPLACE).</p>
+    <p>Geography: Natural Earth 1:110m countries, Natural Earth I projection. Each cluster is assigned to the country polygon
+      that contains it (point in polygon), and the validation table checks that those totals match the source table.
+      Small states such as Singapore are not polygons at this scale, so the city is drawn as a point.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="geo-world110m"></script>
+<script data-ie="map"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, build with --from "$TEMP/<name>". -->
+<script data-ie-file="model.js">
+// MODEL (REPLACE): where does the haze over a city come from? Hotspot clusters (illustrative counts) send smoke
+// downwind; the share that reaches the city falls with distance and with the angle between the wind and the line
+// from the cluster to the city. Pure functions, no DOM; Node: require('./model.js').
+const CITY = { id: 'city', name: 'Singapore', lon: 103.82, lat: 1.35 };
+const REAL = { windDir: 225, windSpeed: 5, reach: 120 };   // wind FROM 225° (south-west monsoon), m/s, km of reach per m/s
+const SOURCE_TABLE = { IDN: 880, MYS: 55, THA: 60, KHM: 90, LAO: 70, MMR: 110 };   // hotspots per country on the day (illustrative)
+const MAINLAND = ['THA', 'KHM', 'LAO', 'MMR'];
+const CLUSTERS = [   // hotspot clusters: place, country (ISO3), position, hotspot count
+  { id: 'riau', name: 'Riau', a3: 'IDN', lon: 101.5, lat: 0.6, hotspots: 180 },
+  { id: 'jambi', name: 'Jambi', a3: 'IDN', lon: 103.2, lat: -1.7, hotspots: 120 },
+  { id: 'ssum', name: 'South Sumatra', a3: 'IDN', lon: 104.4, lat: -3.2, hotspots: 210 },
+  { id: 'wkal', name: 'West Kalimantan', a3: 'IDN', lon: 111.0, lat: 0.2, hotspots: 140 },
+  { id: 'ckal', name: 'Central Kalimantan', a3: 'IDN', lon: 113.6, lat: -1.6, hotspots: 230 },
+  { id: 'sarawak', name: 'Sarawak', a3: 'MYS', lon: 113.3, lat: 2.6, hotspots: 40 },
+  { id: 'pahang', name: 'Pahang', a3: 'MYS', lon: 102.5, lat: 3.6, hotspots: 15 },
+  { id: 'cthai', name: 'Central Thailand', a3: 'THA', lon: 100.3, lat: 15.5, hotspots: 60 },
+  { id: 'cambo', name: 'Cambodia (north)', a3: 'KHM', lon: 104.6, lat: 13.1, hotspots: 90 },
+  { id: 'laos', name: 'Northern Laos', a3: 'LAO', lon: 102.6, lat: 19.6, hotspots: 70 },
+  { id: 'myan', name: 'Shan State', a3: 'MMR', lon: 97.4, lat: 21.2, hotspots: 110 },
+];
+const RAD = Math.PI / 180, R_KM = 6371.0088;
+function distKm(a, b){ const p1 = a.lat * RAD, p2 = b.lat * RAD, h = Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin((b.lon - a.lon) * RAD / 2) ** 2; return 2 * R_KM * Math.asin(Math.min(1, Math.sqrt(h))); }
+function bearingDeg(a, b){ const p1 = a.lat * RAD, p2 = b.lat * RAD, dl = (b.lon - a.lon) * RAD;
+  return (Math.atan2(Math.sin(dl) * Math.cos(p2), Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)) / RAD + 360) % 360; }
+const isOff = (c, p) => (p.offIDN && c.a3 === 'IDN') || (p.offMain && MAINLAND.includes(c.a3));
+// wind as a vector (east, north) in m/s; the same everywhere in this model
+function windAt(lon, lat, p){ const to = (p.windDir + 180) * RAD; return [p.windSpeed * Math.sin(to), p.windSpeed * Math.cos(to)]; }
+// one cluster: distance, bearing to the city, how well the wind lines up (cos² of the angle, 0 if blowing away), reach
+function transport(c, p){
+  const d = distKm(c, CITY), brg = bearingDeg(c, CITY), off = ((brg - (p.windDir + 180)) % 360 + 540) % 360 - 180;
+  const align = Math.max(0, Math.cos(off * RAD)) ** 2, reach = Math.exp(-d / (p.reach * p.windSpeed));
+  const smoke = isOff(c, p) ? 0 : c.hotspots * align * reach;
+  return { d, brg, off, align, reach, smoke };
+}
+// smoke reaching the city (index, illustrative units), per cluster and per country
+function smokeAt(p){
+  const per = CLUSTERS.map(c => ({ c, ...transport(c, p) })), total = per.reduce((s, x) => s + x.smoke, 0), byCountry = {};
+  for (const a3 of Object.keys(SOURCE_TABLE)) byCountry[a3] = 0;
+  per.forEach(x => { byCountry[x.c.a3] += x.smoke; });
+  return { per, total, byCountry, top: Object.keys(byCountry).sort((a, b) => byCountry[b] - byCountry[a])[0] };
+}
+function hotspotsByCountry(p = {}){ const o = {}; for (const a3 of Object.keys(SOURCE_TABLE)) o[a3] = 0; CLUSTERS.forEach(c => { if (!isOff(c, p)) o[c.a3] += c.hotspots; }); return o; }
+// step up: the city's smoke for every wind direction
+function sweep(p, step = 5){ const o = []; for (let d = 0; d <= 360; d += step) o.push([d, smokeAt({ ...p, windDir: d % 360 }).total]); return o; }
+if (typeof module === 'object' && module.exports) module.exports = { CITY, REAL, SOURCE_TABLE, MAINLAND, CLUSTERS, distKm, bearingDeg, windAt, transport, smokeAt, hotspotsByCountry, sweep };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE;
+IE.sources({   // every number the page quotes gets an entry; cite with cite('id')
+  demo: { title: 'Hotspot counts for one dry-season day (illustrative, REPLACE with the source)', where: 'Table 1 (REPLACE)', quote: 'REPLACE: the exact words or table the counts come from.' },
+  atlas: { title: 'world-atlas 2.0.2, countries-110m (TopoJSON of Natural Earth 1:110m Admin 0)', url: 'https://github.com/topojson/world-atlas', where: 'ISC licence; Natural Earth data are public domain' },
+  fbIDN: { title: 'CIA World Factbook: Indonesia', url: 'https://www.cia.gov/the-world-factbook/countries/indonesia/', where: 'Geography › Area', quote: 'total: 1,904,569 sq km' },
+  fbMYS: { title: 'CIA World Factbook: Malaysia', url: 'https://www.cia.gov/the-world-factbook/countries/malaysia/', where: 'Geography › Area', quote: 'total: 329,847 sq km' },
+});
+const NAME = { IDN: 'Indonesia', MYS: 'Malaysia', THA: 'Thailand', KHM: 'Cambodia', LAO: 'Laos', MMR: 'Myanmar' };
+const ZOOM = { world: 'world', region: [[89, -10], [125, 24]], near: [[96, -6.5], [112, 6.5]] };
+const compass = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((d % 360) + 360) % 360 / 45) % 8];
+const windTxt = P => `${compass(P.windDir)} (${P.windDir}°)`;
+let R = null, ORDER = [], SW = [], SWI = [], zoom = 'region', layersKey = '';
+const cluster = id => CLUSTERS.find(c => c.id === id);
+
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'windDir', label: 'Wind from', min: 0, max: 355, step: 5, fmt: v => `${compass(v)} · ${v}°` },
+    { id: 'windSpeed', label: 'Wind speed', min: 1, max: 10, step: 0.5, fmt: v => fmt.num(v, 1) + ' m/s' },
+  ],
+  toggles: [{ id: 'offIDN', label: 'No fires in Indonesia' }, { id: 'offMain', label: 'No fires on the mainland (Thailand, Cambodia, Laos, Myanmar)' }],
+  options: [{ id: 'showWind', label: 'Show wind arrows', value: true }, { id: 'showFlows', label: 'Show smoke arrows', value: true }],
+  whatIf: [
+    { key: 'sw', label: 'SW monsoon', set: { windDir: 225, windSpeed: 5 } }, { key: 'ne', label: 'NE monsoon', set: { windDir: 45, windSpeed: 5 } },
+    { key: 'se', label: 'SE wind', set: { windDir: 135, windSpeed: 5 } }, { key: 'calm', label: 'Light wind', set: { windDir: 225, windSpeed: 1.5 } },
+  ],
+  sel: { stepBy: (dir, app) => app.setSel(IE.map.cycle(ORDER, app.sel, dir)), keyHint: 'next / previous country by smoke sent' },
+  steps: [   // concrete case first, the sweep across every wind direction near the end
+    { title: '1 · Where the fires are', sel: 'IDN', enter: () => setZoom('region'),
+      html: () => `<p>On this day satellites count ${D('hotTotal')} hotspots in six countries${cite('demo')}. Indonesia has ${D('hotIDN')}, more than the other five together. Each orange circle is a cluster, its area proportional to the count.</p><p>Yet the colours, the smoke each country sends to the city, are dark only south-west of it. The rest of the tour shows why.</p>` },
+    { title: '2 · One cluster, one day', sel: 'IDN', enter: () => setZoom('near'),
+      html: () => `<p>Take Riau, ${D('riauD')} from the city. The line from Riau to the city points ${D('riauBrg')}; the wind blows towards ${D('toDir')}, ${D('riauOff')} off that line.</p><p>Smoke that arrives = hotspots × cos²(angle) × e<sup>−distance/reach</sup> = 180 × ${D('riauAlign')} × ${D('riauReach')} = <b>${D('riauSmoke')}</b>. <button data-set="windDir=250">Aim the wind at the city</button> <button data-set="windDir=225">Back to the real wind</button></p>` },
+    { title: '3 · The wind decides', params: { windDir: 45 }, sel: 'KHM', enter: () => setZoom('region'),
+      html: () => `<p>Same fires, north-east monsoon. Sumatra's smoke now blows out to sea, and the city gets ${D('total')} (it was ${D('totalReal')}), mostly from ${DW('topName')}.</p><p>The arrows on the map turn with the wind; the circles do not change. <button data-set="windDir=225">Back to the south-west monsoon</button></p>` },
+    { title: '4 · Who sends the smoke', sel: 'MYS', enter: () => setZoom('region'),
+      html: () => `<p>The bars split the city's smoke by country, and they add up to the total. Malaysia has ${D('hotMYS')} hotspots in Sarawak and Pahang but sends ${D('mysSmoke')}: both are downwind of the city today.</p><p>Press <kbd>→</kbd> to step through the countries by smoke sent. <button data-set="offIDN=true">Put out Indonesia's fires</button></p>` },
+    { title: '5 · A light wind', params: { windSpeed: 1.5 }, sel: 'IDN', enter: () => setZoom('near'),
+      html: () => `<p>At ${D('speed')} the smoke goes ${D('reachKm')} before most of it has dropped out (reach = 120 km per m/s), so only the nearest clusters matter: the city gets ${D('total')}.</p><p>Real stagnant air also traps smoke near the ground; this model leaves that out.</p>` },
+    { title: '6 · Every wind direction', sel: 'IDN', enter: () => setZoom('region'),
+      html: () => `<p>The chart under the map repeats the model for every wind direction. The city is worst off with the wind from ${D('peakDir')} (${D('peak')}) and best off from ${D('lowDir')} (${D('low')}).</p><p>Click the chart to set the wind; the map and the bars follow.</p>` },
+  ],
+  recompute(P){
+    R = smokeAt(P); ORDER = IE.map.order(R.byCountry);
+    SW = sweep(P); const noI = sweep({ ...P, offIDN: true }); SWI = SW.map(([d, v], i) => [d, v - noI[i][1]]);   // Indonesia's part
+    const hot = hotspotsByCountry(P);
+    map.set({
+      values: R.byCountry,
+      symbols: CLUSTERS.filter(c => hot[c.a3] > 0 && !(P.offIDN && c.a3 === 'IDN') && !(P.offMain && MAINLAND.includes(c.a3))).map(c => ({ id: c.id, lon: c.lon, lat: c.lat, value: c.hotspots, pick: 'c-' + c.id, aria: `${c.name} cluster: ${c.hotspots} hotspots` })),
+    });
+    layersKey = '';   // flows and wind depend on the model and on two view options: redrawn in render()
+    bars.set({ rows: Object.keys(NAME).map(a3 => ({ id: a3, label: NAME[a3], value: R.byCountry[a3] })).sort((a, b) => b.value - a.value) });
+    sweepChart.set(sweepSpec(P));
+  },
+  render({ P, sel }){
+    const lk = [P.showWind, P.showFlows, R.total, P.windDir, P.windSpeed].join('|');
+    if (lk !== layersKey){ layersKey = lk; map.set({
+      flows: P.showFlows ? R.per.filter(x => x.smoke > 0.01 * Math.max(1, R.total)).map(x => ({ id: x.c.id, from: [x.c.lon, x.c.lat], to: [CITY.lon, CITY.lat], value: x.smoke })) : [],
+      field: P.showWind ? { at: (lon, lat) => lon > 85 && lon < 130 && lat > -14 && lat < 27 ? windAt(lon, lat, P) : null, ref: 6, spacing: 46 } : null }); }   // wind only where the model applies
+    map.set({ selected: sel });
+    bars.set({ highlight: sel });
+    sweepChart.set({ cursor: P.windDir, cursorLabel: `from ${windTxt(P)}`, marks: [{ x: P.windDir, y: R.total, color: 'total' }] });
+    drawCard(P, sel);
+    IE.qsa('#zoomSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.zoom === zoom ? 'true' : 'false'));
+  },
+  dyn({ P, sel }){
+    const riau = R.per.find(x => x.c.id === 'riau'), hot = hotspotsByCountry(P), hotT = IE.sum(Object.values(hot));
+    const up = R.per.filter(x => x.align > 0 && !(P.offIDN && x.c.a3 === 'IDN') && !(P.offMain && MAINLAND.includes(x.c.a3))).reduce((s, x) => s + x.c.hotspots, 0);
+    const pk = SW.reduce((a, b) => b[1] > a[1] ? b : a), lo = SW.reduce((a, b) => b[1] < a[1] ? b : a);
+    return { total: fmt.num(R.total, 0), totalReal: fmt.num(smokeAt(REAL).total, 0), hotTotal: fmt.int(hotT), hotIDN: fmt.int(hot.IDN), hotMYS: fmt.int(hot.MYS),
+      upwindShare: hotT ? fmt.pct(up / hotT) : '–', windTxt: windTxt(P),
+      topName: R.total > 0.05 ? NAME[R.top] : 'no country', topShare: R.total > 0.05 ? fmt.pct(R.byCountry[R.top] / R.total) : '–',
+      riauD: fmt.int(riau.d) + ' km', riauBrg: fmt.int(riau.brg) + '°', toDir: fmt.int((P.windDir + 180) % 360) + '°', riauOff: fmt.int(Math.abs(riau.off)) + '°',
+      riauAlign: fmt.num(riau.align, 2), riauReach: fmt.num(riau.reach, 2), riauSmoke: fmt.num(riau.smoke, 0), mysSmoke: fmt.num(R.byCountry.MYS, 1),
+      speed: fmt.num(P.windSpeed, 1) + ' m/s', reachKm: fmt.int(P.reach * P.windSpeed) + ' km',
+      peakDir: `${compass(pk[0])} (${pk[0] % 360}°)`, peak: fmt.num(pk[1], 0), lowDir: `${compass(lo[0])} (${lo[0] % 360}°)`, low: fmt.num(lo[1], 0) };
+  },
+  readout({ P, sel }){
+    const s = R.byCountry[sel] ?? 0;
+    return `Wind from <b>${windTxt(P)}</b> at <b>${fmt.num(P.windSpeed, 1)} m/s</b> · smoke index over ${CITY.name} <b>${fmt.num(R.total, 0)}</b>` +
+      (R.total > 0.05 ? ` · <b>${NAME[sel] || '–'}</b> sends <b>${fmt.num(s, 1)}</b> (${fmt.pct(s / R.total)})` + (s < 0.05 && hotspotsByCountry(P)[sel] ? ': its fires are downwind' : '') : ' · <b>no smoke reaches the city</b>');
+  },
+});
+
+// ---- views (created before app.start runs, which is queued after IE.app returns)
+const map = IE.map.view(document.getElementById('map'), {
+  title: 'Map: smoke each country sends to the city', projection: 'naturalEarth', bounds: ZOOM.region, unit: 'smoke index',
+  scale: IE.map.scale({ breaks: [5, 20, 50, 100], fmt: v => fmt.num(v, 0) }),   // fixed breaks: colours compare across winds
+  names: NAME, labels: Object.keys(NAME),
+  points: [{ id: 'city', lon: CITY.lon, lat: CITY.lat, label: CITY.name, color: 'ink', r: 5 }],
+  symbolRef: 230, symbolMax: 20, flowRef: 100, flowMax: 8,
+  legend: { title: 'Smoke sent (index)', items: [{ circle: 's2', label: 'fire cluster' }, { arrow: 's2', label: 'smoke reaching the city' }, { arrow: 'muted', label: 'wind' }] },
+  onPick: (id, kind) => { app.pause(); const a3 = kind === 'symbol' ? cluster(id.slice(2)).a3 : (map.feature(id) || {}).properties?.a3; if (a3 && NAME[a3]) app.setSel(a3); },
+});
+const bars = IE.barChart(document.getElementById('bars'), { title: 'Smoke sent to the city by country', rows: [], fmt: v => fmt.num(v, 1), min: 0, onPick: a3 => { app.pause(); app.setSel(a3); } });
+const sweepChart = IE.lineChart(document.getElementById('sweep'), { ...sweepSpec(REAL), onPick: x => app.set({ windDir: Math.round(x / 5) * 5 % 360 }) });
+IE.map.browse(document.getElementById('browse'), app, { order: () => ORDER, name: a3 => NAME[a3], label: 'Country, by smoke sent' });
+function setZoom(z){ zoom = z; map.zoomTo(ZOOM[z]); app.redraw(); }
+document.getElementById('zoomSeg').addEventListener('click', e => { const b = e.target.closest('button[data-zoom]'); if (b) setZoom(b.dataset.zoom); });
+function sweepSpec(P){
+  const pts = SW.length ? SW : sweep(P), m = IE.niceMax(Math.max(10, ...pts.map(p => p[1])));
+  return { title: 'Smoke over the city by wind direction', height: 230, summary: `peak ${fmt.num(Math.max(...pts.map(p => p[1])), 0)}`,
+    x: { min: 0, max: 360, ticks: [0, 45, 90, 135, 180, 225, 270, 315, 360], fmt: v => compass(v), label: 'wind from' }, y: { min: 0, max: m, fmt: v => fmt.num(v, 0) },
+    series: [{ id: 'idn', label: 'Indonesia alone', color: 's2', points: SWI.length ? SWI : pts, ghost: true }, { id: 'all', label: 'all fires', color: 'total', points: pts, width: 2.6 }] };
+}
+function drawCard(P, a3){
+  const f = map.feature(a3); if (!f){ IE.map.card(document.getElementById('card'), { title: 'Nothing selected', note: 'Click a coloured country, a bar or a fire cluster.' }); return; }
+  const mine = R.per.filter(x => x.c.a3 === a3), s = R.byCountry[a3] || 0, near = mine.slice().sort((x, y) => x.d - y.d)[0];
+  IE.map.card(document.getElementById('card'), { title: NAME[a3] || f.properties.name,
+    rows: [['Hotspots (source table)', fmt.int(SOURCE_TABLE[a3]) + cite('demo')], ['Fire clusters', mine.map(x => x.c.name).join(', ')],
+      ['Smoke sent to ' + CITY.name, `${fmt.num(s, 1)} (${R.total > 0.05 ? fmt.pct(s / R.total) : '–'})`],
+      ['Nearest cluster', near ? `${near.c.name}, ${fmt.int(near.d)} km, ${fmt.int(Math.abs(near.off))}° off the wind` : '–'],
+      ['Land area (map polygons)', fmt.si(IE.map.area(f), 2) + ' km²']],
+    note: s < 0.05 && mine.some(x => !(P.offIDN && a3 === 'IDN') && !(P.offMain && MAINLAND.includes(a3))) ? 'Its fires are downwind of the city or too far for this wind.' : '' });
+}
+
+// ---- validation: geography and the model against stated targets (REPLACE the rows with your source's numbers)
+const W110 = IE.map.world(), byA3 = a3 => W110.features.find(f => f.properties.a3 === a3);
+const PIP = (() => { const t = {}; for (const c of CLUSTERS){ const f = IE.map.locate(W110, [c.lon, c.lat]), a3 = f && f.properties.a3; t[a3] = (t[a3] || 0) + c.hotspots; } return t; })();
+const RT = (() => { let e = 0; for (const name of Object.keys(IE.map.projections)){ const pr = IE.map.fit(name, ZOOM.region, 800, 600);
+  for (const p of [[CITY.lon, CITY.lat], [0, 0], [-70, 45], [151.2, -33.9], [179, 80]]){ const q = pr.invert(pr.project(p)); e = Math.max(e, Math.abs(q[0] - p[0]), Math.abs(q[1] - p[1])); } } return e; })();
+const areaErr = (a3, ref) => IE.map.area(byA3(a3)) / ref - 1;
+const valid = IE.validation('valid', [
+  { claim: 'Each cluster falls inside its stated country, and the country totals equal the source table', source: 'demo', target: Object.entries(SOURCE_TABLE).map(([k, v]) => `${k} ${v}`).join(' · '),
+    model: () => Object.keys(SOURCE_TABLE).map(k => `${k} ${PIP[k] || 0}`).join(' · '), ok: () => Object.keys(SOURCE_TABLE).every(k => PIP[k] === SOURCE_TABLE[k]) && Object.keys(PIP).every(k => k in SOURCE_TABLE) },
+  { claim: 'Countries\' smoke adds up to the city total (every wind direction)', source: 'conservation', target: '0 difference', model: () => fmt.num(Math.max(...IE.range(0, 355, 72).map(d => { const r = smokeAt({ ...REAL, windDir: d }); return Math.abs(IE.sum(Object.values(r.byCountry)) - r.total); })), 6), ok: () => IE.range(0, 355, 72).every(d => { const r = smokeAt({ ...REAL, windDir: d }); return Math.abs(IE.sum(Object.values(r.byCountry)) - r.total) < 1e-9; }) },
+  { claim: 'Projections invert exactly (Natural Earth, Mercator, equirectangular; 5 known points)', source: 'round trip', target: '< 1e-9°', model: () => RT.toExponential(1) + '°', ok: () => RT < 1e-9 },
+  { claim: 'The city sits inside the region view', source: 'fit to bounds', target: 'inside', model: () => { const pr = IE.map.fit('naturalEarth', ZOOM.region, 800, 600), [x, y] = pr.project([CITY.lon, CITY.lat]); return `${fmt.int(x)}, ${fmt.int(y)} of 800 × 600`; }, ok: () => { const [x, y] = IE.map.fit('naturalEarth', ZOOM.region, 800, 600).project([CITY.lon, CITY.lat]); return x > 0 && x < 800 && y > 0 && y < 600; } },
+  { claim: 'Indonesia\'s area from the map polygons', source: 'fbIDN', target: '1,904,569 km² ± 6%', model: () => `${fmt.int(IE.map.area(byA3('IDN')))} km² (${fmt.sgn(areaErr('IDN', 1904569) * 100, 1)}%)`, ok: () => Math.abs(areaErr('IDN', 1904569)) < 0.06 },
+  { claim: 'Malaysia\'s area from the map polygons', source: 'fbMYS', target: '329,847 km² ± 6%', model: () => `${fmt.int(IE.map.area(byA3('MYS')))} km² (${fmt.sgn(areaErr('MYS', 329847) * 100, 1)}%)`, ok: () => Math.abs(areaErr('MYS', 329847)) < 0.06 },
+  { claim: 'Great-circle distance along a quarter of the equator', source: 'πR/2, R = 6371 km', target: fmt.int(Math.PI * IE.map.R / 2) + ' km', model: () => fmt.int(IE.map.distance([0, 0], [90, 0])) + ' km', ok: () => Math.abs(IE.map.distance([0, 0], [90, 0]) - Math.PI * IE.map.R / 2) < 1e-6 },
+  { claim: 'Under the NE monsoon no Sumatran cluster sends smoke', source: 'model rule', target: '0', model: () => fmt.num(IE.sum(smokeAt({ ...REAL, windDir: 45 }).per.filter(x => ['riau', 'jambi', 'ssum'].includes(x.c.id)).map(x => x.smoke)), 2), ok: () => smokeAt({ ...REAL, windDir: 45 }).per.filter(x => ['riau', 'jambi', 'ssum'].includes(x.c.id)).every(x => x.smoke === 0) },
+]);
+</script>
+</body>
+</html>

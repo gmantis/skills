@@ -1,0 +1,34 @@
+/* interactive-explainer runtime: stepper.css (IE.stepper lanes, source panel, step card, comparison table). */
+.ie-lanes{max-height:72vh;overflow:auto;border-radius:6px;background:var(--panel2);user-select:none;-webkit-user-select:none;overscroll-behavior:contain}
+.ie-lanes svg{display:block;max-width:none}
+.ie-lanes .lanehead{position:sticky;top:0;z-index:1;background:var(--panel2)}
+.ie-lanes .hbox{fill:var(--panel);stroke:var(--axis)}
+.ie-lanes text{fill:var(--ink);font:11px var(--font);pointer-events:none}
+.ie-lanes text.head{font-weight:650;font-size:12px}
+.ie-lanes text.tl{fill:var(--muted);font-size:10px;font-variant-numeric:tabular-nums} .ie-lanes text.tl.div{fill:var(--bad-ink);font-weight:650}
+.ie-lanes .lifeline{stroke:var(--axis);stroke-dasharray:4 4}
+.ie-lanes .rowhl{fill:var(--hl)}
+.ie-lanes .tbreak{fill:var(--panel2)} .ie-lanes .tbreakline{stroke:var(--axis);stroke-dasharray:2 3;fill:none}
+.ie-lanes .entry{cursor:pointer}
+.ie-lanes .entry.future{opacity:.28}
+.ie-lanes path.arrow{fill:none;stroke:var(--s1);stroke-width:1.6}
+.ie-lanes .entry.lost path.arrow{stroke:var(--bad);stroke-dasharray:5 4}
+.ie-lanes path.xmark{stroke:var(--bad);stroke-width:2.2;fill:none}
+.ie-lanes rect.note{fill:var(--panel);stroke:var(--s7);stroke-width:1.2}
+.ie-lanes .entry.broken path.arrow{stroke:var(--bad);stroke-width:2.4}
+.ie-lanes .entry.broken rect.note{stroke:var(--bad);stroke-width:2.2}
+.ie-lanes .entry.broken text{fill:var(--bad-ink);font-weight:650}
+.ie-lanes .entry.cur path.arrow{stroke:var(--ink);stroke-width:2.8}
+.ie-lanes .entry.cur rect.note{stroke:var(--ink);stroke-width:2.4}
+.ie-lanes .entry.cur text{font-weight:700}
+.ie-lanes .mk.msg{fill:var(--s1)} .ie-lanes .mk.cur{fill:var(--ink)} .ie-lanes .mk.bad{fill:var(--bad)}
+.ie-lanes path.hit{fill:transparent;stroke:none}
+pre.ie-src{max-height:72vh;overflow:auto;margin:0;font:12px/1.5 ui-monospace,Consolas,"DejaVu Sans Mono",monospace;background:var(--panel2);border-radius:6px;padding:6px 0;color:var(--ink2)}
+pre.ie-src .ln{display:block;padding:0 10px 0 0;white-space:pre} pre.ie-src .ln.hl{background:var(--hl);color:var(--ink)}
+pre.ie-src .n{color:var(--muted);display:inline-block;width:3.4em;text-align:right;margin-right:10px;user-select:none} pre.ie-src .ln.hl .n{color:var(--ink);font-weight:650}
+.kv{width:100%;border-collapse:collapse;font-size:.84rem;margin-bottom:10px} .kv td{padding:3px 6px;border-bottom:1px solid var(--grid);vertical-align:top;overflow-wrap:anywhere}
+.kv td:first-child{color:var(--ink2);white-space:nowrap;width:1%} .kv .chg{background:var(--hl);font-weight:600;border-radius:3px;padding:0 2px}
+.inv{font-size:.86rem;margin:0 0 4px} .inv .tbd{color:var(--muted)}
+.ie-cmp{max-height:60vh;overflow:auto} .ie-cmp tbody tr{cursor:pointer}
+.ie-cmp td.diff{color:var(--bad-ink);font-weight:600}
+@media print{.ie-lanes,pre.ie-src,.ie-cmp{max-height:none;overflow:visible}}

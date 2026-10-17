@@ -1,0 +1,13 @@
+{
+  "id": "etl-records",
+  "tier": "Explainer",
+  "prompt": "/interactive-explainer explain what happens to each record in source.md",
+  "expect_shapes": ["recordflow", "sankey"],
+  "targets": [
+    { "label": "final counts 2 / 4 / 2", "expr": "/\\b2\\b[^\\n]{0,40}(output|ok)/i.test(document.body.innerText) && /\\b4\\b[^\\n]{0,40}reject/i.test(document.body.innerText)" },
+    { "label": "each record traceable (8 picks or rows)", "expr": "document.querySelectorAll('[data-pick]').length >= 8" },
+    { "label": "conservation checked", "expr": "document.querySelectorAll('.ok').length >= 3 && !document.querySelector('.fail')" },
+    { "label": "reject reasons shown", "expr": "/bad amount/i.test(document.body.innerText) && /unknown country/i.test(document.body.innerText)" }
+  ],
+  "budget": { "minutes": 15, "output_tokens": 150000 }
+}

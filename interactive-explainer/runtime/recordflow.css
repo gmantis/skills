@@ -1,0 +1,60 @@
+/* interactive-explainer runtime: recordflow.css (IE.recordflow). Pipeline SVG, record chips, hop card, source, diff, nav. */
+/* pipeline */
+svg.rf-flow{display:block;width:100%;background:var(--panel2);border-radius:6px;user-select:none;overflow:hidden}
+.rf-flow text{fill:var(--ink);font:12px var(--font);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rf-flow text.rf-name{font-weight:650}
+.rf-flow text.rf-kind{fill:var(--muted);font-size:10px} .rf-flow text.rf-kind.warn{fill:var(--bad-ink);font-weight:650}
+.rf-flow text.rf-badge{font-weight:700;font-size:11px;font-variant-numeric:tabular-nums}
+.rf-flow text.rf-badge.cur{fill:var(--ink)} .rf-flow text.rf-badge.bad{fill:var(--bad-ink)}
+.rf-node{cursor:pointer;outline:none}
+.rf-node rect{fill:var(--panel);stroke:var(--axis);stroke-width:1.5}
+.rf-node.side rect{fill:var(--panel2);stroke-dasharray:4 3}
+.rf-node.onpath rect{stroke:var(--s4);stroke-width:2}
+.rf-node.sel rect{stroke:var(--accent);stroke-width:3}
+.rf-node.endbad rect{fill:color-mix(in srgb,var(--bad) 16%,var(--panel))}
+.rf-node.cut{opacity:.55}
+.rf-node:focus-visible rect{stroke:var(--focus);stroke-width:3.5}
+path.rf-fl{fill:none;stroke-width:1.8}
+.rf-fl.main{stroke:var(--s3)} .rf-fl.rej{stroke:var(--bad)} .rf-fl.desel{stroke:var(--muted)} .rf-fl.lookup{stroke:var(--s1);stroke-dasharray:3 4}
+.rf-fl.zero{opacity:.3}
+.rf-fl.live{stroke-dasharray:7 5;animation:rf-flow 1.1s linear infinite}
+.rf-fl.onpath{stroke:var(--s4);stroke-width:3.4;opacity:1}
+.rf-fl.cut{stroke-dasharray:2 5;opacity:.45;animation:none}
+circle.rf-bg{fill:var(--panel2);stroke:var(--axis)} circle.rf-bg.onpath{stroke:var(--s4);stroke-width:2}
+circle.rf-dot{fill:var(--s4);stroke:var(--panel2);stroke-width:2;transition:transform .35s ease;pointer-events:none}
+.rf-m-main{fill:var(--s3)} .rf-m-rej{fill:var(--bad)} .rf-m-desel{fill:var(--muted)} .rf-m-lookup{fill:var(--s1)} .rf-m-cur{fill:var(--s4)}
+@keyframes rf-flow{to{stroke-dashoffset:-12}}
+@media (prefers-reduced-motion:reduce){.rf-fl.live{animation:none}circle.rf-dot{transition:none}}
+/* record chips and the hop navigator */
+.rf-chipgroup{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:0 0 8px}
+.rf-src{font-size:.74rem;color:var(--muted);width:100%}
+.rf-chip{font:inherit;font-size:.78rem;background:var(--btn);border:1px solid var(--line);border-left:4px solid var(--s3);color:var(--ink);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap}
+.rf-chip small{color:var(--muted);margin-left:4px}
+.rf-chip.e-rejected,.rf-chip.e-lost{border-left-color:var(--bad)} .rf-chip.e-lost{border-left-style:dashed}
+.rf-chip.e-deselected,.rf-chip.e-unmatched,.rf-chip.e-dropped{border-left-color:var(--muted)}
+.rf-chip.on{background:var(--hl);border-color:var(--s4);border-left-color:var(--s4)} .rf-chip.differs small{color:var(--bad-ink)}
+.rf-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}
+.rf-nav input{flex:1 1 120px;min-width:100px} .rf-nav output{font-size:.8rem;color:var(--ink2);white-space:nowrap}
+/* hop card */
+.rf-note{color:var(--ink2);font-size:.84rem;margin:0 0 6px}
+#atHop p,.rf-card p{margin:0 0 6px;font-size:.88rem}
+.rf-port{font-weight:650;white-space:nowrap} .rf-port.out{color:var(--good-ink)} .rf-port.reject{color:var(--bad-ink)} .rf-port.deselect{color:var(--ink2)}
+table.rf-ba{width:100%;border-collapse:collapse;font-size:.82rem;margin:2px 0 8px}
+.rf-ba th{color:var(--ink2);text-align:left;font-weight:600;border-bottom:1px solid var(--axis)}
+.rf-ba td,.rf-ba th{padding:2px 6px;vertical-align:top} .rf-ba td{border-bottom:1px solid var(--grid);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rf-ty{display:block;color:var(--muted);font-size:.7rem} .rf-s{white-space:pre}
+.rf-ba tr.chg td:last-child{background:var(--hl);font-weight:650}
+.rf-ba tr.add td:last-child{color:var(--good-ink);font-weight:650}
+.rf-ba tr.drop td:not(:last-child){text-decoration:line-through;color:var(--muted)} .rf-ba tr.drop td:last-child{color:var(--muted);font-style:italic}
+.rf-null{color:var(--s7);font-style:italic;font-weight:650}
+.rf-rule{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:.82rem;padding:3px 6px;border-left:3px solid var(--good);margin:0 0 4px;background:var(--panel2)}
+.rf-rule span{color:var(--ink2)} .rf-rule.null{border-left-color:var(--s7)} .rf-rule.fail{border-left-color:var(--bad)} .rf-rule.fail span{color:var(--bad-ink)} .rf-rule.skip{opacity:.6}
+.rf-err{background:color-mix(in srgb,var(--bad) 12%,var(--panel));border:1px solid var(--bad);border-radius:6px;padding:6px 8px;font-size:.84rem;margin:6px 0}
+.rf-h{margin-top:10px}
+.rf-inv{font-size:.84rem;margin:0 0 4px} .rf-inv .ok{color:var(--good-ink);font-weight:700} .rf-inv .bad{color:var(--bad-ink);font-weight:650} .rf-inv .tbd{color:var(--muted)} .rf-inv small{color:var(--ink2)}
+table.rf-rates{border-collapse:collapse;font-size:.84rem} .rf-rates td{padding:2px 10px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums} .rf-rates tr.hit td{background:var(--hl);font-weight:650}
+/* source and diff */
+pre.rf-src{max-height:60vh;overflow:auto;margin:0;font:12px/1.5 ui-monospace,Consolas,"DejaVu Sans Mono",monospace;background:var(--panel2);border-radius:6px;padding:6px 0;color:var(--ink2)}
+.rf-ln{display:block;padding:0 10px 0 0;white-space:pre} .rf-ln.hl{background:var(--hl);color:var(--ink)} .rf-ln.hl.nul{background:color-mix(in srgb,var(--s7) 18%,var(--panel2))} .rf-ln.hl.bad{background:color-mix(in srgb,var(--bad) 18%,var(--panel2))}
+.rf-ln.skip{color:var(--muted)} .rf-ln .n{color:var(--muted);display:inline-block;width:3.2em;text-align:right;margin-right:10px;user-select:none}
+.rf-diff .tablewrap{max-height:50vh;overflow:auto} .rf-diff tr[data-pick]{cursor:pointer} .rf-d{color:var(--bad-ink);font-weight:600}

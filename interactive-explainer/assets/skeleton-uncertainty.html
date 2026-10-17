@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A positive test: how likely is it real? — interactive explainer</title>
+<!--
+  SKELETON (uncertainty shape) for the interactive-explainer skill. Build: node scripts/build.js <this file> [--from <dir with model.js>]
+  Demo: a screening test (prevalence, sensitivity, specificity -> how many positives are truly sick), exact Bayes checked
+  against a seeded per-person simulation. Replace everything marked REPLACE. Guide: shapes/uncertainty.md.
+  The runtime (core + uncertainty) is inlined by build.js; never edit inside data-ie blocks. API: runtime/API.md.
+-->
+<style data-ie="core"></style>
+<style data-ie="uncertainty"></style>
+<style>/* page-only styles (usually none) */</style>
+</head>
+<body>
+<header class="ie-head"><div class="ttl">
+  <h1>A positive test: how likely is it real? (REPLACE)</h1>
+  <p class="lede">A screening test is right most of the time, yet most people who test positive are healthy. The tour walks through 1,000 people; change the test or the population under <i>What if?</i>, click a colour to follow one group, and press <i>Draw again</i> to see how much chance moves the counts. (REPLACE)</p>
+</div></header>
+
+<div class="answer" aria-label="Short answer">
+  <p class="claim"><b>Short answer (REPLACE):</b> after a positive result the chance of having the condition is only <span class="dyn" data-dyn="ppv"></span>, because the condition is rare: of 1,000 people screened, <span class="dyn" data-dyn="ppvFreq"></span> who test positive are truly sick.</p>
+  <div class="stat"><b data-dyn="ppv"></b><span>chance a positive is real</span></div>
+  <div class="stat"><b data-dyn="ppvFreq"></b><span>positives truly sick</span></div>
+  <div class="stat"><b data-dyn="oneIn"></b><span>in words</span></div>
+</div>
+
+<div class="layout">
+<aside>
+  <div class="card" id="tour"></div>
+  <div class="card" id="whatif"></div>
+  <div class="card" id="controls"><h4>Outcome group</h4><div id="pick"></div></div>
+</aside>
+<main>
+  <div class="grid2">
+    <section class="panel"><h3>1,000 people screened</h3><p class="sub">Each figure is one person, coloured by whether they are sick and what the test said. Blocks hold 100 people. Click a colour to follow that group.</p>
+      <div id="icons"></div></section>
+    <section class="panel"><div class="ptop"><h3 id="histTitle">The group's count across simulated towns</h3><span id="again"></span></div>
+      <p class="sub">Bars: how often each count came up in <span class="dyn" data-dyn="runs"></span> simulated towns of 1,000 people. Dots: the exact binomial distribution. Dashed: the middle 90% and the median.</p>
+      <div id="hist"></div></section>
+  </div>
+  <section class="panel"><h3>Chance a positive is real, by population</h3><p class="sub">The same test in groups where the condition is more or less common. Dot: the exact chance. Line: where 90% of towns of 1,000 screened people land. Click a row to screen that population.</p>
+    <div id="forest"></div></section>
+  <div id="readout" aria-live="polite"></div>
+</main>
+</div>
+
+<div class="wide">
+  <section><h2>Does the model reproduce the source?</h2><div id="valid"></div></section>
+  <section><details><summary>How the model works</summary>
+    <p>Every screened person is sick with probability <i>prevalence</i>. A sick person tests positive with probability <i>sensitivity</i>; a healthy person tests negative with probability <i>specificity</i>, so false alarms happen at 1 − specificity. Multiplying out gives four groups whose expected sizes out of 1,000 are the natural frequencies in the icon array. The chance that a positive is real is the true positives divided by all positives, which is Bayes' rule written with counts.</p>
+    <p>The simulation draws each of 1,000 people with a seeded random number generator, <span class="dyn" data-dyn="runs"></span> times. Its averages must agree with the exact numbers within about three standard errors (the validation table checks this live); its spread shows how far a single real town can land from the expectation. The populations in the bottom chart are illustrative <span class="badge illustrative">illustrative</span>. Natural frequencies make this easier to reason about than percentages<span id="ggcite"></span>.</p>
+  </details></section>
+  <section id="sources"></section>
+</div>
+
+<script data-ie="core"></script>
+<script data-ie="uncertainty"></script>
+<!-- MODEL: pure functions, no DOM. Write it as model.js in $TEMP, test it in Node, and build with --from "$TEMP/<name>".
+     The demo model below is the inlined copy; build.js keeps it until a model.js file is found. -->
+<script data-ie-file="model.js">
+// DEMO MODEL (REPLACE): a screening test. Exact natural frequencies by Bayes' rule, plus a seeded per-person
+// simulation that checks them. Pure: the page passes a uniform random function u() (IE.seeded), Node passes its own.
+const N_PEOPLE = 1000, RUNS = 2000;
+const REAL = { prevalence: 0.01, sens: 0.90, spec: 0.91, seed: 1 };        // prevalence, sensitivity, specificity (source: Table 1)
+const GROUPS = [
+  { id: 'tp', label: 'Sick, test positive', short: 'True +', color: 's8' },
+  { id: 'fn', label: 'Sick, missed by the test', short: 'Missed', color: 's4' },
+  { id: 'fp', label: 'Healthy, false alarm', short: 'False +', color: 's1' },
+  { id: 'tn', label: 'Healthy, test negative', short: 'True −', color: 'axis' },
+];
+const POPULATIONS = [   // illustrative base rates for the "step up" view
+  { id: 'low', label: 'Low risk', prevalence: 0.001 }, { id: 'gen', label: 'General population', prevalence: 0.01 },
+  { id: 'older', label: 'Older adults', prevalence: 0.03 }, { id: 'sympt', label: 'With symptoms', prevalence: 0.10 },
+  { id: 'ref', label: 'Referred by a doctor', prevalence: 0.30 },
+];
+// probability that one screened person lands in each group
+function probs(p){ return { tp: p.prevalence * p.sens, fn: p.prevalence * (1 - p.sens), fp: (1 - p.prevalence) * (1 - p.spec), tn: (1 - p.prevalence) * p.spec }; }
+// expected natural frequencies out of N people
+function expected(p, N = N_PEOPLE){
+  const q = probs(p), e = { N };
+  for (const k in q) e[k] = q[k] * N;
+  e.sick = e.tp + e.fn; e.healthy = e.fp + e.tn; e.pos = e.tp + e.fp; e.ppv = e.pos ? e.tp / e.pos : NaN; e.npv = e.tn / (e.tn + e.fn);
+  return e;
+}
+// Bayes' rule written directly: P(sick | positive)
+function ppvBayes(p){ return p.sens * p.prevalence / (p.sens * p.prevalence + (1 - p.spec) * (1 - p.prevalence)); }
+// one town: every person is sick or not, then tests positive or not
+function screenTown(p, N, u){
+  const c = { tp: 0, fn: 0, fp: 0, tn: 0 };
+  for (let i = 0; i < N; i++){ const sick = u() < p.prevalence, pos = sick ? u() < p.sens : u() >= p.spec; c[sick ? (pos ? 'tp' : 'fn') : (pos ? 'fp' : 'tn')]++; }
+  return c;
+}
+function simulate(p, runs, N, u){ const out = []; for (let r = 0; r < runs; r++) out.push(screenTown(p, N, u)); return out; }
+if (typeof module === 'object' && module.exports) module.exports = { N_PEOPLE, RUNS, REAL, GROUPS, POPULATIONS, probs, expected, ppvBayes, screenTown, simulate };
+</script>
+<script>
+// ============================ PAGE: sources, steps, views (REPLACE) ============================
+const { fmt } = IE, U = IE.uncertainty, $ = IE.$;
+IE.sources({   // every number the page quotes from the source gets an entry; cite with cite('id')
+  leaflet: { title: 'Screening test fact sheet (REPLACE)', url: 'https://example.org', where: 'Table 1 (REPLACE)',
+    quote: 'Of 1,000 people screened, about 10 have the condition. The test finds 9 of them; about 89 of the 990 people without it also test positive (REPLACE).' },
+  gh: { title: 'Gigerenzer G, Hoffrage U (1995). How to improve Bayesian reasoning without instruction: frequency formats. Psychological Review 102(4), 684–704', url: 'https://doi.org/10.1037/0033-295X.102.4.684', where: 'natural frequencies' },
+});
+$('ggcite').innerHTML = cite('gh');
+const G = id => GROUPS.find(g => g.id === id) || GROUPS[0];
+let E = null, SIM = [], SUM = null, POP = [], icons, hist, forest, picker;
+
+const app = IE.app({
+  real: REAL,
+  params: [
+    { id: 'prevalence', label: 'How common it is (prevalence)', min: 0.001, max: 0.5, step: 0.001, fmt: v => U.both(v, 1000) },
+    { id: 'sens', label: 'Sick people it catches (sensitivity)', min: 0.5, max: 1, step: 0.01, fmt: v => fmt.pct(v) },
+    { id: 'spec', label: 'Healthy people it clears (specificity)', min: 0.5, max: 0.999, step: 0.001, fmt: v => fmt.pct(v, 1) },
+  ],
+  options: [{ id: 'scatter', label: 'Icon array: show one simulated town, people in random places', value: false }],
+  whatIf: [
+    { key: 'real', label: 'Real', set: { prevalence: REAL.prevalence, sens: REAL.sens, spec: REAL.spec } },
+    { key: 'spec', label: '99% specific', set: { prevalence: REAL.prevalence, sens: REAL.sens, spec: 0.99 } },
+    { key: 'common', label: '10× as common', set: { prevalence: REAL.prevalence * 10, sens: REAL.sens, spec: REAL.spec } },
+    { key: 'retest', label: 'Retest positives', set: { prevalence: +ppvBayes(REAL).toFixed(4), sens: REAL.sens, spec: REAL.spec } },
+  ],
+  // the shared selection: one outcome group (← → cycle through them)
+  sel: { stepBy(dir, app){ const i = GROUPS.findIndex(g => g.id === app.sel); app.setSel(GROUPS[(i + dir + GROUPS.length) % GROUPS.length].id); }, keyHint: 'next / previous outcome group' },
+  steps: [
+    { title: '1 · You test positive', sel: 'tp',
+      html: () => `<p>A test catches ${D('sens')} of people who have the condition and clears ${D('spec')} of people who don't${cite('leaflet')}. You test positive. How likely is it that you are sick?</p>
+        <p>Many people answer "about 90%". The answer is ${D('ppv')}: ${D('ppvFreq')}. The next steps count it out.</p>` },
+    { title: '2 · Picture 1,000 people', sel: 'fn',
+      html: () => `<p>Of 1,000 people screened, ${D('sickN')} have the condition (${D('prevPct')}). The test finds ${D('tpN')} of them and misses ${D('fnN')}.</p>
+        <p><button data-set="prevalence=0.05">Make it 5× as common</button> <button data-set="prevalence=0.01">Back to 1%</button></p>` },
+    { title: '3 · The false alarms', sel: 'fp',
+      html: () => `<p>The other ${D('healthyN')} people are healthy. The test wrongly flags ${D('fpRate')} of them, which is ${D('fpN')} false alarms: about ${D('fpPerTp')} for every true positive.</p>` },
+    { title: '4 · Count the positives', sel: 'tp',
+      html: () => `<p>${D('tpN')} true + ${D('fpN')} false = ${D('posN')} positives, and only ${D('tpN')} of them are sick: ${D('ppv')}.</p>
+        <p>That is Bayes' rule, done with counts: chance sick given positive = sick and positive ÷ all positive.</p>` },
+    { title: '5 · Chance moves the counts', sel: 'fp',
+      html: () => `<p>No real town of 1,000 hits the expected counts. Across ${D('runs')} simulated towns, the ${DW('gShort')} count landed between ${D('q05')} and ${D('q95')} in 90% of them.</p>
+        <p><button data-set="scatter=true">Show one simulated town</button> <button data-set="seed=7">Use another seed</button></p>` },
+    { title: '6 · Step up: the base rate decides', sel: 'tp',
+      html: () => `<p>The same test, used where the condition is common, gives very different answers: from ${D('ppvLow')} for low-risk people to ${D('ppvRef')} for people referred by a doctor. Click a row in the bottom chart to screen that group.</p>
+        <p><button data-set="prevalence=0.1">Screen people with symptoms</button></p>` },
+    { title: '7 · A more specific test', params: { spec: 0.99 }, sel: 'fp',
+      html: () => `<p>Raise specificity to ${D('spec')} and false alarms fall to ${D('fpN')}. A positive now means ${D('ppv')}. Fewer false alarms help more than catching more of the sick, because the healthy are the crowd.</p>` },
+  ],
+  recompute(P){
+    E = expected(P);
+    SIM = simulate(P, RUNS, N_PEOPLE, IE.seeded(P.seed));
+    const prng = U.rng(P.seed * 7919 + 17);   // populations: multinomial draws per town (tp, then fp among the rest)
+    POP = POPULATIONS.map(po => { const p = { ...P, prevalence: po.prevalence }, q = probs(p), r = [];
+      for (let i = 0; i < 1000; i++){ const tp = prng.binomial(N_PEOPLE, q.tp), fp = prng.binomial(N_PEOPLE - tp, q.fp / (1 - q.tp)); if (tp + fp) r.push(tp / (tp + fp)); }
+      const s = U.summary(r, [0.05, 0.95]); return { ...po, est: ppvBayes(p), lo: s.q[0], hi: s.q[1] }; });
+    const rows = POP.map(po => ({ id: po.id, label: `${po.label} (${U.pct(po.prevalence)})`, est: po.est, lo: po.lo, hi: po.hi, color: Math.abs(po.prevalence - P.prevalence) < 1e-9 ? 's2' : 's1' }));
+    if (!POP.some(po => Math.abs(po.prevalence - P.prevalence) < 1e-9)) rows.push({ id: 'you', label: `Your setting (${U.pct(P.prevalence)})`, est: ppvBayes(P), lo: NaN, hi: NaN, color: 's2' });
+    for (const r of rows) if (!isFinite(r.lo)){ const s = U.summary(SIM.filter(c => c.tp + c.fp).map(c => c.tp / (c.tp + c.fp)), [0.05, 0.95]); r.lo = s.q[0]; r.hi = s.q[1]; }
+    const fspec = { title: 'Chance a positive is real, by population', rows, x: { min: 0, max: 1, fmt: v => fmt.pct(v) , label: 'chance a positive result is real' },
+      refs: [{ x: 0.5, label: 'coin flip' }], valueText: (r, narrow) => narrow ? U.pct(r.est) : `${U.pct(r.est)} (${U.pct(r.lo)}–${U.pct(r.hi)})`,
+      onPick: id => { const po = POPULATIONS.find(x => x.id === id); if (po) app.set({ prevalence: po.prevalence }); } };
+    forest ? forest.set(fspec) : (forest = U.forest($('forest'), fspec));
+  },
+  render({ P, sel }){
+    const g = G(sel), d = SIM.map(c => c[g.id]), q = probs(P)[g.id];
+    SUM = U.summary(d);
+    const counts = P.scatter ? GROUPS.map(x => SIM[0][x.id]) : U.roundCounts(GROUPS.map(x => E[x.id]), N_PEOPLE);   // option: no recompute
+    icons.set({ groups: GROUPS.map((x, i) => ({ ...x, count: counts[i] })), shuffle: P.scatter ? P.seed : null, highlight: g.id }); picker.set(g.id); forest.set({ highlight: POP.find(po => Math.abs(po.prevalence - P.prevalence) < 1e-9)?.id || 'you' });
+    hist.set({ draws: d, exact: { pmf: k => U.binom.pmf(k, N_PEOPLE, q) }, color: g.color === 'axis' ? 'ink2' : g.color, title: `${g.label}: count in ${fmt.int(RUNS)} simulated towns`,
+      exactLabel: `exact binomial (n = 1,000, p = ${U.pct(q)})` });
+    $('histTitle').textContent = `${g.label}: how many in a town of 1,000?`;
+    valid.render();
+  },
+  dyn({ P, sel }){
+    const g = G(sel), pop = id => POP.find(p => p.id === id);
+    return { ppv: U.pct(E.ppv), ppvFreq: `${fmt.int(E.tp)} of ${fmt.int(E.pos)}`, oneIn: U.oneIn(E.ppv), sens: fmt.pct(P.sens), spec: fmt.pct(P.spec, P.spec > 0.99 ? 1 : 0),
+      prevPct: U.pct(P.prevalence), sickN: fmt.num(E.sick, E.sick < 10 && E.sick % 1 ? 1 : 0), tpN: fmt.int(E.tp), fnN: fmt.int(E.fn), healthyN: fmt.int(E.healthy), fpN: fmt.int(E.fp),
+      posN: fmt.int(E.pos), fpRate: U.pct(1 - P.spec), fpPerTp: E.tp ? fmt.num(E.fp / E.tp, E.fp / E.tp < 3 ? 1 : 0) : '–', runs: fmt.int(RUNS),
+      gShort: g.label.toLowerCase(), q05: fmt.int(SUM.q[0]), q95: fmt.int(SUM.q[2]), ppvLow: U.pct(pop('low').est), ppvRef: U.pct(pop('ref').est) };
+  },
+  readout({ P, sel }){ const g = G(sel), pg = probs(P)[g.id], pos = g.id === 'tp' || g.id === 'fp';
+    return `<b>${g.label}</b>: ${U.both(pg, 1000)} of everyone screened` +
+      (pos ? ` · <b>${fmt.int(E[g.id])} of the ${fmt.int(E.pos)}</b> positives (${U.pct(E[g.id] / E.pos)})` : ` · <b>${fmt.int(E[g.id])} of the ${fmt.int(E.fn + E.tn)}</b> negatives (${U.pct(E[g.id] / (E.fn + E.tn))})`) +
+      ` · in 90% of simulated towns: <b>${fmt.int(SUM.q[0])}–${fmt.int(SUM.q[2])}</b> people · seed ${P.seed}`; },
+});
+
+// ---- views that do not depend on the model run
+picker = U.picker($('pick'), GROUPS.map(g => ({ id: g.id, label: g.short, title: g.label })), id => app.setSel(id), { label: 'Outcome group' });
+icons = U.iconArray($('icons'), { title: '1,000 people screened', groups: [], N: N_PEOPLE, onPick: id => app.setSel(id) });
+hist = U.histogram($('hist'), { draws: [], height: 250, x: { label: 'people in the group, per town of 1,000' } });
+U.drawAgain($('again'), () => app.set({ seed: (app.P.seed % 9973) + 1 }));
+
+// ---- validation: source numbers at the real settings, maths and simulation at the current settings (REPLACE)
+const near = (a, b, t) => Math.abs(a - b) <= t;
+const valid = IE.validation('valid', [   // rows are read live: getters keep claim/target in step with the selection
+  { claim: 'Of 1,000 people screened, about 10 have the condition', source: 'leaflet', target: '10', model: () => fmt.num(expected(REAL).sick, 1), ok: () => near(expected(REAL).sick, 10, 0.5) },
+  { claim: 'The test finds 9 of them', source: 'leaflet', target: '9', model: () => fmt.num(expected(REAL).tp, 1), ok: () => near(expected(REAL).tp, 9, 0.5) },
+  { claim: 'About 89 of the 990 healthy people test positive', source: 'leaflet', target: '89', model: () => fmt.num(expected(REAL).fp, 1), ok: () => near(expected(REAL).fp, 89, 0.5) },
+  { claim: "Bayes' rule gives the same answer as counting (current settings)", source: 'exact identity', target: '', model: () => `${U.pct(ppvBayes(app.P))} = ${U.pct(E.ppv)}`, ok: () => near(ppvBayes(app.P), E.ppv, 1e-12) },
+  { claim: 'Every person lands in exactly one group, in every simulated town', source: 'conservation', target: '1,000', model: () => fmt.num(E.tp + E.fn + E.fp + E.tn, 0) + (SIM.every(c => c.tp + c.fn + c.fp + c.tn === N_PEOPLE) ? ' (all towns)' : ' (a town differs)'),
+    ok: () => near(E.tp + E.fn + E.fp + E.tn, N_PEOPLE, 1e-9) && SIM.every(c => c.tp + c.fn + c.fp + c.tn === N_PEOPLE) },
+  { claim: 'Simulated share of positives who are sick agrees with Bayes (within 3 standard errors)', source: 'simulation', get target(){ return U.pct(ppvBayes(app.P)); },
+    model: () => { const a = simPPV(); return `${U.pct(a.sim)} ± ${U.pct(a.tol)}`; }, ok: () => simPPV().ok },
+  { get claim(){ return `${G(app.sel).label}: simulated average count vs the binomial mean (within 3 standard errors)`; }, source: 'simulation', get target(){ return fmt.num(N_PEOPLE * probs(app.P)[G(app.sel).id], 1); },
+    model: () => fmt.num(SUM.mean, 2), ok: () => { const q = probs(app.P)[G(app.sel).id]; return U.agree(SUM.mean, N_PEOPLE * q, U.seMean(Math.sqrt(N_PEOPLE * q * (1 - q)), RUNS)).ok; } },
+  { get claim(){ return `${G(app.sel).label}: simulated 5% and 95% points vs the exact binomial quantiles`; }, source: 'simulation', get target(){ return exactQ().map(z => z.ex).join('–'); },
+    model: () => `${fmt.int(SUM.q[0])}–${fmt.int(SUM.q[2])}`, ok: () => exactQ().every((z, i) => Math.abs(SUM.q[i * 2] - z.ex) <= z.tol) },
+]);
+function simPPV(){ const tp = SIM.reduce((s, c) => s + c.tp, 0), pos = SIM.reduce((s, c) => s + c.tp + c.fp, 0), ex = ppvBayes(app.P), a = U.agree(tp / pos, ex, U.seProp(ex, pos)); return { sim: tp / pos, tol: a.tol, ok: a.ok }; }
+function exactQ(){ const q = probs(app.P)[G(app.sel).id];   // tolerance: 3 standard errors of a sample quantile, at least one person
+  return [0.05, 0.95].map(qu => { const ex = U.binom.quantile(qu, N_PEOPLE, q); return { ex, tol: Math.max(1, Math.ceil(3 * U.seQuantile(qu, RUNS, Math.max(U.binom.pmf(ex, N_PEOPLE, q), 1e-9)))) }; }); }
+</script>
+</body>
+</html>

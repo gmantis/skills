@@ -1,0 +1,70 @@
+/* interactive-explainer runtime: compare.css (IE.compare views). Theme tokens only, so light and dark both work. */
+.cmp-sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline;flex-shrink:0}
+.mut{color:var(--muted);font-size:.76rem;font-weight:400}
+h5{margin:6px 0 2px;font-size:.78rem;color:var(--ink2);font-weight:650}
+/* presets wrap into rows of three in the narrow aside */
+#whatSeg{flex-wrap:wrap;gap:4px}
+#whatSeg button{flex:1 1 30%;border-radius:6px!important}
+.ctl.cmp-zero{opacity:.45}
+/* flex/grid items default to min-width:auto, so a wide table would widen main past a phone screen */
+main .panel,main .grid2>*{min-width:0}
+/* .sr-only text is position:absolute; without a positioned scroll wrapper it escapes the clip and widens the page */
+.tablewrap{position:relative}
+/* the aligned table */
+table.cmp{width:100%;min-width:640px;border-collapse:separate;border-spacing:0;font-size:.82rem;background:var(--panel2)}
+.cmp th,.cmp td{padding:6px 9px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
+.cmp thead th{border-bottom:2px solid var(--axis);font-weight:600}
+.cmp th.corner{color:var(--ink2);font-weight:500;width:28%}
+.cmp tbody th{font-weight:600}
+/* the criterion column stays put while the options scroll sideways (phones) */
+.cmp tbody th,.cmp th.corner{position:sticky;left:0;z-index:1;background:var(--panel2)}
+.cmp th.opt{min-width:110px} .cmp th.opt .oname{font-weight:650}
+.cmp td{white-space:nowrap}
+.cmp [data-pick]{cursor:pointer}
+.cmp [data-pick]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.cmp .selcol{background:color-mix(in srgb,var(--accent) 9%,var(--panel2))}
+.cmp tr.selrow>*{background:color-mix(in srgb,var(--accent) 9%,var(--panel2))} .cmp tr.selrow>th{box-shadow:inset 3px 0 0 var(--accent)}
+.cmp td.win{background:var(--hl);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--s4) 60%,transparent)}
+.cmp td.win .raw::after{content:" ★";color:var(--s4);font-size:.8em}
+.cmp td.sel{outline:2px solid var(--ink);outline-offset:-2px}
+.cmp tr.zero>*{opacity:.4} .cmp .out{opacity:.4}
+.cmp th.lead .oname::after{content:" · first";color:var(--good-ink);font-weight:600;font-size:.8em}
+.cmp tr.tot>*{border-top:2px solid var(--axis);font-weight:600}
+.cmp .raw{font-weight:600}
+.cmp .sc{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.74rem;font-variant-numeric:tabular-nums}
+.cmp .sc b{display:block;width:46px;height:5px;background:var(--grid);border-radius:2px;overflow:hidden} .cmp .sc b i{display:block;height:100%}
+.cmp-rk{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;border-radius:11px;background:var(--btn);border:1px solid var(--line);font-size:.75rem;font-weight:700}
+.cmp-rk.r1{background:var(--hl);border-color:var(--s4)}
+.cmp-up{color:var(--good-ink);font-size:.74rem} .cmp-down{color:var(--bad-ink);font-size:.74rem}
+/* ranking: absolutely placed rows that slide when the order changes */
+.cmp-rank{position:relative}
+.cmp-rrow{position:absolute;left:0;right:0;top:0;height:30px;display:grid;grid-template-columns:30px minmax(0,160px) minmax(0,1fr) 46px;gap:8px;align-items:center;cursor:pointer;transition:transform .5s ease,opacity .3s;font-size:.82rem;border-radius:6px;padding:0 4px}
+.cmp-rrow.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)} .cmp-rrow.out{opacity:.4}
+.cmp-rname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-stack{display:flex;height:16px;background:var(--grid);border-radius:3px;overflow:hidden} .cmp-stack i{display:block;height:100%;transition:width .5s ease}
+.cmp-stack i+i{box-shadow:inset 1px 0 0 var(--panel)}
+.cmp-num{text-align:right;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cmp-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.76rem;color:var(--ink2);margin-top:8px}
+.cmp-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+/* small side-by-side views */
+.cmp-minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.cmp-mini{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;min-width:0}
+.cmp-mini.win{border-color:var(--s4)} .cmp-mini.sel{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)} .cmp-mini.out{opacity:.4}
+.cmp-mhead{display:flex;justify-content:space-between;gap:6px;font-size:.82rem;margin-bottom:4px} .cmp-mhead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .cmp-mhead span{white-space:nowrap;flex-shrink:0}
+.cmp-mrow{display:grid;grid-template-columns:62px minmax(0,1fr) 32px;gap:6px;align-items:center;font-size:.76rem;margin:3px 0}
+.cmp-mrow>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-track{position:relative;display:block;height:10px;background:var(--grid);border-radius:3px}
+.cmp-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .5s ease,opacity .3s}
+.cmp-mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--axis)}
+/* sensitivity rows, detail card, selection nav */
+.cmp-srow{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:start;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:.84rem}
+.cmp-srow.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)} .cmp-srow.frag{box-shadow:inset 3px 0 0 var(--bad)}
+.cmp-srow .cmp-sw{margin-top:6px}
+.cmp-ev{width:100%;border-collapse:collapse;font-size:.8rem;margin:4px 0 8px} .cmp-ev td{padding:3px 6px;border-bottom:1px solid var(--grid);vertical-align:top}
+.cmp-ev td.v{white-space:nowrap;font-weight:600} .cmp-ev td.n{color:var(--ink2)}
+.cmp-pc{display:grid;grid-template-columns:1fr 1fr;gap:10px} .cmp-pc ul{margin:0;padding-left:16px;font-size:.84rem}
+.cmp-note{border-left:3px solid var(--s4);padding:4px 8px;background:var(--panel2);border-radius:0 6px 6px 0;font-size:.86rem}
+.cmp-selnav{display:flex;align-items:center;gap:8px} .cmp-selnav .cur{flex:1;min-width:0;font-size:.88rem}
+#detail p{margin:0 0 8px;font-size:.9rem}
+@media (prefers-reduced-motion:reduce){.cmp-rrow,.cmp-stack i,.cmp-fill{transition:none}}
+@media (max-width:520px){.cmp-pc{grid-template-columns:1fr} .cmp th.corner{width:auto} .cmp tbody th{max-width:132px;min-width:110px}}

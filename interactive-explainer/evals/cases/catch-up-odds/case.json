@@ -1,0 +1,13 @@
+{
+  "id": "catch-up-odds",
+  "tier": "Explainer",
+  "prompt": "/interactive-explainer on source.md",
+  "expect_shapes": ["derivation", "uncertainty", "sweep"],
+  "targets": [
+    { "label": "reproduces 0.0009137 (q=0.1, z=5)", "expr": "/0\\.000913[67]|0\\.0914\\s*%|0\\.09137/.test(document.body.innerText)" },
+    { "label": "reproduces 0.1773523 (q=0.3, z=5)", "expr": "/0\\.17735|17\\.7\\d?\\s*%/.test(document.body.innerText)" },
+    { "label": "z=24 at q=30% for <0.1%", "expr": "/\\b24\\b/.test(document.body.innerText)" },
+    { "label": "validation table all pass", "expr": "document.querySelectorAll('.ok').length >= 5 && !document.querySelector('.fail')" }
+  ],
+  "budget": { "minutes": 15, "output_tokens": 150000 }
+}
