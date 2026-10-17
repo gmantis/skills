@@ -6,6 +6,7 @@
 // [data-w] what-if button, takes screenshots, and fails loudly on page errors.
 // It also re-runs the page at devicePixelRatio 1.5 (canvases must not grow on redraw) and at phone width 390 px
 // (no horizontal page scroll).
+// It presses ← / → (time must move: the slider marked data-time) and Ctrl + ← / → (STEP must change).
 // Diagram shapes: it clicks every [data-pick] element (probing after each), warns on overlapping labels (svg text, .lbl)
 // and fails on labels cut off at their svg edge, at desktop and phone width.
 // Teaching lint (warnings, not failures): quiz options must have equal word counts, the right answer must not be
@@ -106,6 +107,26 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
     await doProbe(`what-if ${w}`);
     await page.screenshot({ path: path.join(outDir, `whatif-${w}.png`), fullPage: true });
   }
+  // keyboard: ← / → must move time (the slider marked data-time changes), Ctrl + ← / → must change topic (STEP)
+  const kb = await page.evaluate(() => ({ time: !!document.querySelector('input[data-time]'), hint: !!document.querySelector('.keys'),
+    steps: typeof STEPS !== 'undefined' && typeof goStep === 'function' && typeof STEP !== 'undefined' }));
+  if (!kb.time && !kb.hint) warnings.push('keyboard: page has no ← → / Ctrl+← → shortcuts (no data-time slider or .keys hint); add them from the skeleton onKey function');
+  else {
+    await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (typeof goStep === 'function') goStep(0); });
+    await page.waitForTimeout(200);
+    if (kb.time){
+      const tv = () => page.$eval('input[data-time]', e => e.value), v0 = await tv();
+      await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150); let moved = (await tv()) !== v0;
+      if (!moved){ await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(150); moved = (await tv()) !== v0; }   // may sit at a clamped end
+      if (!moved) errors.push('keyboard: ← / → did not move time (input[data-time] unchanged); wire onKey/stepTime as in the skeleton');
+    } else warnings.push('keyboard: no time slider marked data-time, so ← / → is untested');
+    if (kb.steps && nSteps > 1){
+      const s0 = await page.evaluate(() => STEP);
+      await page.keyboard.press('Control+ArrowRight'); await page.waitForTimeout(200); const s1 = await page.evaluate(() => STEP);
+      await page.keyboard.press('Control+ArrowLeft'); await page.waitForTimeout(200); const s2 = await page.evaluate(() => STEP);
+      if (s1 !== s0 + 1 || s2 !== s0) errors.push(`keyboard: Ctrl+→ / Ctrl+← should change topic ${s0}→${s0 + 1}→${s0}, got ${s0}→${s1}→${s2}`);
+    }
+  }
   // diagram shapes: click every [data-pick] target (boxes, arrows, tree nodes, table rows) and probe after each
   await page.evaluate(() => typeof goStep === 'function' && goStep(0)); await page.waitForTimeout(250);
   const picks = await page.$$eval('[data-pick]', es => es.map(e => e.dataset.pick));
@@ -180,7 +201,7 @@ function playwrightCandidates(){   // every Playwright we can require: local, np
   await ph.close();
   await browser.close();
   console.log(`steps: ${nSteps}, step buttons: ${nSetButtons}, what-if scenarios: ${whats.length}, picks: ${picks.length}, quiz questions: ${lint.qs.length}${isLesson ? ' (lesson)' : ''}, screenshots in ${path.resolve(outDir)}`);
-  if (warnings.length) console.log('WARNINGS (teaching lint, not failures):\n' + warnings.join('\n'));
+  if (warnings.length) console.log('WARNINGS (not failures):\n' + warnings.join('\n'));
   if (errors.length){ console.error('ERRORS:\n' + errors.join('\n')); process.exit(1); }
   console.log('errors: none');
 })();

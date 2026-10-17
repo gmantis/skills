@@ -71,6 +71,7 @@ Include:
 4. **Live readout and explanation** that update with the settings, e.g. "A dominates" / "B dominates" / "balanced".
 5. **Presets** for the named cases in the source, and a reproduction of any table in the source with the source's values shown in grey next to the model's.
 6. **Plain-language captions** on every panel, saying what to look at.
+7. **Keyboard shortcuts**: <kbd>←</kbd> / <kbd>→</kbd> move the shared selection one natural unit and pause playback. That unit is a day, an hour or a cohort for the over-time shape, one notch of the parameter for a sweep, and one trace step `K` for a stepper. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>←</kbd> / <kbd>→</kbd> go to the previous or next topic (tour step). Copy the skeleton's `onKey` and keep its guards: it ignores typing fields and Alt (browser back on Windows), and a focused slider keeps its own plain-arrow behaviour. Mark the slider that holds the selection `data-time` so `check.js` can test the keys, and show the keys hint (`.keys`) under the step text. Clamp in `stepTime` when the axis isn't cyclic (cohorts, a parameter range).
 
 ### 3b. 2D diagram and chart rules
 - **Canvas sizing: always use the skeleton's `setupCanvas`.** It keeps the logical height in `data-h`. Never read the height back from `cv.height` or `getAttribute('height')` after setting the backing store to `H * dpr`. On a HiDPI screen (Windows at 125–150%) every redraw multiplies the height, and the chart grows with each click until the page is unusable. To resize a canvas at runtime, set `cv.dataset.h`.
@@ -97,6 +98,7 @@ node ~/.claude/skills/interactive-explainer/scripts/check.js "<page.html>" "$TEM
   - syntax-checks the inline script;
   - walks every step and every `[data-w]` what-if;
   - flags empty or `NaN`/`undefined` `data-dyn` fields and page errors;
+  - presses <kbd>←</kbd>/<kbd>→</kbd> (the `data-time` slider must move) and <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> (`STEP` must change by one), and fails if they don't. Pages without a `data-time` slider or `.keys` hint (older pages) only get a warning;
   - re-runs at **devicePixelRatio 1.5**, clicking every non-drag canvas, and fails if any canvas height changes;
   - re-runs at **390 px phone width** and fails on horizontal page scroll;
   - clicks every inline `data-set` button in each step's text and probes after each;
@@ -129,6 +131,7 @@ node ~/.claude/skills/interactive-explainer/scripts/check.js "<page.html>" "$TEM
 - Hand-rolled `fit()` helpers that read `getAttribute('height')` make canvases grow on every redraw on HiDPI screens. Use `setupCanvas`/`data-h` (see 3b). Headless tests at dpr 1 don't show it; `check.js` now tests at 1.5.
 - Emoji drawn with `fillText` show as boxes in the verification screenshots, so use words.
 - Labels drawn in scaled figure coordinates become unreadable on small canvases. Draw them in screen space.
+- A global arrow-key handler that doesn't check the focused element hijacks slider adjustment and Ctrl+← word jumps in text fields. Copy the skeleton's `onKey` guards rather than writing a bare `keydown` listener.
 - Forcing a causal or structural source into a time chart hides the point. Pick the shape first (step 1b).
 - At phone width the column `.layout` keeps `align-items:flex-start`, so `main` can grow to its max-content width when it holds a wide `nowrap` table. Add `align-items: stretch` to `.layout` in the 1000 px media query if `check.js` reports sideways scroll with no named element.
 - `.dyn` live numbers are `nowrap`. For values that are sentences (a winner's name, a sensitivity line) use a wrapping variant (the compare skeleton's `DW()` / `.dyn.wrap`), or they run out of the tour card.

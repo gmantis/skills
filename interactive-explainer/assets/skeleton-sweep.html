@@ -34,6 +34,7 @@
   .dots{display:flex;gap:5px;flex:1;justify-content:center}
   .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
   .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  .keys{margin:6px 0 0;font-size:.72rem;color:var(--muted)} .keys kbd{font:inherit;background:#1b2640;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink)}
   #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--cur)}
   #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
   h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
@@ -74,8 +75,9 @@
 <div class="layout">
 <aside>
   <div class="card">
-    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <div class="stepnav"><button id="prev" title="Previous topic (Ctrl+←)">‹</button><div class="dots" id="dots"></div><button id="next" title="Next topic (Ctrl+→)">›</button></div>
     <h2 id="stepTitle"></h2><div id="stepText"></div>
+    <p class="keys">Keys: <kbd>←</kbd> <kbd>→</kbd> move the swept value · <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>←</kbd> <kbd>→</kbd> previous / next topic</p>
   </div>
   <div class="card">
     <h4>What if?</h4>
@@ -195,6 +197,7 @@ const pct = v => Math.round(v * 100) + '%';
 const fmtMin = v => !Number.isFinite(v) ? 'grows without limit' : v < 1 ? Math.round(v * 60) + ' s' : v < 100 ? v.toFixed(1) + ' min' : (v / 60).toFixed(1) + ' h';
 const fmtDur = m => m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + ' h ' + String(Math.round(m % 60)).padStart(2, '0') + ' min';
 const SWEEP_SPEC = { id: 'rho', label: 'Utilisation ρ: how busy each server is', min: SWEEP.min, max: SWEEP.max, step: 0.005, fmt: pct };
+const KEY_STEP = 0.01;   // REPLACE: one ← / → press moves the swept parameter by this much (clamped to the range)
 const SPEC = [   // REPLACE: every other meaningful parameter
   { id: 's', label: 'Mean service time', min: 0.5, max: 10, step: 0.5, fmt: v => v.toFixed(1) + ' min' },
   { id: 'cs2', label: 'How uneven service is (cs²: 0 constant, 1 random)', min: 0, max: 3, step: 0.1, fmt: v => v.toFixed(1) },
@@ -421,6 +424,23 @@ function syncUI(){
   document.querySelectorAll('#whatSeg button').forEach(b => { const w = WHAT[b.dataset.w]; b.classList.toggle('on', WHAT_KEYS.every(k => P[k] === w[k])); });
 }
 function setParams(o){ Object.assign(P, o); P.rho = Math.max(SWEEP.min, Math.min(SWEEP.max, P.rho)); syncUI(); recompute(); }
+// ← / → move the swept value one notch (clamped: a parameter range is not cyclic). Pauses the sweep.
+function stepTime(dir){
+  playing = false; $('play').textContent = '▶ Sweep';
+  setParams({ [SWEEP_SPEC.id]: Math.round((P[SWEEP_SPEC.id] + dir * KEY_STEP) / KEY_STEP) * KEY_STEP });
+}
+// Keyboard: ← → swept value, Ctrl/⌘ + ← → topic (tour step). Leaves typing fields alone, lets a focused slider keep its
+// own plain-arrow behaviour, and ignores Alt (browser back/forward on Windows).
+function onKey(e){
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.altKey || e.defaultPrevented) return;
+  const el = e.target, tag = el && el.tagName, mod = e.ctrlKey || e.metaKey;
+  if (el && (el.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && el.type !== 'range' && el.type !== 'checkbox' && el.type !== 'radio'))) return;
+  if (!mod && tag === 'INPUT' && el.type === 'range') return;
+  const dir = e.key === 'ArrowRight' ? 1 : -1;
+  e.preventDefault();
+  if (mod) goStep(STEP + dir); else stepTime(dir);
+}
 function goStep(i){
   STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
   if (st.params){ Object.keys(P).forEach(k => delete P[k]); setParams({ ...st.params }); }
@@ -434,6 +454,7 @@ function init(){
     d.innerHTML = `<div class="lab"><span>${s.label}</span><output id="${s.id}_o"></output></div><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
     $(host).appendChild(d); $(s.id).addEventListener('input', () => setParams({ [s.id]: +$(s.id).value })); };
   mk(SWEEP_SPEC, 'sweepCtl'); SPEC.forEach(s => mk(s, 'params'));
+  $(SWEEP_SPEC.id).setAttribute('data-time', '');   // check.js presses ← / → and expects this slider to move
   for (const b of BOOLS) $(b).onchange = () => setParams({ [b]: $(b).checked });
   $('two').onchange = () => setParams({ c: $('two').checked ? 2 : 1 });
   $('ghosts').onchange = () => dirty = true;
@@ -450,6 +471,7 @@ function init(){
   buildPanels();
   $('smGrid').addEventListener('click', ev => { const t = ev.target.closest('[data-pick]'); if (t){ playing = false; setParams({ rho: +t.dataset.pick.split(':')[1] }); } });
   window.addEventListener('resize', () => dirty = true);
+  document.addEventListener('keydown', onKey);
   syncUI(); goStep(0);
   let last = null;
   const frame = now => {

@@ -25,6 +25,7 @@
   .dots{display:flex;gap:5px;flex:1;justify-content:center}
   .dots span{width:22px;height:22px;border-radius:50%;background:#1b2640;border:1px solid var(--line);font-size:.72rem;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
   .dots span.on{background:#2b4a7a;border-color:var(--accent);color:var(--ink)}
+  .keys{margin:6px 0 0;font-size:.72rem;color:var(--muted)} .keys kbd{font:inherit;background:#1b2640;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink)}
   #stepTitle{margin:8px 0 6px;font-size:1.02rem;color:var(--total)}
   #stepText{font-size:.87rem} #stepText p{margin:0 0 8px} #stepText .dyn{color:var(--ink);font-weight:600;white-space:nowrap}
   h4{margin:0 0 8px;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
@@ -50,8 +51,9 @@
 <div class="layout">
 <aside>
   <div class="card">
-    <div class="stepnav"><button id="prev">‹</button><div class="dots" id="dots"></div><button id="next">›</button></div>
+    <div class="stepnav"><button id="prev" title="Previous topic (Ctrl+←)">‹</button><div class="dots" id="dots"></div><button id="next" title="Next topic (Ctrl+→)">›</button></div>
     <h2 id="stepTitle"></h2><div id="stepText"></div>
+    <p class="keys">Keys: <kbd>←</kbd> <kbd>→</kbd> step through time · <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>←</kbd> <kbd>→</kbd> previous / next topic</p>
   </div>
   <div class="card">
     <h4>What if?</h4>
@@ -62,7 +64,7 @@
   </div>
   <div class="card">
     <h4>Time</h4>
-    <div class="ctl"><div class="lab"><span>Position in the cycle</span><output id="t_o"></output></div><input type="range" id="t" min="0" max="1" step="0.001" value="0.3"></div>
+    <div class="ctl"><div class="lab"><span>Position in the cycle</span><output id="t_o"></output></div><input type="range" id="t" data-time min="0" max="1" step="0.001" value="0.3"></div>
     <button class="btn" id="play">▶ Play</button>
     <h4 style="margin-top:12px">Parameters</h4>
     <div id="params"></div>
@@ -98,6 +100,7 @@ const SPEC = [   // REPLACE: one entry per physical parameter
 ];
 const P = { ...REAL, offA: false, offB: false };
 let T = 0.3, SER = [], playing = false, dirty = true, STEP = 0;
+const TIME_KEY_STEP = 1 / N;   // REPLACE: one natural unit per ← / → press (a day, an hour, a cohort)
 const recompute = () => { SER = series(P); dirty = true; };
 
 // ============================ STEPS (guided tour) — REPLACE ============================
@@ -250,6 +253,23 @@ function syncUI(){
   document.querySelectorAll('#whatSeg button').forEach(b => { const [a, c] = WHAT[b.dataset.w]; b.classList.toggle('on', a === P.offA && c === P.offB); });
 }
 function setParams(o){ Object.assign(P, o); syncUI(); recompute(); }
+// ← / → move time by one unit (cyclic here; clamp instead for a non-cyclic axis such as cohorts). Pauses playback.
+function stepTime(dir){
+  if (playing){ playing = false; $('play').textContent = '▶ Play'; }
+  T = ((T + dir * TIME_KEY_STEP) % 1 + 1) % 1; dirty = true;
+}
+// Keyboard: ← → time, Ctrl/⌘ + ← → topic (tour step). Leaves typing fields alone, lets a focused slider keep its
+// own plain-arrow behaviour, and ignores Alt (browser back/forward on Windows).
+function onKey(e){
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.altKey || e.defaultPrevented) return;
+  const el = e.target, tag = el && el.tagName, mod = e.ctrlKey || e.metaKey;
+  if (el && (el.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && el.type !== 'range' && el.type !== 'checkbox' && el.type !== 'radio'))) return;
+  if (!mod && tag === 'INPUT' && el.type === 'range') return;
+  const dir = e.key === 'ArrowRight' ? 1 : -1;
+  e.preventDefault();
+  if (mod) goStep(STEP + dir); else stepTime(dir);
+}
 function goStep(i){
   STEP = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[STEP];
   if (st.params) setParams({ ...st.params });
@@ -279,6 +299,7 @@ function init(){
   const ch = $('chart'), pick = e => { const g = ch._geo; if (!g) return; T = Math.max(0, Math.min(0.999, (e.clientX - ch.getBoundingClientRect().left - g.pad.l) / g.pw)); dirty = true; };
   ch.addEventListener('pointerdown', e => { ch.setPointerCapture(e.pointerId); pick(e); }); ch.addEventListener('pointermove', e => { if (e.buttons) pick(e); });
   window.addEventListener('resize', () => dirty = true);
+  document.addEventListener('keydown', onKey);
   recompute(); syncUI(); goStep(0);
   let last = null;
   const frame = now => {
